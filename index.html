@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skope Digital Academy – Knowledge Without Limits</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Premium Styles -->
+    <link rel="stylesheet" href="assets/css/main.css">
+    <style>
+        .hero { 
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+            padding: 180px 0 140px; 
+            text-align: center; color: white; position: relative; overflow: hidden;
+        }
+        .hero-title { font-size: 5rem; font-weight: 900; line-height: 1; margin-bottom: 24px; letter-spacing: -2px; }
+        .hero-subtitle { font-size: 1.5rem; opacity: 0.8; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        .hero-btn { 
+            display: inline-flex; align-items: center; gap: 12px; margin-top: 48px;
+            padding: 24px 56px; border-radius: 99px; font-weight: 800; font-size: 1.25rem;
+            color: white; background: var(--primary-color, #00BFFF); text-decoration: none;
+            box-shadow: 0 20px 40px rgba(0,191,255,0.3); transition: 0.4s;
+        }
+        .nav-link { font-weight: 700; color: white; text-decoration: none; font-size: 1rem; opacity: 0.8; margin: 0 20px; transition: 0.3s; }
+        .nav-link:hover { opacity: 1; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+
+    <nav style="position: fixed; top: 0; width: 100%; z-index: 1000; padding: 30px 60px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-family: 'Poppins', sans-serif; font-size: 1.5rem; font-weight: 900; color: white;">SD<span style="color: #00BFFF;">AC</span></div>
+        <div>
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="courses.html" class="nav-link">Academy Tracks</a>
+            <a href="about.html" class="nav-link">About Us</a>
+            <a href="contact.html" class="nav-link" style="background: white; color: #0f172a; padding: 12px 32px; border-radius: 99px; opacity: 1;">Enroll Now</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1 class="hero-title">Knowledge Without <br><span style="color: #00BFFF;">Limits</span></h1>
+            <p class="hero-subtitle">Experience the next generation of academic excellence with SDAC. Premium digital learning tailored for the innovators of tomorrow.</p>
+            <a href="courses.html" class="hero-btn">Browse Academy Tracks <i class="fas fa-arrow-right"></i></a>
+        </div>
+    </section>
+
+    <section style="padding: 100px 0; background: #fff;">
+        <div class="container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px;">
+            <div style="padding: 40px; border-radius: 32px; background: #f8fafc; text-align: center;">
+                <i class="fas fa-certificate" style="font-size: 3rem; color: #00BFFF; margin-bottom: 24px;"></i>
+                <h3 style="font-weight: 800; margin-bottom: 16px;">Global Credentials</h3>
+                <p style="color: #64748b;">Earn industry-recognized certifications valid across major domestic and international tech hubs.</p>
+            </div>
+            <div style="padding: 40px; border-radius: 32px; background: #f8fafc; text-align: center;">
+                <i class="fas fa-microchip" style="font-size: 3rem; color: #FF8C00; margin-bottom: 24px;"></i>
+                <h3 style="font-weight: 800; margin-bottom: 16px;">Modern Curriculum</h3>
+                <p style="color: #64748b;">Software Development, AI, and Cybersecurity tracks consistently updated to match market trends.</p>
+            </div>
+            <div style="padding: 40px; border-radius: 32px; background: #f8fafc; text-align: center;">
+                <i class="fas fa-users" style="font-size: 3rem; color: #10b981; margin-bottom: 24px;"></i>
+                <h3 style="font-weight: 800; margin-bottom: 16px;">Expert Mentorship</h3>
+                <p style="color: #64748b;">Direct access to senior instructors and academic counselors to guide your professional journey.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer style="background: #0f172a; padding: 80px 0; color: white; text-align: center;">
+        <p style="opacity: 0.6;">© 2026 Skope Digital Academy (SDAC). All rights reserved.</p>
+    </footer>
+
+</body>
+</html>
