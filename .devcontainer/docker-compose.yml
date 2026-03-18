@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/php:8.2
+    volumes:
+      - ..:/workspace:cached
+    networks:
+      - sdac-network
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: skopedigital
+    ports:
+      - '3306:3306'
+    networks:
+      - sdac-network
+
+networks:
+  sdac-network:
+    driver: bridge

@@ -1,0 +1,76 @@
+/* Home page specific styles */
+
+/* Announcement ticker carousel */
+.announcement-banner {
+  overflow: hidden;
+}
+
+/* Hero section extra tweaks */
+.hero {
+  background-attachment: fixed;
+}
+
+/* Particles / decorative dots */
+.hero::after {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,174,239,0.06), transparent);
+  bottom: -100px;
+  left: -50px;
+  z-index: 0;
+}
+
+/* Scholarship section shimmer */
+.scholarship-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
+  animation: shimmer 3s infinite;
+}
+@keyframes shimmer {
+  to { left: 150%; }
+}
+
+/* Category card hover glow */
+.category-card:hover .category-icon {
+  transform: scale(1.1);
+  transition: transform 0.25s ease;
+}
+
+/* Course card image overlay */
+.course-card .course-thumbnail-placeholder {
+  transition: all 0.25s ease;
+}
+.course-card:hover .course-thumbnail-placeholder {
+  background: linear-gradient(135deg, rgba(0,174,239,0.15), rgba(247,148,29,0.08));
+}
+
+/* Pulse glow on stats numbers */
+.stats-num {
+  text-shadow: 0 0 30px rgba(255,255,255,0.3);
+}
+
+/* Scroll fade-in animation */
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Level badge hover */
+.level-badge:hover {
+  border-color: var(--primary) !important;
+  background: var(--dark-card2) !important;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-glow);
+}
