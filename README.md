@@ -1,34 +1,61 @@
-# SDAC Academy – Premium eLearning Platform
+# Skope Digital Academy
 
-Welcome to the **Skope Digital Academy (SDAC)** platform! This repository contains a high-fidelity, scholarly eLearning system designed for both tutors and students.
+Skope Digital Academy is a comprehensive Learning Management System (LMS) built with PHP. It provides a full-featured platform for online education, supporting both students and tutors with interactive learning, gamification, AI assistance, and seamless payment integration.
 
-### 🌟 Features
-*   **Tutor Portal:** Dynamic track creation, lesson management, and a 3-tier assessment system (Quiz, CAT, Final).
-*   **Student Experience:** Gamified learning, automated marking (MCQ, T/F, Text), and merit-based progression.
-*   **Branding:** Sophisticated, scholarly design with SDAC identifiers.
-*   **Cloud Ready:** Fully configured for **GitHub Codespaces**.
+## Features
 
-## 🚀 Running on GitHub
-You can run this entire project directly on GitHub without installing anything on your machine!
+### Student Portal
+- **Dashboard & Courses:** Browse and enroll in courses, view progress, and access materials.
+- **Assignments & Quizzes:** Submit assignments and take interactive quizzes.
+- **Gamification & Leaderboard:** Earn badges, track points, and compete on the leaderboard.
+- **Certificates:** Automatically generate and view certificates upon course completion.
+- **AI Assistant:** Integrated AI features to assist students with learning.
+- **Community & Messaging:** Interact with other students, mentors, and receive announcements.
+- **Payments:** Secure course enrollment payments using Paystack.
 
-1.  Click the **"Code"** button on this repository.
-2.  Switch to the **"Codespaces"** tab.
-3.  Click **"Create codespace on main"**.
-4.  Wait about 60 seconds (it's building your server).
-5.  A window will pop up asking to **"Open in Browser"** — click it!
-6.  You are now running SDAC in the cloud!
+### Tutor Portal
+- **Dashboard & Analytics:** Track student progress, course engagement, and overall revenue.
+- **Course & Lesson Management:** Create and manage courses, lessons, quizzes, and assignments.
+- **Student Management:** View student profiles, award badges, and export student data.
+- **AI Assistant:** Utilize AI to help generate course content and manage tasks.
+- **Notifications & Communication:** Send announcements and manage direct messages.
 
-## 🛠 Local Setup (XAMPP)
-If you'd rather run it on your own computer:
-1.  Copy all files to your `xampp/htdocs/Skope Digital Academy` folder.
-2.  Open **phpMyAdmin** and create a database named `skopedigital`.
-3.  Import the schema or run the migration scripts found in the root.
-4.  Visit `http://localhost/Skope Digital Academy`.
+## Tech Stack
+- **Backend:** PHP
+- **Database:** MySQL
+- **Frontend:** HTML, CSS, JavaScript
+- **Payment Gateway:** Paystack
+- **AI Integration:** Custom AI handlers and proxy
 
-## 📂 Core Structure
-*   `tutor/` — Instructor dashboard and assessment center.
-*   `student/` — Learner classroom and examination room.
-*   `includes/` — Core database, authentication, and layout logic.
-*   `assets/` — Premium CSS, JS, and scholarly branding.
+## Installation
 
-© 2026 Skope Digital Academy. All rights reserved.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Sege-Peter/Skope-Digital-Academy.git
+   ```
+
+2. **Server Environment Setup:**
+   - Move the cloned repository to your local server document root (e.g., `htdocs` for XAMPP or `www` for WAMP/MAMP).
+   - Ensure your server has PHP installed and MySQL running.
+
+3. **Database Configuration:**
+   - Create a new MySQL database.
+   - Import the database schema (if provided in the repository).
+   - Update the database credentials in `includes/db.php` (or wherever your configuration file is located).
+
+4. **Environment Variables / Configuration:**
+   - Configure your Paystack API keys in `includes/paystack.php`.
+   - Configure AI settings in `includes/ai_config.php`.
+
+5. **Run the Application:**
+   - Access the application via your web browser, e.g., `http://localhost/Skope Digital Academy/`.
+
+## Directory Structure
+- `/assets`: Contains CSS, JS, and image files.
+- `/includes`: Core PHP files for database connection, authentication, layout components (header/footer/sidebar), and shared logic.
+- `/student`: All views and logic for the student portal.
+- `/tutor`: All views and logic for the tutor portal.
+- `/uploads`: Directory for uploaded assignments, avatars, course materials, and certificates.
+
+## License
+All rights reserved.

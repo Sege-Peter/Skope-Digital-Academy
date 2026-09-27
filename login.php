@@ -28,9 +28,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($user['status'] === 'suspended') {
                         $error = 'Your account has been suspended. Please contact support.';
                     } elseif ($user['status'] === 'pending') {
-                        $error = 'Your account is pending approval. Please check your email or contact support.';
+                        if ($user['role'] === 'student') {
+                            loginUser($user);
+                            header("Location: checkout.php?type=registration");
+                            exit;
+                        } else {
+                            $error = 'Your tutor account is pending admin approval. Please check back later.';
+                        }
                     } else {
-                        $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$user['id']]);
+                        if (!empty($user['requires_password_change'])) {
+                            $_SESSION['force_password_change_uid'] = $user['id'];
+                            header("Location: force_password_change.php");
+                            exit;
+                        }
+                        // Streak Logic calculation
+                        $today = date('Y-m-d');
+                        $last_streak = $user['last_streak_date'] ?? null;
+                        $streak_days = $user['streak_days'] ?? 0;
+                        if ($last_streak !== $today) {
+                            if ($last_streak === date('Y-m-d', strtotime('-1 day'))) {
+                                $streak_days++; // Continues consecutive days
+                            } else {
+                                $streak_days = 1; // Resets if more than 1 day missed
+                            }
+                            $pdo->prepare("UPDATE users SET last_login = NOW(), streak_days = ?, last_streak_date = ? WHERE id = ?")->execute([$streak_days, $today, $user['id']]);
+                        } else {
+                            $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")->execute([$user['id']]);
+                        }
+                        
                         loginUser($user);
                         redirectByRole($user['role']);
                     }
@@ -146,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: inset 2px 2px 5px var(--shadow-dark), 
                        inset -2px -2px 5px var(--shadow-light);
         }
-        .input-group i {
+        .input-group i:not(.toggle-password) {
             position: absolute;
             left: 25px;
             top: 50%;
@@ -154,6 +179,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: var(--text-dim);
             font-size: 1.1rem;
         }
+        .toggle-password {
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: 0.3s;
+            z-index: 10;
+        }
+        .toggle-password:hover { color: var(--primary-btn); }
 
         /* ══ BUTTON ══ */
         .btn-neu {
@@ -239,8 +275,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <?php if ($error): ?>
-            <div id="error-overlay">
+            <div id="error-overlay" style="margin-bottom: 20px; font-size: 0.85rem; color: #ef4444; font-weight: 700;">
                 <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
+            </div>
+        <?php elseif(isset($_GET['msg']) && $_GET['msg'] === 'pw_updated'): ?>
+            <div id="success-overlay" style="margin-bottom: 20px; font-size: 0.85rem; color: #059669; font-weight: 700; background: #dcfce7; border: 1px solid #bbf7d0; padding: 12px; border-radius: 12px;">
+                <i class="fas fa-check-circle"></i> Password secured successfully. Please re-login.
             </div>
         <?php endif; ?>
 
@@ -254,7 +294,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <div class="input-group">
                 <i class="fas fa-lock"></i>
-                <input type="password" name="password" class="input-neu" placeholder="Password" required>
+                <input type="password" name="password" id="password" class="input-neu" placeholder="Password" required>
+                <i class="fas fa-eye toggle-password" onclick="togglePassword('password', this)"></i>
             </div>
 
             <button type="submit" class="btn-neu" id="loginBtn">Login</button>
@@ -275,6 +316,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script src="assets/js/main.js"></script>
     <script>
+        function togglePassword(inputId, icon) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
         document.getElementById('loginForm').addEventListener('submit', function() {
             const btn = document.getElementById('loginBtn');
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';

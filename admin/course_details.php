@@ -55,6 +55,14 @@ try {
         $success_action = "Course status updated to " . ucfirst($new_status);
     }
 
+    // 6. Send Health Notice directly to Instructor Alert Center
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_instructor'])) {
+        $msg = "Action Required on '" . htmlspecialchars($course['title']) . "': This course is highly active and contributing massive revenue value. Please ensure you respond to all student support queries within 12 hours minimum SLA.";
+        $stmt = $pdo->prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, 'Platform Health Directive', ?, 'warning')");
+        $stmt->execute([$course['tutor_id'], $msg]);
+        $success_action = "Health directive instantly dispatched to instructor's Alert Center.";
+    }
+
 } catch (Exception $e) {
     error_log($e->getMessage());
     header('Location: courses.php');
@@ -221,7 +229,9 @@ try {
                         This course is currently contributing 12.5% of the total academy revenue. 
                         Engagement levels are high. Ensure the mentor responds to support tickets within 12 hours.
                     </p>
-                    <button class="btn btn-primary btn-block btn-sm">Message Instructor</button>
+                    <form method="POST">
+                        <button type="submit" name="message_instructor" value="1" class="btn btn-primary btn-block btn-sm">Dispatch Health Directive</button>
+                    </form>
                 </div>
             </aside>
         </div>

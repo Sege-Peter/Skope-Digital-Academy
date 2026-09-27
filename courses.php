@@ -46,6 +46,7 @@ try {
 }
 
 $user = isLoggedIn() ? currentUser() : null;
+$enrolled_ids = $user ? $pdo->query("SELECT course_id FROM enrollments WHERE student_id = ".$user['id']." AND status != 'cancelled'")->fetchAll(PDO::FETCH_COLUMN) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -292,29 +293,32 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
 .page-btn:hover, .page-btn.active { background: #00BFFF; border-color: #00BFFF; color: #fff; }
 
 /* ═══ RESPONSIVE ═══ */
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
   .catalog-wrap { grid-template-columns: 260px 1fr; gap: 28px; }
-}
-
-@media (max-width: 900px) {
-  .catalog-wrap { grid-template-columns: 1fr; }
-  .filter-panel  { display: none; } /* hidden on mobile — use drawer */
-  .mobile-filter-btn { display: flex; }
   .course-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 600px) {
-  .page-hero { padding: 56px 0 64px; text-align: center; }
-  .page-hero p { margin: 0 auto 28px; }
-  .course-grid { grid-template-columns: 1fr; }
+@media (max-width: 991px) {
+  .catalog-wrap { grid-template-columns: 1fr; }
+  .filter-panel { display: none; }
+  .mobile-filter-btn { display: flex; }
   .results-header { flex-direction: column; align-items: flex-start; }
-  .sort-select { width: 100%; }
+  .desktop-sort { display: none !important; }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 768px) {
+  .page-hero { padding: 56px 0 40px; text-align: center; }
+  .page-hero p { margin: 0 auto 24px; font-size: 0.95rem; }
+  .search-field { height: 50px; font-size: 0.9rem; padding-left: 48px; }
+  .search-wrap .search-icon { left: 18px; }
+}
+
+@media (max-width: 480px) {
+  .course-grid { grid-template-columns: 1fr; }
   .c-stats { flex-wrap: wrap; gap: 8px; }
   .c-footer { flex-direction: column; gap: 12px; align-items: flex-start; }
   .btn-enroll { width: 100%; justify-content: center; }
+  .stat-pod-elite .value { font-size: 1.3rem !important; }
 }
 </style>
 </head>
@@ -483,9 +487,15 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
               </div>
               <div class="c-footer">
                 <span class="c-price">KES <?= number_format($c['price']) ?></span>
-                <a href="course-details.php?id=<?= $c['id'] ?>" class="btn-enroll">
-                  Enroll Now <i class="fas fa-arrow-right"></i>
-                </a>
+                <?php if(in_array($c['id'], $enrolled_ids)): ?>
+                  <a href="student/classroom.php?id=<?= $c['id'] ?>" class="btn-enroll" style="background: var(--secondary); border-color: var(--secondary);">
+                    Resume Learning <i class="fas fa-play-circle" style="margin-left:5px;"></i>
+                  </a>
+                <?php else: ?>
+                  <a href="course-details.php?id=<?= $c['id'] ?>" class="btn-enroll">
+                    Enroll Now <i class="fas fa-arrow-right"></i>
+                  </a>
+                <?php endif; ?>
               </div>
             </div>
           </article>

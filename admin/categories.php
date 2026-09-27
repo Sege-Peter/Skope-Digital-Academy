@@ -1,6 +1,6 @@
 <?php
-$pageTitle = 'Curriculum Categories';
-require_once '../includes/header.php';
+$pageTitle = 'Curriculum Taxonomy Governance';
+require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
@@ -22,11 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($id > 0) {
                 $stmt = $pdo->prepare("UPDATE categories SET name = ?, slug = ?, icon = ?, color = ? WHERE id = ?");
                 $stmt->execute([$name, $slug, $icon, $color, $id]);
-                $message = "Category '{$name}' updated successfully.";
+                $message = "Knowledge domain '{$name}' synchronized successfully.";
             } else {
                 $stmt = $pdo->prepare("INSERT INTO categories (name, slug, icon, color) VALUES (?, ?, ?, ?)");
                 $stmt->execute([$name, $slug, $icon, $color]);
-                $message = "New category '{$name}' created successfully.";
+                $message = "New knowledge domain '{$name}' integrated into taxonomy.";
             }
         } catch (Exception $e) { $message = "Error: " . $e->getMessage(); }
     } elseif (isset($_POST['delete_category'])) {
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
             $stmt->execute([$id]);
-            $message = "Category archived and removed from curriculum.";
+            $message = "Domain archived and removed from institutional taxonomy.";
         } catch (Exception $e) { $message = "Error: " . $e->getMessage(); }
     }
 }
@@ -47,142 +47,127 @@ try {
 } catch (Exception $e) { $categories = []; }
 ?>
 
-<?php require_once '../includes/sidebar.php'; ?>
-
-<style>
-    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; margin-bottom: 40px; }
-    .cat-card { background: white; border: 1px solid var(--dark-border); border-radius: 20px; padding: 32px; transition: 0.3s; position: relative; overflow: hidden; }
-    .cat-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); border-color: var(--primary); }
-    
-    .cat-icon-lg { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 24px; color: white; box-shadow: 0 8px 16px -4px rgba(0,0,0,0.1); }
-    .cat-name { font-family: 'Poppins', sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
-    .cat-stats { font-size: 0.85rem; color: var(--text-dim); display: flex; gap: 16px; align-items: center; }
-    .cat-stats span { display: flex; align-items: center; gap: 6px; }
-
-    .add-cat-card { border: 2px dashed var(--primary); background: #e0f2fe; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); min-height: 220px; border-radius: 32px; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-    .add-cat-card i { background: var(--primary); color: white; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0, 191, 255, 0.4); }
-    .add-cat-card span { font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.1rem; }
-    .add-cat-card:hover { background: #bae6fd; transform: scale(1.02); box-shadow: 0 10px 25px -5px rgba(0, 191, 255, 0.2); }
-
-    /* Fading Modal System */
-    .modal-overlay { 
-        position: fixed; inset: 0; 
-        background: rgba(15, 23, 42, 0.85); 
-        backdrop-filter: blur(12px); 
-        z-index: 2000; 
-        display: flex; align-items: center; justify-content: center; 
-        opacity: 0; visibility: hidden; 
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .modal-overlay.open { opacity: 1; visibility: visible; }
-    
-    .cat-modal { 
-        background: white; width: 95%; max-width: 500px; 
-        border-radius: 32px; padding: 48px; 
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
-        transform: scale(0.9) translateY(20px); 
-        transition: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .modal-overlay.open .cat-modal { transform: scale(1) translateY(0); }
-
-    .form-group { margin-bottom: 24px; }
-    .form-group label { display: block; font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
-    .form-input { width: 100%; padding: 14px 20px; border-radius: 14px; border: 1px solid #e2e8f0; font-family: var(--font); font-size: 0.95rem; transition: 0.3s; background: #f8fafc; }
-    .form-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 4px var(--primary-glow); background: white; }
-
-    .color-swatch-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-    .color-swatch { width: 36px; height: 36px; border-radius: 10px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; box-shadow: var(--shadow-sm); }
-    .color-swatch:hover { transform: scale(1.2); z-index: 2; }
-    .color-swatch.active { border-color: white; box-shadow: 0 0 0 2px var(--dark); }
-
-    @media (max-width: 768px) { 
-        .admin-header { flex-direction: column; align-items: flex-start !important; gap: 24px; }
-        .admin-header .btn { width: 100%; justify-content: center; padding: 14px; border-radius: 12px; }
-        .cat-grid { grid-template-columns: 1fr; }
-        .main-content { padding: 30px 20px; }
-        .cat-modal { padding: 32px 24px; }
-    }
-</style>
+<?php require_once 'includes/sidebar.php'; ?>
 
 <main class="main-content">
     <header class="admin-header">
-        <div style="display: flex; align-items: center;">
-            <button class="nav-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <button class="nav-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
             <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Taxonomy <span class="text-primary">Management</span></h1>
-                <p style="color: var(--text-dim); margin-top: 4px;">Organize the academy's knowledge repository into curated categories.</p>
+                <h1 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px;">Institutional <span>Taxonomy</span></h1>
+                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Knowledge Domain Curation • Skope Digital Academy</p>
             </div>
         </div>
-        <div style="display: flex; gap: 12px;">
-            <button class="btn btn-primary btn-sm" onclick="openModal()"><i class="fas fa-plus"></i> New Category</button>
+        
+        <div style="display: flex; gap: 16px;">
+            <button class="btn-premium" onclick="openModal()">
+                <i class="fas fa-plus-circle"></i> Create New Domain
+            </button>
         </div>
     </header>
 
+    <div class="admin-body">
+        <div class="dash-stats-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+            <?php foreach($categories as $c): ?>
+            <div class="premium-card" style="display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="width: 54px; height: 54px; border-radius: 16px; background: <?= $c['color'] ?: 'var(--primary)' ?>; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.4rem; box-shadow: 0 8px 20px -4px <?= $c['color'] ?>44;">
+                        <i class="<?= $c['icon'] ?: 'fas fa-book' ?>"></i>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick='editCategory(<?= json_encode($c) ?>)' class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--text-dim); cursor: pointer;" title="Refine Metadata">
+                            <i class="fas fa-pen-nib" style="font-size: 0.75rem;"></i>
+                        </button>
+                        <button onclick="confirmDelete(<?= $c['id'] ?>)" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--danger); cursor: pointer;" title="Archive Domain">
+                            <i class="fas fa-trash-alt" style="font-size: 0.75rem;"></i>
+                        </button>
+                    </div>
+                </div>
 
-    <div class="cat-grid">
-        <?php foreach($categories as $c): ?>
-        <div class="cat-card">
-            <div class="cat-icon-lg" style="background: <?= $c['color'] ?: 'var(--primary)' ?>">
-                <i class="<?= $c['icon'] ?: 'fas fa-book' ?>"></i>
-            </div>
-            <h3 class="cat-name"><?= htmlspecialchars($c['name']) ?></h3>
-            <div class="cat-stats">
-                <span><i class="fas fa-layer-group"></i> <?= $c['course_count'] ?> Courses</span>
-                <div style="display: flex; gap: 12px; margin-left: auto;">
-                    <span class="text-primary" style="font-weight: 800; cursor: pointer; font-size: 0.8rem;" onclick='editCategory(<?= json_encode($c) ?>)'>Edit <i class="fas fa-edit"></i></span>
-                    <button type="button" onclick="confirmDelete(<?= $c['id'] ?>)" style="background:none; border:none; color:var(--danger); font-weight:800; cursor:pointer; font-size:0.8rem; padding:0;">Delete <i class="fas fa-trash-alt"></i></button>
+                <div>
+                    <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px;"><?= htmlspecialchars($c['name']) ?></h3>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge-premium" style="background: var(--bg-main); color: var(--text-muted); font-size: 0.65rem; border: 1.5px solid var(--border-light);">
+                            <?= $c['course_count'] ?> ACTIVE TRACKS
+                        </span>
+                    </div>
+                </div>
+
+                <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Institutional Reach</div>
+                    <div class="velocity-line" style="flex: 1; margin: 0 16px; height: 4px; background: var(--bg-main); border-radius: 2px; overflow: hidden;">
+                        <div style="width: <?= min(100, $c['course_count'] * 10) ?>%; height: 100%; background: <?= $c['color'] ?>; border-radius: 2px;"></div>
+                    </div>
                 </div>
             </div>
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: <?= $c['color'] ?>; opacity: 0.4;"></div>
-        </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
 
-        <div class="cat-card add-cat-card" onclick="openModal()">
-            <i class="fas fa-plus"></i>
-            <span>Add Category</span>
+            <div class="premium-card" style="border: 2.5px dashed var(--border); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; min-height: 200px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.borderColor='var(--primary-glow)'; this.style.background='var(--bg-main)'" onmouseout="this.style.borderColor='var(--border)'; this.style.background='transparent'" onclick="openModal()">
+                <div style="width: 54px; height: 54px; border-radius: 50%; background: var(--primary-glow); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-weight: 900; color: var(--text-main); font-size: 1.1rem; letter-spacing: -0.5px;">Expand Taxonomy</div>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-top: 4px;">Integrate a new knowledge domain</p>
+                </div>
+            </div>
         </div>
     </div>
 </main>
 
-<!-- Category Modal -->
-<div class="modal-overlay" id="catModalOverlay">
-    <form method="POST" action="categories.php" class="cat-modal">
-        <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.4rem; margin-bottom: 30px;" id="modalTitle">Create New Category</h2>
+<!-- Unified Taxonomy Modal -->
+<div id="catModalOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); z-index: 2000; align-items: center; justify-content: center; padding: 20px;">
+    <div class="premium-card" style="width: 100%; max-width: 540px; padding: 48px; animation: modal-pop 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border-light);">
+            <div>
+                <h2 id="modalTitle" style="font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; margin: 0;">Create New Domain</h2>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; font-weight: 600;">Define a new scholarly classification.</p>
+            </div>
+            <button onclick="closeModal()" class="avatar-sm" style="width: 40px; height: 40px; background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fas fa-times"></i></button>
+        </div>
         
-        <input type="hidden" name="save_category" value="1">
-        <input type="hidden" id="catId" name="id">
+        <form id="catForm" method="POST">
+            <input type="hidden" name="save_category" value="1">
+            <input type="hidden" id="catId" name="id">
 
-        <div class="form-group">
-            <label>Category Display Name</label>
-            <input type="text" name="name" id="catName" class="form-input" placeholder="e.g. Artificial Intelligence" required>
-        </div>
-
-        <div class="form-group">
-            <label>Icon Class (Font Awesome)</label>
-            <div style="position: relative;">
-                <input type="text" name="icon" id="catIcon" class="form-input" value="fas fa-rocket">
-                <i class="fas fa-search" style="position: absolute; right: 15px; top: 14px; opacity: 0.3;"></i>
+            <div style="margin-bottom: 24px;">
+                <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Domain Nomenclature</label>
+                <input type="text" name="name" id="catName" required placeholder="e.g. Artificial Intelligence" style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;box-sizing:border-box;">
             </div>
-        </div>
 
-        <div class="form-group">
-            <label>Brand Color Theme</label>
-            <input type="text" name="color" id="catColorInput" class="form-input" value="#00BFFF">
-            <div class="color-swatch-row">
-                <?php 
-                $swatches = ['#00BFFF', '#FF8C00', '#10B981', '#6366F1', '#EC4899', '#8B5CF6', '#F59E0B', '#EF4444'];
-                foreach($swatches as $s): ?>
-                    <div class="color-swatch" style="background: <?= $s ?>" onclick="setColor('<?= $s ?>')"></div>
-                <?php endforeach; ?>
+            <div style="margin-bottom: 24px;">
+                <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Symbolic Indicator (Icon)</label>
+                <div style="position: relative;">
+                    <input type="text" name="icon" id="catIcon" value="fas fa-rocket" style="width:100%;padding:14px 20px 14px 50px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;box-sizing:border-box;">
+                    <i class="fas fa-icons" style="position: absolute; left: 20px; top: 16px; color: var(--primary); opacity: 0.5;"></i>
+                </div>
             </div>
-        </div>
 
-        <div style="display: flex; gap: 12px; margin-top: 40px;">
-            <button type="button" class="btn btn-ghost" onclick="closeModal()" style="flex: 1;">Cancel</button>
-            <button type="submit" class="btn btn-primary" style="flex: 2;">Save Category</button>
-        </div>
-    </form>
+            <div style="margin-bottom: 32px;">
+                <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Brand Aesthetic Color</label>
+                <input type="text" name="color" id="catColorInput" value="#00BFFF" style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:700;outline:none;box-sizing:border-box;margin-bottom:16px;">
+                <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px;">
+                    <?php 
+                    $swatches = ['#00BFFF', '#FF8C00', '#10B981', '#6366F1', '#EC4899', '#8B5CF6', '#F59E0B', '#EF4444'];
+                    foreach($swatches as $s): ?>
+                        <div onclick="setColor('<?= $s ?>', this)" style="aspect-ratio: 1; border-radius: 8px; background: <?= $s ?>; cursor: pointer; transition: 0.2s; border: 2px solid transparent;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'"></div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 16px;">
+                <button type="submit" class="btn-premium" style="flex: 2; justify-content: center; height: 56px; font-size: 1rem;">Execute Integration</button>
+                <button type="button" class="btn-premium" onclick="closeModal()" style="flex: 1; background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; height: 56px; justify-content: center;">Abort</button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<style>
+@keyframes modal-pop { 0% { transform: scale(0.9) translateY(20px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+</style>
 
 <script src="../assets/js/main.js"></script>
 <script>
@@ -191,30 +176,33 @@ try {
             SDA.showToast("<?= $message ?>", "<?= strpos($message, 'Error') === false ? 'success' : 'danger' ?>");
         <?php endif; ?>
     });
+
     function openModal() {
-        document.getElementById('catModalOverlay').classList.add('open');
-        document.getElementById('modalTitle').innerText = 'Create New Category';
+        const modal = document.getElementById('catModalOverlay');
+        document.getElementById('modalTitle').innerText = 'Create New Domain';
         document.getElementById('catName').value = '';
         document.getElementById('catIcon').value = 'fas fa-rocket';
         document.getElementById('catColorInput').value = '#00BFFF';
         document.getElementById('catId').value = '';
+        modal.style.display = 'flex';
     }
 
     function closeModal() {
-        document.getElementById('catModalOverlay').classList.remove('open');
+        document.getElementById('catModalOverlay').style.display = 'none';
     }
 
     function editCategory(cat) {
-        document.getElementById('catModalOverlay').classList.add('open');
-        document.getElementById('modalTitle').innerText = 'Edit Category';
+        const modal = document.getElementById('catModalOverlay');
+        document.getElementById('modalTitle').innerText = 'Refine Knowledge Domain';
         document.getElementById('catName').value = cat.name;
         document.getElementById('catIcon').value = cat.icon || 'fas fa-book';
         document.getElementById('catColorInput').value = cat.color || '#00BFFF';
         document.getElementById('catId').value = cat.id;
+        modal.style.display = 'flex';
     }
 
     function confirmDelete(id) {
-        SDA.confirmAction("This will permanently archive this category and detach it from all associated courses. Continue?", () => {
+        SDA.confirmAction("This will permanently archive this domain and detach it from all associated academic tracks. Continue?", () => {
             const form = document.createElement('form');
             form.method = 'POST';
             form.innerHTML = `<input type="hidden" name="id" value="${id}"><input type="hidden" name="delete_category" value="1">`;
@@ -223,18 +211,21 @@ try {
         });
     }
 
-    function setColor(color) {
+    function setColor(color, el) {
         document.getElementById('catColorInput').value = color;
         // visual feedback
-        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-        event.target.classList.add('active');
+        el.parentElement.querySelectorAll('div').forEach(s => s.style.borderColor = 'transparent');
+        el.style.borderColor = 'var(--text-main)';
     }
 
-    // Close on backdrop
     window.onclick = function(e) {
-        if(e.target == document.getElementById('catModalOverlay')) closeModal();
+        const modal = document.getElementById('catModalOverlay');
+        if(e.target == modal) closeModal();
+    }
+
+    function toggleSidebar() {
+        document.getElementById('dashSidebar').classList.toggle('open');
+        document.getElementById('sidebarOverlay').classList.toggle('open');
     }
 </script>
-
-</body>
-</html>
+</body></html>

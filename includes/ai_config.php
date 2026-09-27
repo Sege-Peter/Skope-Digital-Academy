@@ -5,7 +5,7 @@
  */
 
 // DO NOT SHARE THIS FILE
-define('GEMINI_API_KEY', 'AIzaSyBd5dAZF2BFxnY9pLATkUdLebVM8DvVu6U');
+define('GEMINI_API_KEY', 'AIzaSyAdInQlcrhpXm6y1I-9kSqLeMYlosdZz4k');
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent');
 
 /**
@@ -19,6 +19,9 @@ function callGemini(string $prompt): ?string {
                     ["text" => $prompt]
                 ]
             ]
+        ],
+        "generationConfig" => [
+            "responseMimeType" => "application/json"
         ]
     ];
 

@@ -17,7 +17,7 @@ try {
     $stmt->execute([$student['id']]);
     $progress_data['quizzes_passed'] = (int)$stmt->fetchColumn();
 
-    $progress_data['points_earned'] = (int)($student['points'] ?? 0);
+    $progress_data['points_earned'] = (int)($student['merit_points'] ?? 0);
 
     // 2. Fetch available badges to check for unlocks
     $stmt = $pdo->prepare("SELECT * FROM badges 

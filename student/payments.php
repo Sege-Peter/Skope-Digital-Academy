@@ -12,175 +12,87 @@ try {
     $stmt->execute([$student['id']]);
     $payments = $stmt->fetchAll();
 
-    // 2. Fetch pending verification count
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM payments WHERE student_id = ? AND status = 'pending'");
-    $stmt->execute([$student['id']]);
-    $pending_count = $stmt->fetchColumn();
+    // 2. Counts
+    $pending_count = count(array_filter($payments, fn($p) => $p['status'] === 'pending'));
+    $verified_count = count(array_filter($payments, fn($p) => $p['status'] === 'verified'));
 
-} catch (Exception $e) {
-    error_log($e->getMessage());
-    $payments = [];
-    $pending_count = 0;
-}
+} catch (Exception $e) { $payments = []; $pending_count = $verified_count = 0; }
+
+require_once 'includes/layout-top.php';
 ?>
 
-<?php require_once 'includes/sidebar.php'; ?>
+<header class="portal-header" style="margin-bottom: 24px;">
+    <div class="greeting">
+        <h1 style="font-size: 1.85rem; font-weight: 800; margin: 0;">Billing & Ledger</h1>
+        <p style="color: var(--text-dim); margin-top: 4px;">Track your curriculum investments and course acquisitions.</p>
+    </div>
+    <div>
+        <a href="../courses.php" class="btn-premium" style="display: flex; gap: 8px; align-items: center; padding: 12px 24px; border-radius: 12px;"><i class="fas fa-plus"></i> New Enrollment</a>
+    </div>
+</header>
 
-<style>
-    .billing-hero {
-        background: white;
-        border: 1px solid var(--dark-border);
-        border-radius: 32px;
-        padding: 48px;
-        margin-bottom: 40px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        position: relative;
-    }
-    .billing-hero::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 8px;
-        background: var(--primary);
-        border-radius: 32px 0 0 32px;
-    }
+<div class="grid-3" style="margin-bottom: 32px;">
+    <div class="card" style="display: flex; align-items: center; gap: 20px;">
+        <div style="width: 50px; height: 50px; background: #f1f5f9; color: var(--text-main); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-receipt"></i></div>
+        <div>
+            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Total Invoices</span>
+            <strong style="font-size: 1.5rem; font-weight: 800;"><?= count($payments) ?></strong>
+        </div>
+    </div>
+    <div class="card" style="display: flex; align-items: center; gap: 20px;">
+        <div style="width: 50px; height: 50px; background: #FFF9E7; color: #D97706; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-clock"></i></div>
+        <div>
+            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">In Audit</span>
+            <strong style="font-size: 1.5rem; font-weight: 800;"><?= $pending_count ?></strong>
+        </div>
+    </div>
+    <div class="card" style="display: flex; align-items: center; gap: 20px;">
+        <div style="width: 50px; height: 50px; background: #ECFDF5; color: #059669; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-check-circle"></i></div>
+        <div>
+            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Verified</span>
+            <strong style="font-size: 1.5rem; font-weight: 800;"><?= $verified_count ?></strong>
+        </div>
+    </div>
+</div>
 
-    .payment-stats { display: flex; gap: 48px; }
-    .stat-group { text-align: center; }
-    .stat-val { font-family: 'Poppins', sans-serif; font-size: 2rem; font-weight: 900; color: var(--dark); line-height: 1.2; }
-    .stat-label { font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-weight: 800; letter-spacing: 1px; margin-top: 4px; }
-
-    .transaction-card {
-        background: white;
-        border: 1px solid var(--dark-border);
-        border-radius: 24px;
-        padding: 24px;
-        margin-bottom: 16px;
-        display: grid;
-        grid-template-columns: 80px 1fr 150px 150px 120px;
-        align-items: center;
-        gap: 24px;
-        transition: 0.3s;
-    }
-    .transaction-card:hover { border-color: var(--primary); transform: translateX(5px); box-shadow: var(--shadow-sm); }
-
-    .course-mini-thumb { width: 80px; height: 55px; border-radius: 12px; object-fit: cover; }
+<div class="ledger-stack">
+    <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 20px;">Transaction History</h3>
     
-    .status-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; text-align: center; }
-    .status-verified { background: #DCFCE7; color: #166534; }
-    .status-pending { background: #FEF9C3; color: #854D0E; }
-    .status-failed { background: #FEE2E2; color: #991B1B; }
+    <?php if(!empty($payments)): ?>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+        <?php foreach($payments as $p): ?>
+        <div class="card" style="padding: 16px 24px; display: flex; align-items: center; gap: 24px; border: 1px solid var(--border); border-radius: 16px; transition: 0.2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+            <img src="../<?= $p['course_thumb'] ?: 'assets/images/course-placeholder.jpg' ?>" style="width: 60px; height: 40px; border-radius: 8px; object-fit: cover;">
+            
+            <div style="flex: 1;">
+                <div style="font-weight: 800; font-size: 0.9rem;"><?= htmlspecialchars($p['course_title']) ?></div>
+                <div style="font-size: 0.7rem; color: var(--text-dim);">Tx ID: #<?= str_pad($p['id'], 6, '0', STR_PAD_LEFT) ?> • <?= date('M j, Y', strtotime($p['created_at'])) ?></div>
+            </div>
 
-    .ledger-empty {
-        text-align: center;
-        padding: 80px 40px;
-        background: var(--bg-light);
-        border-radius: 32px;
-        border: 1px dashed var(--dark-border);
-    }
-
-    @media (max-width: 1100px) {
-        .transaction-card { grid-template-columns: 80px 1fr 150px; }
-        .hide-md { display: none; }
-    }
-    @media (max-width: 768px) {
-        .billing-hero { flex-direction: column; text-align: center; padding: 40px 24px; }
-        .payment-stats { margin-top: 32px; gap: 32px; }
-        .transaction-card { grid-template-columns: 1fr 1fr; gap: 16px; }
-        .course-mini-thumb { grid-column: span 2; width: 100%; height: 120px; }
-    }
-</style>
-
-<main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-            <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Billing <span class="text-primary">& Ledger</span></h1>
-                <p style="color: var(--text-dim); margin-top: 4px;">Verified history of your curriculum investments and course acquisitions.</p>
+            <div style="text-align: right;">
+                <div style="font-weight: 900; font-size: 1rem; color: var(--text-main);">KES <?= number_format($p['amount']) ?></div>
+                <span style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; background: <?= $p['status'] == 'verified' ? '#ECFDF5' : ($p['status'] == 'pending' ? '#FFF9E7' : '#FEF2F2') ?>; color: <?= $p['status'] == 'verified' ? '#059669' : ($p['status'] == 'pending' ? '#D97706' : '#ef4444') ?>;">
+                    <?= $p['status'] ?>
+                </span>
             </div>
         </div>
-        <div>
-            <a href="../courses.php" class="btn btn-primary btn-sm"><i class="fas fa-shopping-cart"></i> New Enrollment</a>
+        <?php endforeach; ?>
         </div>
-    </header>
+    <?php else: ?>
+        <div class="card" style="text-align: center; padding: 60px 40px; border-style: dashed;">
+            <i class="fas fa-receipt" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 20px; display: block;"></i>
+            <h3 style="font-weight: 800;">No Financial Records</h3>
+            <p style="color: var(--text-dim);">You haven't made any curriculum investments yet.</p>
+        </div>
+    <?php endif; ?>
+</div>
 
-    <div class="billing-hero">
-        <div>
-            <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: 8px;">Financial Overview</h2>
-            <p style="color: var(--text-dim); font-size: 0.95rem;">Transparent tracking of all manual and automated payment cycles.</p>
-        </div>
-        <div class="payment-stats">
-            <div class="stat-group">
-                <div class="stat-val"><?= count($payments) ?></div>
-                <div class="stat-label">Invoices</div>
-            </div>
-            <div class="stat-group">
-                <div class="stat-val" style="color: var(--secondary);"><?= $pending_count ?></div>
-                <div class="stat-label">In Audit</div>
-            </div>
-            <div class="stat-group">
-                <div class="stat-val" style="color: #10B981;"><?= count(array_filter($payments, fn($p) => $p['status'] === 'verified')) ?></div>
-                <div class="stat-label">Verified</div>
-            </div>
-        </div>
+<div style="margin-top: 40px; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 16px; padding: 20px; display: flex; gap: 16px; align-items: flex-start;">
+    <i class="fas fa-shield-alt" style="color: var(--primary); font-size: 1.25rem;"></i>
+    <div>
+        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 800; color: #0284c7;">Secure Payments</h4>
+        <p style="margin: 4px 0 0; font-size: 0.8rem; color: #0369a1; line-height: 1.5;">All manual payment proofs are reviewed by our financial compliance team within 2-4 hours. For billing support, please contact the Help Desk.</p>
     </div>
+</div>
 
-    <!-- Payment List -->
-    <div style="margin-bottom: 48px;">
-        <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem; font-weight: 800; margin-bottom: 24px; display: flex; align-items: center; gap: 12px;">
-            <i class="fas fa-list-ul text-primary"></i> Transaction History
-        </h3>
-        
-        <?php if(!empty($payments)): ?>
-            <?php foreach($payments as $p): ?>
-            <div class="transaction-card">
-                <img src="../<?= $p['course_thumb'] ?: 'assets/images/course-placeholder.jpg' ?>" class="course-mini-thumb" alt="">
-                
-                <div>
-                    <div style="font-weight: 800; color: var(--dark); margin-bottom: 4px;"><?= htmlspecialchars($p['course_title']) ?></div>
-                    <div style="font-size: 0.75rem; color: var(--text-dim);">Tx ID: #<?= str_pad($p['id'], 6, '0', STR_PAD_LEFT) ?></div>
-                </div>
-
-                <div class="hide-md" style="text-align: center;">
-                    <div style="font-family: 'Poppins', sans-serif; font-weight: 900; color: var(--dark);">KES <?= number_format($p['amount']) ?></div>
-                    <div style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase;">Amount Paid</div>
-                </div>
-
-                <div class="hide-md" style="text-align: center;">
-                    <div style="font-weight: 700; color: var(--text-muted); font-size: 0.85rem;"><?= date('M j, Y', strtotime($p['created_at'])) ?></div>
-                    <div style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase;">Payment Date</div>
-                </div>
-
-                <div style="display: flex; justify-content: flex-end;">
-                    <span class="status-pill status-<?= $p['status'] ?>"><?= $p['status'] ?></span>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="ledger-empty">
-                <i class="fas fa-receipt" style="font-size: 4rem; color: var(--dark-border); margin-bottom: 24px;"></i>
-                <h4 style="font-family: 'Poppins', sans-serif; font-weight: 800; color: var(--dark);">Financial Ledger is Empty</h4>
-                <p style="color: var(--text-dim); margin-bottom: 32px;">You haven't made any course purchases yet. Explore our high-impact curriculum today.</p>
-                <a href="../courses.php" class="btn btn-primary">Browse Courses</a>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Secure Notice -->
-    <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 20px; padding: 24px; display: flex; align-items: flex-start; gap: 20px;">
-        <i class="fas fa-shield-halved" style="font-size: 1.5rem; color: #10B981;"></i>
-        <div>
-            <h4 style="font-family: 'Poppins', sans-serif; font-weight: 800; color: #10B880; font-size: 0.9rem; margin-bottom: 4px;">Highly Secure Transactions</h4>
-            <p style="font-size: 0.82rem; color: var(--text-dim); line-height: 1.5;">All manual payment proofs are reviewed by our financial compliance team within 2-4 hours. Once verified, your course content is unlocked automatically. For support regarding billing, please visit the Help Desk.</p>
-        </div>
-    </div>
-</main>
-
-<script src="../assets/js/main.js"></script>
-</body>
-</html>
+<?php require_once 'includes/layout-bottom.php'; ?>

@@ -248,6 +248,11 @@ $msg = $_GET['msg'] ?? '';
                     </div>
 
                     <div class="input-neu-group">
+                        <label>Phone Number <span style="font-weight: 400; color: #94a3b8;">(optional)</span></label>
+                        <input type="tel" name="phone" class="input-neu" placeholder="e.g., 0712 345 678">
+                    </div>
+
+                    <div class="input-neu-group">
                         <label>Nature of Inquiry</label>
                         <select name="subject" class="input-neu" style="appearance: none;" required>
                             <option value="" disabled selected>Select a topic</option>

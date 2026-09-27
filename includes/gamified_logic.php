@@ -44,22 +44,34 @@ function awardBadgeIfEligible($student_id, $criteria_type, $pdo) {
         
         switch($criteria_type) {
             case 'courses_completed':
-                $current_value = $pdo->query("SELECT COUNT(*) FROM enrollments WHERE student_id = $student_id AND status = 'completed'")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND status = 'completed'");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
             case 'lessons_completed':
-                $current_value = $pdo->query("SELECT COUNT(*) FROM lesson_progress WHERE student_id = $student_id AND status = 'completed'")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM lesson_progress WHERE student_id = ? AND status = 'completed'");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
             case 'quizzes_passed':
-                $current_value = $pdo->query("SELECT COUNT(*) FROM quiz_attempts WHERE student_id = $student_id AND passed = 1")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM quiz_attempts WHERE student_id = ? AND passed = 1");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
             case 'points_earned':
-                $current_value = $pdo->query("SELECT points FROM users WHERE id = $student_id")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT merit_points FROM users WHERE id = ?");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
             case 'coins_earned':
-                $current_value = $pdo->query("SELECT merit_coins FROM users WHERE id = $student_id")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT merit_coins FROM users WHERE id = ?");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
             case 'referrals_count':
-                $current_value = $pdo->query("SELECT COUNT(*) FROM users WHERE referred_by = $student_id")->fetchColumn();
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE referred_by = ?");
+                $stmt->execute([$student_id]);
+                $current_value = $stmt->fetchColumn();
                 break;
         }
 
@@ -84,4 +96,24 @@ function awardBadgeIfEligible($student_id, $criteria_type, $pdo) {
         }
 
     } catch (Exception $e) { error_log("Badge Error: " . $e->getMessage()); }
+}
+
+/**
+ * Award merit points for academic achievements
+ */
+function rewardStudentPoints($student_id, $points, $pdo) {
+    try {
+        if ($points <= 0) return;
+
+        // Update merit points
+        $upd = $pdo->prepare("UPDATE users SET merit_points = merit_points + ? WHERE id = ?");
+        $upd->execute([round($points), $student_id]);
+
+        // Log to point_ledger for transcript history
+        $stmt = $pdo->prepare("INSERT INTO point_ledger (student_id, merit_points, reason) VALUES (?, ?, 'Quiz / Assessment completion')");
+        $stmt->execute([$student_id, round($points)]);
+
+        // Automate badge check for achievements
+        awardBadgeIfEligible($student_id, 'points_earned', $pdo);
+    } catch (Exception $e) { error_log("Merit Reward Error: " . $e->getMessage()); }
 }

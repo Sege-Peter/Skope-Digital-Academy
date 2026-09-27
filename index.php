@@ -9,6 +9,10 @@ $BASE_TUTORS   = 80;
 $BASE_HOURS    = 15000;
 
 try {
+    // 0. Fetch latest active scholarship (Isolated priority)
+    $stmt = $pdo->query("SELECT * FROM scholarships WHERE (expiry_date >= CURDATE() OR expiry_date IS NULL) ORDER BY created_at DESC LIMIT 1");
+    $featured_scholarship = $stmt->fetch();
+
     $db_students  = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn();
     $db_courses   = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status = 'published'")->fetchColumn();
     $db_tutors    = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'tutor' AND status = 'active'")->fetchColumn();
@@ -37,6 +41,7 @@ try {
     $total_tutors   = $BASE_TUTORS;
     $total_hours    = $BASE_HOURS;
     $recent_courses = [];
+    $featured_scholarship = $featured_scholarship ?? null; // Keep if already fetched
 }
 
 $user = isLoggedIn() ? currentUser() : null;
@@ -284,16 +289,16 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 /* ═══════════ ACHIEVEMENT BANNER ═══════════ */
 .achieve-banner {
   background: linear-gradient(135deg, #0a1628 0%, #0c1f40 100%);
-  padding: 76px 0; text-align: center; color: #fff;
+  padding: 80px 0; text-align: center; color: #fff;
   position: relative; overflow: hidden;
 }
 .achieve-banner::after {
   content: ''; position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(0,191,255,0.07) 0%, transparent 60%);
+  background: radial-gradient(circle at 70% 30%, rgba(0,191,255,0.08) 0%, transparent 60%);
   pointer-events: none;
 }
 .achieve-grid {
-  display: flex; justify-content: center; gap: 68px; flex-wrap: wrap;
+  display: flex; justify-content: center; gap: 60px; flex-wrap: wrap;
   position: relative; z-index: 1;
 }
 .ach-num {
@@ -304,30 +309,36 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 .ach-num sup { font-size: 1.3rem; }
 .ach-lbl { font-size: 0.88rem; opacity: 0.75; margin-top: 10px; font-weight: 500; }
 
-/* ═══════════ COURSE CARD ═══════════ */
+/* ═══════════ COURSE CARD (Elite Master Standard) ═══════════ */
 .c-card {
   background: #fff; border: 1px solid #E2E8F0;
-  border-radius: 16px; overflow: hidden;
+  border-radius: 20px; overflow: hidden;
   transition: 0.3s; display: flex; flex-direction: column;
+  position: relative;
 }
-.c-card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,0.08); border-color: #00BFFF; }
-.c-thumb { height: 195px; position: relative; overflow: hidden; background: #f1f5f9; }
+.c-card:hover { transform: translateY(-6px); box-shadow: 0 15px 35px rgba(0,0,0,0.06); border-color: var(--primary); }
+.c-thumb { height: 180px; position: relative; overflow: hidden; background: #f1f5f9; }
 .c-thumb img { width: 100%; height: 100%; object-fit: cover; transition: 0.4s; }
-.c-card:hover .c-thumb img { transform: scale(1.04); }
-.c-thumb-placeholder { width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center; background: linear-gradient(135deg,#e0f2fe,#f0f9ff); }
+.c-card:hover .c-thumb img { transform: scale(1.03); }
 .c-cat {
-  position: absolute; top: 10px; left: 10px;
-  background: rgba(255,255,255,0.95); color: #00BFFF;
-  padding: 4px 11px; border-radius: 6px;
-  font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-  backdrop-filter: blur(4px);
+  position: absolute; top: 12px; left: 12px;
+  background: rgba(255,255,255,0.98); color: var(--primary);
+  padding: 6px 14px; border-radius: 10px;
+  font-size: 0.62rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.2px;
 }
-.c-body { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
-.c-title { font-family: 'Poppins',sans-serif; font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 7px; line-height: 1.35; }
-.c-meta { font-size: 0.78rem; color: #64748B; margin-bottom: 12px; }
-.c-pills { display: flex; gap: 12px; font-size: 0.74rem; color: #64748B; margin-bottom: auto; }
-.c-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 14px; margin-top: 14px; border-top: 1px solid #E2E8F0; }
-.c-price { font-size: 1.1rem; font-weight: 800; color: #FF8C00; }
+.c-body { padding: 24px; flex-grow: 1; display: flex; flex-direction: column; }
+.c-title { font-family: 'Poppins',sans-serif; font-size: 1.05rem; font-weight: 800; color: #0F172A; margin-bottom: 8px; line-height: 1.4; }
+.c-meta { 
+  display: flex; align-items: center; gap: 8px; font-size: 0.76rem; 
+  color: #64748B; margin-bottom: 16px; font-weight: 600; 
+  flex-wrap: wrap; line-height: 1.4;
+}
+.c-pills { 
+  display: flex; gap: 10px; font-size: 0.72rem; color: #94a3b8; 
+  font-weight: 700; margin-bottom: auto; flex-wrap: wrap;
+}
+.c-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 18px; margin-top: 18px; border-top: 1px solid #f1f5f9; }
+.c-price { font-size: 1.2rem; font-weight: 900; color: #0f172a; }
 
 /* ═══════════ MISSION CARDS ═══════════ */
 .mv-card {
@@ -370,31 +381,42 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 }
 
 /* ═══════════ RESPONSIVE ═══════════ */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
+  .hero-inner { gap: 40px; }
   .why-grid { grid-template-columns: repeat(2,1fr); }
 }
-@media (max-width: 900px) {
-  .hero-inner { grid-template-columns: 1fr; gap: 40px; }
-  .achieve-grid { gap: 40px; }
+
+@media (max-width: 991px) {
+  .hero-inner { grid-template-columns: 1fr; text-align: center; }
+  .hero-sub { margin-left: auto; margin-right: auto; }
+  .hero-trust-badges, .cta-row, .stats-bar { justify-content: center; }
+  .hero-headline { font-size: clamp(2.2rem, 6vw, 3.2rem); }
 }
+
 @media (max-width: 768px) {
-  .hero-section { padding: 70px 0 60px; }
-  .hero-headline { font-size: clamp(2rem, 7vw, 2.7rem); }
-  .stats-bar { gap: 20px; }
-  .why-grid  { grid-template-columns: 1fr 1fr; }
-  .schol-card { padding: 28px 20px; }
-  .ach-num { font-size: 2.6rem; }
-  .ai-strip { padding: 18px; gap: 16px; }
-  .partner-row { gap: 32px; }
-  .achieve-banner { padding: 60px 0; }
-}
-@media (max-width: 540px) {
+  .hero-section { padding: 60px 0 40px; }
+  .stats-bar { gap: 24px; padding-top: 24px; }
+  .stat-num { font-size: 1.6rem; }
+  .stat-lbl { font-size: 0.7rem; }
+  
+  .schol-card { padding: 32px 24px; }
+  .schol-mini-stats { flex-direction: column; gap: 20px; }
+  .schol-mini-stats div[style*="width:1px"] { display: none; }
+  
+  .ai-strip { padding: 16px; margin: 0; }
   .why-grid { grid-template-columns: 1fr; }
-  .cta-row { flex-direction: column; }
-  .btn-cta-primary, .btn-cta-outline { justify-content: center; width: 100%; }
-  .stats-bar { gap: 20px; }
-  .hero-trust-badges { gap: 8px; }
-  .achieve-grid { flex-direction: column; gap: 28px; align-items: center; }
+  .grid-3 { gap: 20px !important; }
+  .navbar-logo img { height: 40px !important; }
+}
+
+@media (max-width: 480px) {
+  .hero-headline { font-size: 2rem !important; margin-bottom: 16px; }
+  .hero-sub { font-size: 0.95rem; }
+  .btn-cta-primary, .btn-cta-outline { width: 100%; justify-content: center; }
+  .achieve-grid { flex-direction: column; gap: 32px; }
+  .ach-num { font-size: 2.4rem; }
+  .schol-tag { font-size: 0.65rem; }
+  .navbar-logo img { height: 32px !important; }
 }
 </style>
 </head>
@@ -461,36 +483,55 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 
       <!-- RIGHT: Scholarship Card -->
       <div class="schol-card">
-        <div class="schol-tag"><i class="fas fa-star"></i> Scholarship Funding 2026</div>
-        <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
-          Get Fully Funded.<br>Start Today.
-        </h2>
-        <p style="color:#475569; font-size:0.97rem; line-height:1.75; margin-bottom:24px;">
-          Supporting Kenya's next generation of tech leaders. Receive up to <strong style="color:#FF8C00;">100% course funding</strong> based on merit and financial need. Application takes under 5 minutes.
-        </p>
-        <a href="scholarships.php" class="btn-cta-primary" style="width:100%; justify-content:center;">
-          <i class="fas fa-graduation-cap"></i> Apply for Scholarship
-        </a>
-        <div class="schol-deadline">
-          <i class="fas fa-calendar-alt" style="color:#FF8C00;"></i>
-          <span>Deadline: <strong style="color:#0f172a;">June 30, 2026</strong> — Seats are limited</span>
-        </div>
-        <div class="schol-mini-stats">
-          <div>
-            <div class="val" style="color:#00BFFF;">100%</div>
-            <div class="lbl">Max Funding</div>
-          </div>
-          <div style="width:1px;background:#e2e8f0;"></div>
-          <div>
-            <div class="val" style="color:#FF8C00;">48h</div>
-            <div class="lbl">Review Time</div>
-          </div>
-          <div style="width:1px;background:#e2e8f0;"></div>
-          <div>
-            <div class="val" style="color:#10b981;"><?= $total_courses ?>+</div>
-            <div class="lbl">Eligible Courses</div>
-          </div>
-        </div>
+        <?php if($featured_scholarship): ?>
+            <div class="schol-tag"><i class="fas fa-star"></i> Featured Program 2026</div>
+            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
+              <?= htmlspecialchars($featured_scholarship['title']) ?>
+            </h2>
+            <p style="color:#475569; font-size:0.92rem; line-height:1.7; margin-bottom:24px;">
+              <?= nl2br(htmlspecialchars($featured_scholarship['description'])) ?>
+            </p>
+            <a href="scholarships.php?id=<?= $featured_scholarship['id'] ?>" class="btn-cta-primary" style="width:100%; justify-content:center;">
+              <i class="fas fa-graduation-cap"></i> View Active Scholarships
+            </a>
+            <div class="schol-deadline">
+              <i class="fas fa-calendar-alt" style="color:#FF8C00;"></i>
+              <span>Deadline: <strong style="color:#0f172a;"><?= $featured_scholarship['expiry_date'] ? date('M j, Y', strtotime($featured_scholarship['expiry_date'])) : 'Rolling Admission' ?></strong></span>
+            </div>
+            <div class="schol-mini-stats">
+              <div>
+                <div class="val" style="color:#00BFFF;">80%+</div>
+                <div class="lbl">Funding Grade</div>
+              </div>
+              <div style="width:1px;background:#e2e8f0;"></div>
+              <div>
+                <div class="val" style="color:#FF8C00;">KES <?= number_format($featured_scholarship['amount']/1000) ?>k</div>
+                <div class="lbl">Max Award</div>
+              </div>
+              <div style="width:1px;background:#e2e8f0;"></div>
+              <div>
+                <div class="val" style="color:#10b981;"><?= $total_courses ?>+</div>
+                <div class="lbl">Eligible Paths</div>
+              </div>
+            </div>
+        <?php else: ?>
+            <div class="schol-tag"><i class="fas fa-info-circle"></i> Updates Pending</div>
+            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
+              New Programs<br>Launching Soon.
+            </h2>
+            <p style="color:#475569; font-size:0.97rem; line-height:1.75; margin-bottom:24px;">
+              We are currently finalizing our next round of institutional funding. Join our waitlist to be notified first when seats open for Q2 2026.
+            </p>
+            <button class="btn-cta-primary" style="width:100%; justify-content:center;" onclick="SDA.showToast('We will notify you of new openings!', 'info')">
+              <i class="fas fa-bell"></i> Notify Me
+            </button>
+            <div class="schol-mini-stats" style="filter:grayscale(1); opacity:0.5;">
+              <div>
+                <div class="val">100%</div>
+                <div class="lbl">Funding Hub</div>
+              </div>
+            </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -712,6 +753,25 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
   </div>
 </section>
 
+<!-- ══════════════════════════════════
+     SUPPORT OUR LEARNERS (CTA)
+══════════════════════════════════ -->
+<section class="section" style="background: linear-gradient(135deg, #003274ff 0%, #0c1f40 100%); color: white; overflow: hidden; position: relative;">
+  <div style="position: absolute; inset: 0; background: radial-gradient(circle at 70% 30%, rgba(0,191,255,0.15) 0%, transparent 60%); pointer-events: none;"></div>
+  <div class="container" style="position: relative; z-index: 5;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap;">
+      <div style="max-width: 600px;">
+        <div style="display: inline-block; background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 50px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px;">Empowerment Initiative</div>
+        <h2 style="font-family: 'Poppins', sans-serif; font-weight: 950; font-size: clamp(1.8rem, 5vw, 2.8rem); margin-bottom: 16px; line-height: 1.1; letter-spacing: -1.5px;">Support Our <span style="color: #00BFFF;">Learners.</span></h2>
+        <p style="font-size: 1.1rem; opacity: 0.85; line-height: 1.6; margin-bottom: 0;">Your contribution directly funds tuition and certifications for talented students in need. Join us in breaking the barriers to elite digital education.</p>
+      </div>
+      <div style="display: flex; gap: 16px;">
+        <a href="donate.php" class="btn-premium" style="background: #00BFFF; border: none; padding: 20px 48px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,191,255,0.25);">Donate Now <i class="fas fa-heart" style="margin-left: 10px;"></i></a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <?php require_once 'includes/footer.php'; ?>
 
 <script>
@@ -727,9 +787,16 @@ function countUp(el) {
   function tick(now) {
     const p = Math.min((now - t0) / duration, 1);
     const v = Math.floor(ease(p) * target);
-    el.childNodes[0].textContent = v.toLocaleString();
+    if(el.childNodes[0].nodeType === 3) {
+      el.childNodes[0].textContent = v.toLocaleString();
+    } else {
+      el.innerText = v.toLocaleString() + isSuffix;
+    }
     if (p < 1) requestAnimationFrame(tick);
-    else el.childNodes[0].textContent = target.toLocaleString();
+    else {
+      if(el.childNodes[0].nodeType === 3) el.childNodes[0].textContent = target.toLocaleString();
+      else el.innerText = target.toLocaleString() + isSuffix;
+    }
   }
   requestAnimationFrame(tick);
 }

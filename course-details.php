@@ -27,13 +27,28 @@ try {
     $lessons = $stmt->fetchAll();
 
     // 3. Related Courses
-    $stmt = $pdo->prepare("SELECT * FROM courses WHERE category_id = ? AND id != ? LIMIT 3");
+    $stmt = $pdo->prepare("SELECT * FROM courses WHERE category_id = ? AND id != ? AND status = 'published' LIMIT 3");
     $stmt->execute([$course['category_id'], $id]);
     $related = $stmt->fetchAll();
 
 } catch (Exception $e) { header('Location: courses.php'); exit; }
 
 $user = isLoggedIn() ? currentUser() : null;
+$is_enrolled = ($user && $id) ? $pdo->query("SELECT 1 FROM enrollments WHERE student_id = ".$user['id']." AND course_id = $id AND status != 'cancelled'")->fetchColumn() : false;
+
+// 4. Global Visibility Guard
+$is_admin = ($user && $user['role'] === 'admin');
+$is_tutor = ($user && $user['id'] == $course['tutor_id']);
+
+if ($course['status'] === 'archived' && !$is_enrolled && !$is_admin && !$is_tutor) {
+    header('Location: courses.php?error=archived');
+    exit;
+}
+
+if ($course['status'] !== 'published' && !$is_admin && !$is_tutor && !$is_enrolled) {
+    header('Location: courses.php?error=unavailable');
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -120,7 +135,15 @@ $user = isLoggedIn() ? currentUser() : null;
         @media (max-width: 992px) {
             .course-page-hero { padding: 100px 0 60px; text-align: center; }
             .hero-meta-row { justify-content: center; }
-            .purchase-sticky { position: static; margin-top: 40px; }
+            .purchase-sticky { position: static; margin-top: 40px; padding: 32px; }
+            .hero-grid-res { grid-template-columns: 1fr !important; }
+            .main-content-grid { grid-template-columns: 1fr !important; }
+            .course-vignette { max-width: 500px; margin: 0 auto; }
+            .instructor-card { flex-direction: column; text-align: center; align-items: center; }
+        }
+        @media (min-width: 993px) {
+            .hero-grid-res { grid-template-columns: 1.4fr 1fr !important; gap: 80px !important; }
+            .main-content-grid { grid-template-columns: 1.6fr 1fr !important; gap: 80px !important; }
         }
     </style>
 </head>
@@ -133,7 +156,7 @@ $user = isLoggedIn() ? currentUser() : null;
     <header class="course-page-hero">
         <div class="hero-backdrop"></div>
         <div class="container relative" style="z-index: 2;">
-            <div class="grid-2" style="grid-template-columns: 1.4fr 1fr; align-items: center; gap: 80px;">
+            <div class="hero-grid-res" style="display: grid; gap: 40px; align-items: center;">
                 <div>
                     <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 24px; color: var(--primary); font-weight: 800; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;">
                         <i class="fas fa-layer-group"></i>
@@ -143,7 +166,7 @@ $user = isLoggedIn() ? currentUser() : null;
                     </div>
                     <h1 style="color: #fff; font-size: clamp(2.2rem, 5vw, 3.8rem); line-height: 1.1; margin-bottom: 32px; font-family: 'Poppins', sans-serif;"><?= htmlspecialchars($course['title']) ?></h1>
                     
-                    <div class="hero-meta-row" style="display: flex; gap: 48px; margin-bottom: 48px;">
+                    <div class="hero-meta-row" style="display: flex; gap: 24px; margin-bottom: 40px; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 14px;">
                             <div style="width: 44px; height: 44px; background: rgba(255,140,0,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--secondary);">
                                 <i class="fas fa-star"></i>
@@ -190,8 +213,8 @@ $user = isLoggedIn() ? currentUser() : null;
     </header>
 
     <!-- Main Content Grid -->
-    <div class="container" style="padding: 100px 0;">
-        <div class="grid-2" style="grid-template-columns: 1.6fr 1fr; gap: 80px;">
+    <div class="container" style="padding: 60px 0;">
+        <div class="main-content-grid" style="display: grid; gap: 40px;">
             
             <div class="course-main-column">
                 <section style="margin-bottom: 80px;">
@@ -262,7 +285,11 @@ $user = isLoggedIn() ? currentUser() : null;
                         </div>
                     </div>
 
-                    <a href="enroll.php?id=<?= $id ?>" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;">Secure Spot Now <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                    <?php if($is_enrolled): ?>
+                        <a href="student/classroom.php?id=<?= $id ?>" class="btn btn-secondary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px; background: var(--secondary); border: none;">Go to Classroom <i class="fas fa-play-circle" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                    <?php else: ?>
+                        <a href="enroll.php?id=<?= $id ?>" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;">Secure Spot Now <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                    <?php endif; ?>
                     
                     <div style="margin-top: 40px; text-align: center; padding-top: 32px; border-top: 1px solid var(--bg-light);">
                         <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 24px;">Need financial assistance? We offer merit scholarships for eligible candidates.</p>

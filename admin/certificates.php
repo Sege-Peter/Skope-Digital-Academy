@@ -28,9 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("INSERT INTO certificates (student_id, course_id, verification_code, issued_by, issued_by_role, notes, status) VALUES (?,?,?,?,'admin',?,'approved')");
             $stmt->execute([$student_id, $course_id, $code, $user['id'], $notes]);
-            // Award 100 points for cert
-            $pdo->prepare("UPDATE users SET points = points + 100 WHERE id=?")->execute([$student_id]);
-            $pdo->prepare("INSERT INTO point_ledger (student_id, points, reason, awarded_by) VALUES (?,100,'Certificate awarded',?)")->execute([$student_id, $user['id']]);
+            // Award 100 merit points for cert
+            $pdo->prepare("UPDATE users SET merit_points = merit_points + 100 WHERE id=?")->execute([$student_id]);
+            $pdo->prepare("INSERT INTO point_ledger (student_id, merit_points, reason, awarded_by) VALUES (?,100,'Certificate awarded',?)")->execute([$student_id, $user['id']]);
             $pdo->commit();
             $msg = "Certificate issued successfully! Code: $code";
         } catch (Exception $e) {
@@ -71,8 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $points     = (int)$_POST['points'];
         $reason     = trim($_POST['reason'] ?? 'Admin award');
         if ($points > 0 && $points <= 10000) {
-            $pdo->prepare("UPDATE users SET points=points+? WHERE id=?")->execute([$points, $student_id]);
-            $pdo->prepare("INSERT INTO point_ledger (student_id, points, reason, awarded_by) VALUES (?,?,?,?)")->execute([$student_id, $points, $reason, $user['id']]);
+            $pdo->prepare("UPDATE users SET merit_points=merit_points+? WHERE id=?")->execute([$points, $student_id]);
+            $pdo->prepare("INSERT INTO point_ledger (student_id, merit_points, reason, awarded_by) VALUES (?,?,?,?)")->execute([$student_id, $points, $reason, $user['id']]);
             $msg = "$points merit points awarded!";
         } else { $msg = 'Invalid points value (1-10000).'; $msgType = 'danger'; }
     }
@@ -106,7 +106,7 @@ try {
         LEFT JOIN users iss ON ce.issued_by = iss.id
         ORDER BY ce.issued_at DESC LIMIT 60")->fetchAll();
 
-    $students = $pdo->query("SELECT id, name, email, points FROM users WHERE role='student' AND status='active' ORDER BY name")->fetchAll();
+    $students = $pdo->query("SELECT id, name, email, merit_points FROM users WHERE role='student' AND status='active' ORDER BY name")->fetchAll();
     $courses  = $pdo->query("SELECT id, title FROM courses WHERE status='published' ORDER BY title")->fetchAll();
     $badges   = $pdo->query("SELECT id, name, icon FROM badges ORDER BY name")->fetchAll();
 
@@ -248,7 +248,7 @@ try {
                             <select name="student_id" class="form-control" required>
                                 <option value="">— Student —</option>
                                 <?php foreach($students as $s): ?>
-                                <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= $s['points'] ?>pts)</option>
+                                <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= $s['merit_points'] ?>pts)</option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

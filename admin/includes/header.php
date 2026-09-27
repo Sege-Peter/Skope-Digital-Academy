@@ -20,10 +20,25 @@ $admin = currentUser();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="../assets/css/main.css">
-    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="../assets/css/main.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="../assets/css/admin.css?v=<?= time() ?>">
     
     <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
+    
+    <style>
+        /* ── Stealth Report Protocol ── */
+        .print-only { display: none !important; }
+        
+        @media print {
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .sidebar, .dashboard-sidebar, .sidebar-wrapper, .admin-header, .pay-header, .dash-header, .sidebar-overlay, .nav-toggle, .dash-toggle, .btn-sm, .screen-only, nav, header, button, .admin-alert { display: none !important; }
+            .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+            .admin-body { padding: 0 !important; }
+            .print-only { display: block !important; }
+            .table-card, .pay-table-card, .chart-card { border: none !important; box-shadow: none !important; }
+            * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+        }
+    </style>
 </head>
 <body class="dashboard-body">
 

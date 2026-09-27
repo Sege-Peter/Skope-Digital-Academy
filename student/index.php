@@ -1,266 +1,414 @@
 <?php
 $pageTitle = 'Student Command Center';
-require_once '../includes/header.php';
+require_once 'includes/header.php'; 
 
-// Fetch Professional Student Stats
+// Fetch Learning Path Data
 try {
-    // Refresh student context from DB to get the latest referral_code, merit_coins, etc.
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $student = $stmt->fetch();
+    // Silent Init: Ensure calendar events architecture exists
+    $pdo->exec("CREATE TABLE IF NOT EXISTS calendar_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        event_date DATE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        category VARCHAR(50) DEFAULT 'activity',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
 
-    if (!$student) { header('Location: ../login.php'); exit; }
+    // Process Add Event Form
+    if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_event') {
+        $ev_date = $_POST['event_date'];
+        $ev_title = trim($_POST['title']);
+        $ev_cat = $_POST['category'];
 
-    // 1. Enrolled Courses
-    $stmt = $pdo->prepare("SELECT e.*, c.title, c.thumbnail, u.name as tutor_name 
+        if(!empty($ev_date) && !empty($ev_title)){
+            $ins = $pdo->prepare("INSERT INTO calendar_events (student_id, event_date, title, category) VALUES (?, ?, ?, ?)");
+            $ins->execute([$student['id'], $ev_date, $ev_title, $ev_cat]);
+            
+            // Generate a Reminder Notification natively
+            try {
+                $nIns = $pdo->prepare("INSERT INTO notifications (user_id, message, type) VALUES (?, ?, 'reminder')");
+                $nIns->execute([$student['id'], "Reminder Scheduled: $ev_title on $ev_date"]);
+            } catch(Exception $ex){}
+        }
+        
+        // Prevent re-submission
+        header("Location: index.php");
+        exit;
+    }
+
+    // 1. My Courses (Active Learning Paths)
+    $stmt = $pdo->prepare("SELECT e.*, c.title, c.thumbnail, c.level, u.name as tutor_name 
                            FROM enrollments e 
                            JOIN courses c ON e.course_id = c.id 
-                           JOIN users u ON c.tutor_id = u.id
-                           WHERE e.student_id = ? AND e.status != 'cancelled' 
+                           JOIN users u ON c.tutor_id = u.id 
+                           WHERE e.student_id = ? AND e.status = 'active'
                            ORDER BY e.enrolled_at DESC");
     $stmt->execute([$student['id']]);
     $my_courses = $stmt->fetchAll();
 
-    // 2. Academic Metrics
-    $total_enrolled = count($my_courses);
-    $completed_stmt = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND status = 'completed'");
-    $completed_stmt->execute([$student['id']]);
-    $total_completed = $completed_stmt->fetchColumn();
+    // 2. Dynamic Tasks (Quizzes)
+    $stmt = $pdo->prepare("SELECT q.*, c.title as course_name 
+                           FROM quizzes q 
+                           JOIN enrollments e ON q.course_id = e.course_id 
+                           JOIN courses c ON q.course_id = c.id 
+                           WHERE e.student_id = ? AND e.status = 'active'
+                           LIMIT 5");
+    $stmt->execute([$student['id']]);
+    $dynamic_tasks = $stmt->fetchAll();
 
-} catch (Exception $e) { $my_courses = []; $total_enrolled = $total_completed = 0; }
+    // 3. New Assignments
+    $stmt = $pdo->prepare("SELECT a.*, c.title as course_name 
+                           FROM assignments a 
+                           JOIN enrollments e ON a.course_id = e.course_id 
+                           JOIN courses c ON a.course_id = c.id 
+                           WHERE e.student_id = ? AND e.status = 'active'
+                           ORDER BY a.due_date ASC LIMIT 5");
+    $stmt->execute([$student['id']]);
+    $new_assignments = $stmt->fetchAll();
+
+    // 4. Notifications (Live Pulse)
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+    $stmt->execute([$student['id']]);
+    $live_notifications = $stmt->fetchAll();
+
+    // 5. CAT Quizzes (Diagnostic)
+    $cat_quizzes = array_filter($dynamic_tasks, fn($t) => stripos($t['title'], 'CAT') !== false);
+
+    // Dynamic Referral URL Base
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
+    $baseUrl = $protocol . "://" . $_SERVER['HTTP_HOST'] . str_replace('index.php', '', $_SERVER['PHP_SELF']);
+    $referralLink = str_replace('student/', '', $baseUrl) . "register.php?ref=" . $student['referral_code'];
+
+} catch (Exception $e) { 
+    error_log($e->getMessage());
+    $my_courses = $dynamic_tasks = $new_assignments = $live_notifications = $cat_quizzes = [];
+}
+
+require_once 'includes/layout-top.php';
 ?>
 
-<?php require_once '../includes/sidebar.php'; ?>
-
-<style>
-    .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 40px; }
-    .learning-card { background: white; border: 1px solid var(--dark-border); border-radius: 16px; padding: 20px; transition: 0.3s; margin-bottom: 24px; }
-    .learning-card:hover { transform: translateY(-4px); border-color: var(--primary); box-shadow: var(--shadow-lg); }
-    
-    .lc-inner { display: flex; gap: 20px; align-items: flex-start; }
-    .lc-thumb { width: 80px; height: 80px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: var(--bg-light); border: 1px solid var(--dark-border); }
-    .lc-thumb img { width: 100%; height: 100%; object-fit: cover; }
-    .lc-content { flex: 1; min-width: 0; }
-    .lc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 10px; }
-    .lc-title { font-family: 'Poppins', sans-serif; font-size: 1rem; color: var(--dark); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .lc-progress-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-    .lc-progress-bar { flex: 1; height: 6px; background: var(--bg-light); border-radius: 3px; overflow: hidden; }
-    .lc-progress-bar div { height: 100%; background: var(--primary); border-radius: 3px; transition: 1s; }
-    .lc-pct { font-size: 0.75rem; font-weight: 800; color: var(--text-muted); min-width: 35px; }
-    .lc-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .lc-tutor { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0; }
-    
-    .status-badge { font-size: 0.6rem; font-weight: 800; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-    .status-active { background: var(--primary-glow); color: var(--primary); }
-    
-    .ai-mentor-box { background: linear-gradient(135deg, white, var(--bg-light)); border: 1px dashed var(--primary); border-radius: 20px; padding: 32px; margin-top: 32px; position: relative; overflow: hidden; }
-    .ai-mentor-box::before { content: '\f0e0'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; right: -20px; bottom: -20px; font-size: 6rem; color: var(--primary-glow); transform: rotate(-15deg); pointer-events: none; }
-
-    @media (max-width: 1024px) {
-        .dash-grid { grid-template-columns: 1fr; }
-        .lc-inner { flex-direction: column; }
-        .lc-thumb { width: 100%; height: 140px; }
-        .lc-footer { flex-direction: column; align-items: flex-start; }
-    }
-</style>
-
-<main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-            <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Ready for Excellence, <span><?= explode(' ', $student['name'])[0] ?>?</span></h1>
-                <p style="color: var(--text-dim); margin-top: 4px;">Track your academic growth and certification progress.</p>
-            </div>
+<!-- Section: Welcome Hero -->
+<div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 48px; border-radius: 32px; margin-bottom: 48px; position: relative; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 20px 40px rgba(15, 23, 42, 0.1);">
+    <div style="position: relative; z-index: 1;">
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+            <span style="background: rgba(0, 174, 239, 0.2); color: var(--primary); padding: 6px 14px; border-radius: 50px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Scholar Level: Gold</span>
+            <span style="opacity: 0.5; color: white;">•</span>
+            <span style="opacity: 0.8; font-size: 0.8rem; font-weight: 600; color: white;"><?= date('l, M jS') ?></span>
         </div>
-        <div style="display: flex; gap: 16px;">
-            <div style="text-align: right; background: white; padding: 12px 24px; border-radius: 12px; border: 1px solid var(--dark-border);">
-                <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">Academic Points</div>
-                <div style="font-size: 1.4rem; font-weight: 900; color: var(--secondary);"><i class="fas fa-crown"></i> <?= number_format($student['points'] ?? 0) ?></div>
+        <h1 style="font-family: 'Poppins', sans-serif; font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 950; margin: 0 0 12px; letter-spacing: -1.5px; color: white !important;">Welcome Back, <span style="color: var(--primary);"><?= explode(' ', $student['name'])[0] ?></span>.</h1>
+        <p style="opacity: 0.7; font-size: 1.1rem; max-width: 600px; line-height: 1.6; font-weight: 500; color: white;">Your learning journey is at <span style="font-weight: 800; color: white; opacity: 1;"><?= count($my_courses) ?> active paths</span>. Ready to master your next module today?</p>
+        
+        <div style="margin-top: 40px; display: flex; gap: 24px; flex-wrap: wrap;">
+            <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 12px 20px; border-radius: 16px; display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(0, 174, 239, 0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary);"><i class="fas fa-coins"></i></div>
+                <div>
+                    <div style="font-size: 0.6rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">Merit Coins</div>
+                    <div style="font-size: 1.1rem; font-weight: 900; color: white;"><?= number_format($student['merit_coins'] ?? 0) ?></div>
+                </div>
             </div>
-            <div style="text-align: right; background: white; padding: 12px 24px; border-radius: 12px; border: 1px solid var(--primary); box-shadow: 0 4px 12px rgba(0, 174, 239, 0.1);">
-                <div style="font-size: 0.72rem; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">Merit Coins</div>
-                <div style="font-size: 1.4rem; font-weight: 900; color: var(--primary);"><i class="fas fa-coins"></i> <?= number_format($student['merit_coins'] ?? 0, 2) ?></div>
+            <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 12px 20px; border-radius: 16px; display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; background: rgba(16, 185, 129, 0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10b981;"><i class="fas fa-trophy"></i></div>
+                <div>
+                    <div style="font-size: 0.6rem; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; font-weight: 800;">Completed</div>
+                    <div style="font-size: 1.1rem; font-weight: 900; color: white;"><?= count(array_filter($my_courses, fn($c) => ($c['progress_percent'] ?? 0) >= 100)) ?> <span style="font-size: 0.7rem; opacity: 0.5;">Paths</span></div>
+                </div>
             </div>
-        </div>
-    </header>
-    
-    <!-- Student Utility Hub (Inspired by Maseno MSU pattern) -->
-    <div style="display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 48px; border-bottom: 1px solid var(--dark-border); padding-bottom: 40px; justify-content: space-around;">
-        <a href="announcements.php" style="text-decoration: none; text-align: center; width: 100px;">
-            <div style="width: 72px; height: 72px; background: rgba(0, 191, 255, 0.1); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 12px; transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-bullhorn"></i>
-            </div>
-            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">News Forum</span>
-        </a>
-        <a href="support.php" style="text-decoration: none; text-align: center; width: 100px;">
-            <div style="width: 72px; height: 72px; background: rgba(16, 185, 129, 0.1); color: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 12px; transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-headset"></i>
-            </div>
-            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Admin Help</span>
-        </a>
-        <a href="support.php?action=complain" style="text-decoration: none; text-align: center; width: 100px;">
-            <div style="width: 72px; height: 72px; background: rgba(239, 68, 68, 0.1); color: #EF4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 12px; transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-exclamation-circle"></i>
-            </div>
-            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Grievances</span>
-        </a>
-        <a href="community.php" style="text-decoration: none; text-align: center; width: 100px;">
-            <div style="width: 72px; height: 72px; background: rgba(139, 92, 246, 0.1); color: #8B5CF6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; margin: 0 auto 12px; transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                <i class="fas fa-users"></i>
-            </div>
-            <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Community</span>
-        </a>
-    </div>
-
-    <!-- Referral & Growth Section -->
-    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); color: white; border-radius: 24px; padding: 32px; margin-bottom: 40px; display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; position: relative; overflow: hidden;">
-        <div style="position: absolute; right: -20px; top: -20px; width: 180px; height: 180px; background: radial-gradient(circle, rgba(0, 191, 255, 0.15), transparent 70%); border-radius: 50%;"></div>
-        <div style="flex: 1; min-width: 300px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                <span style="background: #00BFFF; color: white; padding: 4px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Growth Program</span>
-                <span style="font-weight: 700; color: #00BFFF;">Earn 4% Recursive Rewards</span>
-            </div>
-            <h2 style="font-family: 'Poppins', sans-serif; font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; color: #ffffff;">Share Knowledge, Accumulate Wealth</h2>
-            <p style="opacity: 0.9; font-size: 0.9rem; line-height: 1.6; max-width: 550px; color: rgba(255,255,255,0.9);">Refer a colleague and earn <strong>4% of their course price</strong> in Merit Coins upon enrollment. Coins can be used as digital credit for your future certification paths.</p>
-        </div>
-        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; text-align: center; min-width: 280px;">
-            <div style="font-size: 0.72rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">Your Personal Referral Link</div>
-            <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 12px; font-family: monospace; font-size: 0.82rem; margin-bottom: 16px; word-break: break-all;" id="refLink">
-                http://localhost/Skope Digital Academy/register.php?ref=<?= $student['referral_code'] ?>
-            </div>
-            <button class="btn btn-primary btn-sm btn-block" onclick="copyRefLink()" style="font-weight: 800; letter-spacing: 0.5px;">
-                <i class="fas fa-copy"></i> Copy Link
-            </button>
         </div>
     </div>
+</div>
 
-    <div class="dash-grid">
-        <!-- Left: Course Progress -->
-        <div class="dash-main-col">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
-                <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.25rem;">Ongoing Learning Path</h3>
-                <a href="../courses.php" class="btn btn-ghost btn-sm">Explore More Path</a>
-            </div>
+<!-- Section: My Courses — Balanced Grid -->
+<div style="margin-bottom: 64px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px;">
+        <div>
+            <h3 style="margin: 0; font-weight: 950; font-size: 1.8rem; letter-spacing: -1px; color: var(--text-main);">My Active Paths<span style="color: var(--primary);">.</span></h3>
+            <p style="margin: 8px 0 0; color: var(--text-dim); font-size: 0.9rem; font-weight: 500;">Your high-performance curriculum dashboard.</p>
+        </div>
+        <a href="courses.php" class="btn-action" style="color: var(--primary); background: rgba(0, 174, 239, 0.08); font-weight: 800; border-radius: 50px; padding: 12px 24px; text-decoration: none;">View Roadmap</a>
+    </div>
 
-            <?php foreach($my_courses as $c): ?>
-            <div class="learning-card">
-                <div class="lc-inner">
-                    <div class="lc-thumb">
-                        <img src="../uploads/courses/<?= $c['thumbnail'] ?: 'course_demo.jpg' ?>" alt="">
+    <?php if(empty($my_courses)): ?>
+    <div class="premium-card" style="padding: 80px 40px; text-align: center; border: 2px dashed #e2e8f0; background: #fff; display: flex; flex-direction: column; align-items: center;">
+        <div style="width: 100px; height: 100px; background: #f8fafc; border-radius: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 32px; font-size: 2.8rem; color: var(--primary); box-shadow: inset 0 4px 10px rgba(0,0,0,0.03);"><i class="fas fa-graduation-cap"></i></div>
+        <h4 style="margin: 0 0 12px; font-weight: 950; font-size: 1.5rem; letter-spacing: -0.5px;">No Active Enrollment</h4>
+        <p style="color: var(--text-dim); font-size: 1rem; margin: 0 0 32px; max-width: 440px; line-height: 1.6;">Your journey to digital excellence starts here. Explore our elite courses and pick your path today.</p>
+        <a href="../courses.php" class="btn-premium" style="min-width: 240px;">EXPLORE CATALOGUE</a>
+    </div>
+    <?php else: ?>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 32px;">
+            <?php foreach($my_courses as $ci => $c): 
+                $progress = isset($c['progress_percent']) ? round($c['progress_percent']) : 0;
+                $isFallback = isset($c['is_fallback']);
+            ?>
+            <div class="course-card-premium" onclick="window.location.href='classroom.php?id=<?= $c['course_id'] ?>'" style="cursor: pointer;">
+                <div style="height: 200px; position: relative; overflow: hidden;">
+                    <img src="../uploads/courses/<?= htmlspecialchars($c['thumbnail'] ?: 'course-default.jpg') ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(15, 23, 42, 0.9) 100%);"></div>
+                    <div style="position: absolute; top: 16px; right: 16px;">
+                        <span style="background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(8px); padding: 6px 14px; border-radius: 50px; color: white; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                            <?= $isFallback ? 'Live' : 'On-Demand' ?>
+                        </span>
                     </div>
-                    <div class="lc-content">
-                        <div class="lc-header">
-                            <h4 class="lc-title"><?= htmlspecialchars($c['title']) ?></h4>
-                            <?php if($c['status'] === 'pending'): ?>
-                                <span class="badge badge-warning">Waitlist Audit</span>
-                            <?php else: ?>
-                                <span class="status-badge status-active">In Progress</span>
-                            <?php endif; ?>
+                    <div style="position: absolute; bottom: 16px; left: 16px; right: 16px;">
+                        <h5 style="margin: 0; font-size: 1.1rem; font-weight: 900; line-height: 1.3; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.3);"><?= htmlspecialchars($c['title']) ?></h5>
+                    </div>
+                </div>
+                <div style="padding: 24px; flex: 1; display: flex; flex-direction: column;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+                        <div style="width: 28px; height: 28px; border-radius: 10px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border);">
+                            <img src="../assets/images/user-placeholder.png" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
-                        <div class="lc-progress-wrap">
-                            <div class="lc-progress-bar">
-                                <div style="width: <?= round($c['progress_percent']) ?>%;"></div>
-                            </div>
-                            <span class="lc-pct"><?= round($c['progress_percent']) ?>%</span>
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim);"><?= isset($c['tutor_name']) ? htmlspecialchars($c['tutor_name']) : 'Skope Lead Instructor' ?></span>
+                    </div>
+                    
+                    <div style="margin-top: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Path Progress</span>
+                            <span style="font-size: 0.8rem; font-weight: 900; color: var(--primary);"><?= $progress ?>%</span>
                         </div>
-                        <div class="lc-footer">
-                            <p class="lc-tutor"><i class="fas fa-chalkboard-teacher"></i> <?= htmlspecialchars($c['tutor_name']) ?></p>
-                            <?php if($c['status'] === 'pending'): ?>
-                                <button class="btn btn-ghost btn-sm" disabled style="opacity: 0.5;">Awaiting Review</button>
-                            <?php else: ?>
-                                <a href="classroom.php?id=<?= $c['course_id'] ?>" class="btn btn-primary btn-sm">Resume Session</a>
-                            <?php endif; ?>
+                        <div style="background: #f1f5f9; height: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+                            <div style="height: 100%; width: <?= $progress ?>%; background: linear-gradient(to right, var(--primary), #0072FF); border-radius: 10px; transition: 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div>
                         </div>
                     </div>
                 </div>
             </div>
             <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
-            <?php if(empty($my_courses)): ?>
-                <div style="padding: 80px; text-align: center; background: white; border: 2px dashed var(--dark-border); border-radius: 24px;">
-                    <i class="fas fa-book-reader" style="font-size: 3rem; color: var(--dark-border); margin-bottom: 24px;"></i>
-                    <h3 style="color: var(--text-muted);">Your Learning Path is Awaiting</h3>
-                    <p style="color: var(--text-dim); margin-bottom: 32px;">Start your professional journey today with a verified certification.</p>
-                    <a href="../courses.php" class="btn btn-primary">Enroll in First Course</a>
+
+<!-- Section: Today Tasks — Real-Time Tabs -->
+<div style="margin-bottom: 48px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+        <div>
+            <h3 style="margin: 0; font-weight: 950; font-size: 1.6rem; letter-spacing: -0.5px;">Focus Zone <span style="color: var(--secondary);">.</span></h3>
+            <p style="margin: 4px 0 0; color: var(--text-dim); font-size: 0.85rem; font-weight: 500;"><?= date('l, F j, Y') ?></p>
+        </div>
+        <div style="display: flex; background: #f1f5f9; padding: 4px; border-radius: 14px; gap: 4px;">
+            <button class="tab-btn active" onclick="switchTab(this, 'tab-quizzes')" style="padding: 8px 16px; font-size: 0.75rem; border-radius: 10px; margin: 0;">Quizzes</button>
+            <button class="tab-btn" onclick="switchTab(this, 'tab-assignments')" style="padding: 8px 16px; font-size: 0.75rem; border-radius: 10px; margin: 0;">Assignments</button>
+            <button class="tab-btn" onclick="switchTab(this, 'tab-classes')" style="padding: 8px 16px; font-size: 0.75rem; border-radius: 10px; margin: 0;">Schedule</button>
+        </div>
+    </div>
+
+    <style>
+        .course-card-premium {
+            background: white;
+            border-radius: 28px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .course-card-premium:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(0, 114, 255, 0.12);
+            border-color: var(--primary);
+        }
+        .course-card-premium img {
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .course-card-premium:hover img {
+            transform: scale(1.08);
+        }
+        .pulse-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 20px;
+            transition: 0.3s;
+        }
+        .pulse-card:hover {
+            border-color: var(--primary);
+            background: #fcfdfe;
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+    </style>
+
+    <!-- Tab: Quizzes -->
+    <div id="tab-quizzes" class="tasks-list rt-tab" style="display: flex; flex-direction: column; gap: 12px;">
+        <?php
+        if(empty($dynamic_tasks)): ?>
+            <div style="padding: 40px; text-align: center; background: #f8fafc; border-radius: 20px; border: 1px solid var(--border);">
+                <div style="width: 60px; height: 60px; background: #ECFDF5; color: #10B981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 1.5rem;"><i class="fas fa-check-double"></i></div>
+                <p style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main);">No Pending Quizzes</p>
+                <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-dim);">You've cleared all your knowledge checks!</p>
+            </div>
+        <?php else: foreach($dynamic_tasks as $idx => $t): ?>
+            <div class="task-card">
+                <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(0, 174, 239, 0.08); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; color: var(--primary);">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($t['title']) ?></h5>
+                    <p style="margin: 2px 0 0; font-size: 0.75rem; color: var(--text-dim); font-weight: 500;"><?= htmlspecialchars($t['course_name']) ?></p>
+                </div>
+                <a href="take-quiz.php?id=<?= $t['id'] ?>" class="btn-premium" style="padding: 10px 20px; font-size: 0.75rem; border-radius: 12px; box-shadow: none;">Attempt</a>
+            </div>
+        <?php endforeach; endif; ?>
+    </div>
+
+    <!-- Tab: Assignments -->
+    <div id="tab-assignments" class="tasks-list rt-tab" style="display: none; flex-direction: column; gap: 12px;">
+        <?php if(empty($new_assignments)): ?>
+            <div style="padding: 40px; text-align: center; background: #f8fafc; border-radius: 20px; border: 1px solid var(--border);">
+                <div style="width: 60px; height: 60px; background: #FFFBEB; color: #F59E0B; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 1.5rem;"><i class="fas fa-clipboard-check"></i></div>
+                <p style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main);">All Caught Up!</p>
+                <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-dim);">No assignments pending your attention right now.</p>
+            </div>
+        <?php else: foreach($new_assignments as $a):
+            $overdue = strtotime($a['due_date']) < time();
+        ?>
+            <div class="task-card" style="<?= $overdue ? 'border-color: rgba(239, 68, 68, 0.2); background: #FFF5F5;' : '' ?>">
+                <div style="width: 48px; height: 48px; border-radius: 14px; background: <?= $overdue ? '#FEE2E2' : '#FEF3C7' ?>; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: <?= $overdue ? '#EF4444' : '#D97706' ?>; font-size: 1.2rem;">
+                    <i class="fas fa-file-signature"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800;"><?= htmlspecialchars($a['title']) ?></h5>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <span style="font-size: 0.72rem; color: var(--text-dim); font-weight: 500;"><?= htmlspecialchars($a['course_name']) ?></span>
+                        <span style="font-size: 0.7rem; font-weight: 700; color: <?= $overdue ? '#EF4444' : '#D97706' ?>; display: flex; align-items: center; gap: 4px;">
+                            <i class="far fa-clock"></i> <?= $overdue ? 'Overdue' : 'Due: ' . date('M j', strtotime($a['due_date'])) ?>
+                        </span>
+                    </div>
+                </div>
+                <a href="assignments.php" class="btn-action" style="color: <?= $overdue ? '#EF4444' : 'var(--primary)' ?>; background: white; border: 1px solid <?= $overdue ? '#FEE2E2' : 'var(--border)' ?>; font-weight: 800;">Submit</a>
+            </div>
+        <?php endforeach; endif; ?>
+    </div>
+
+    <!-- Tab: Classes -->
+    <div id="tab-classes" class="tasks-list rt-tab" style="display: none; flex-direction: column; gap: 12px;">
+        <?php if(empty($my_courses)): ?>
+            <div style="padding: 40px; text-align: center; background: #f8fafc; border-radius: 20px; border: 1px solid var(--border);">
+                <div style="width: 60px; height: 60px; background: #F0F9FF; color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 1.5rem;"><i class="fas fa-calendar-alt"></i></div>
+                <p style="margin: 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main);">Classroom Empty</p>
+                <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-dim);">Enroll in courses to see your learning schedule.</p>
+            </div>
+        <?php else: foreach($my_courses as $ci => $course): ?>
+            <div class="task-card">
+                <div style="width: 48px; height: 48px; border-radius: 14px; background: #F8FAFC; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary); font-size: 1.2rem;">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800;"><?= htmlspecialchars($course['title']) ?></h5>
+                    <p style="margin: 2px 0 0; font-size: 0.72rem; color: var(--text-dim); font-weight: 500;">
+                        <?= isset($course['tutor_name']) ? htmlspecialchars($course['tutor_name']) : 'SDAC Academy' ?>
+                        <span style="margin-left: 8px; color: var(--primary); font-weight: 700;"><?= round($course['progress_percent'] ?? 0) ?>% Path Complete</span>
+                    </p>
+                </div>
+                <a href="classroom.php?id=<?= $course['course_id'] ?>" class="btn-action" style="background: var(--primary); color: white;">Open Path</a>
+            </div>
+        <?php endforeach; endif; ?>
+    </div>
+</div>
+
+
+<!-- ===== LIVE ACTIVITY FEED ===== -->
+<div style="margin-top: 48px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <h3 style="margin: 0; font-weight: 950; font-size: 1.5rem; letter-spacing: -0.5px;">Live Pulse <span style="color: var(--secondary);">.</span></h3>
+        <a href="notifications.php" style="font-size: 0.8rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 6px;">View Full History <i class="fas fa-arrow-right"></i></a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+
+        <?php // --- Notifications
+        foreach(array_slice($live_notifications, 0, 4) as $notif): ?>
+        <div class="premium-card glass-effect" style="display: flex; flex-direction: column; padding: 20px; gap: 12px; border-radius: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="width: 36px; height: 36px; border-radius: 10px; background: <?= empty($notif['read_status']) ? 'var(--grad-primary)' : '#f1f5f9' ?>; display: flex; align-items: center; justify-content: center; color: <?= empty($notif['read_status']) ? 'white' : 'var(--text-dim)' ?>;">
+                    <i class="fas fa-bell" style="font-size: 0.9rem;"></i>
+                </div>
+                <span style="font-size: 0.65rem; font-weight: 800; color: var(--text-dim);"><?= date('M j, g:i A', strtotime($notif['created_at'])) ?></span>
+            </div>
+            <div>
+                <strong style="display: block; font-size: 0.9rem; font-weight: 900; color: var(--text-main); margin-bottom: 4px;"><?= htmlspecialchars($notif['title'] ?? 'System Update') ?></strong>
+                <p style="margin: 0; font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><?= htmlspecialchars($notif['message']) ?></p>
+            </div>
+            <?php if(empty($notif['read_status'])): ?>
+                <div style="margin-top: auto; display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%;"></span>
+                    <span style="font-size: 0.65rem; font-weight: 900; color: var(--primary); text-transform: uppercase;">Unread Alert</span>
                 </div>
             <?php endif; ?>
         </div>
+        <?php endforeach; ?>
 
-        <!-- Right: AI Mentorship & Highlights -->
-        <aside>
-            <div style="background: white; border: 1px solid var(--dark-border); border-radius: 20px; padding: 32px; box-shadow: var(--shadow-sm);">
-                <h3 style="font-family: 'Poppins', sans-serif; font-size: 1rem; margin-bottom: 20px; border-bottom: 2px solid var(--primary-glow); padding-bottom: 12px;">
-                    <i class="fas fa-calendar-check text-primary"></i> Academic Schedule
-                </h3>
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div style="display: flex; gap: 16px;">
-                        <div style="width: 44px; height: 44px; background: var(--bg-light); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--dark-border);">
-                            <span style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-dim);">Mar</span>
-                            <span style="font-size: 1rem; font-weight: 800; color: var(--primary);">20</span>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.88rem; font-weight: 700;">Logic & Quiz Deadline</div>
-                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Advanced UI/UX Path</p>
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: 16px;">
-                        <div style="width: 44px; height: 44px; background: var(--bg-light); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--dark-border);">
-                            <span style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-dim);">Mar</span>
-                            <span style="font-size: 1rem; font-weight: 800; color: var(--secondary);">22</span>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.88rem; font-weight: 700;">Creative Vision Q&A</div>
-                            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Lead Tutor live session</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <?php if(empty($live_notifications) && empty($new_assignments) && empty($cat_quizzes)): ?>
+        <div style="grid-column: 1 / -1; text-align: center; padding: 60px; background: #f8fafc; border-radius: 24px; border: 1px dashed var(--border);">
+            <div style="font-size: 3rem; color: var(--border); margin-bottom: 16px;"><i class="fas fa-broadcast-tower"></i></div>
+            <p style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--text-dim);">The airwaves are quiet. No new updates for now.</p>
+        </div>
+        <?php endif; ?>
 
-            <div style="background: white; border: 1px solid var(--dark-border); border-radius: 20px; padding: 32px; box-shadow: var(--shadow-sm); margin-bottom: 24px;">
-                <h3 style="font-family: 'Poppins', sans-serif; font-size: 1rem; margin-bottom: 20px; border-bottom: 2px solid var(--primary-glow); padding-bottom: 12px;">
-                    <i class="fas fa-history text-primary"></i> Learning Timeline
-                </h3>
-                <!-- Timeline items (Inspired by Moodle Timeline) -->
-                <div style="display: flex; flex-direction: column; gap: 24px; position: relative; padding-left: 20px; border-left: 2px solid var(--bg-light);">
-                    <div style="position: relative;">
-                        <div style="position: absolute; left: -29px; top: 0; width: 16px; height: 16px; background: var(--primary); border: 4px solid white; border-radius: 50%; box-shadow: 0 0 0 2px var(--primary-glow);"></div>
-                        <div style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 800;">Today, 4:00 PM</div>
-                        <div style="font-size: 0.9rem; font-weight: 700; margin-top: 4px;">Live Q&A Session</div>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Advanced UI/UX Trends</p>
-                    </div>
-                    <div style="position: relative;">
-                        <div style="position: absolute; left: -29px; top: 0; width: 16px; height: 16px; background: #94a3b8; border: 4px solid white; border-radius: 50%;"></div>
-                        <div style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 800;">Mar 22</div>
-                        <div style="font-size: 0.9rem; font-weight: 700; margin-top: 4px;">Quiz Deadline</div>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Chapter 4 Assessment</p>
-                    </div>
-                    <div style="position: relative;">
-                        <div style="position: absolute; left: -29px; top: 0; width: 16px; height: 16px; background: #94a3b8; border: 4px solid white; border-radius: 50%;"></div>
-                        <div style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; font-weight: 800;">Mar 25</div>
-                        <div style="font-size: 0.9rem; font-weight: 700; margin-top: 4px;">Project Submission</div>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Identity Design Phase 1</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ai-mentor-box">
-                <h4 style="font-family: 'Poppins', sans-serif; font-size: 0.95rem; margin-bottom: 12px;"><i class="fas fa-robot"></i> AI Academic Mentor</h4>
-                <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; position: relative; z-index: 1;">"I noticed you're progressing quickly in <strong>Design Theory</strong>. Consider starting the <strong>Interactive Prototyping</strong> module next to maximize your retention."</p>
-                <a href="mentor.php" class="btn btn-ghost btn-sm btn-block" style="margin-top: 24px; position: relative; z-index: 1; text-decoration: none; text-align: center; display: block;">Talk to Mentor</a>
-            </div>
-        </aside>
     </div>
-</main>
+</div>
+<!-- ===== END ACTIVITY FEED ===== -->
 
-<script src="../assets/js/main.js"></script>
+<!-- Event Scheduling Modal -->
+<div id="eventModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h4 style="margin: 0; font-weight: 800;">Schedule Activity</h4>
+            <button onclick="document.getElementById('eventModal').style.display = 'none'" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-dim); transition: 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-dim)'"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="add_event">
+            <input type="hidden" name="event_date" id="modalEventDate">
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px;">Activity Title</label>
+                <input type="text" name="title" required placeholder="e.g. Revision for Science CAT" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; outline: none; transition: 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 8px;">Category</label>
+                <select name="category" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; outline: none; cursor: pointer;">
+                    <option value="activity">📚 Standard Activity</option>
+                    <option value="cat">📝 CAT Date Setup</option>
+                    <option value="tutor">👨‍🏫 Tutor Consultation</option>
+                </select>
+            </div>
+            
+            <button type="submit" style="width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 0.95rem; transition: 0.2s; box-shadow: 0 4px 15px rgba(0, 174, 239, 0.3);" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">Save & Bind Reminder</button>
+        </form>
+    </div>
+</div>
+
 <script>
-    function copyRefLink() {
-        const linkText = document.getElementById('refLink').innerText;
-        navigator.clipboard.writeText(linkText).then(() => {
-            SDA.showToast('Referral link copied to clipboard!', 'success');
+    function openEventModal(dateStr) {
+        document.getElementById('modalEventDate').value = dateStr;
+        document.getElementById('eventModal').style.display = 'flex';
+    }
+    
+    function switchTab(btn, sectionId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.rt-tab').forEach(tab => {
+            tab.style.display = 'none';
         });
+        const target = document.getElementById(sectionId);
+        if (target) {
+            target.style.display = 'flex';
+            target.style.flexDirection = 'column';
+        }
     }
 </script>
-</body>
-</html>
+
+<?php require_once 'includes/layout-bottom.php'; ?>

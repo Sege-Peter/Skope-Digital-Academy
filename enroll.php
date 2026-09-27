@@ -36,8 +36,22 @@ try {
         exit;
     }
 
-    // 3. Handle Free Enrollment
-    if ($c['price'] == 0) {
+    // 3. Handle Free Enrollment & Scholarship Grants
+    $is_scholarship_eligible = false;
+    
+    // Check if they have an approved scholarship
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM scholarship_applications WHERE user_id = ? AND status = 'approved'");
+    $stmt->execute([$user['id']]);
+    if ($stmt->fetchColumn() > 0) {
+        // Count how many courses they are already enrolled in
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = ?");
+        $stmt->execute([$user['id']]);
+        if ($stmt->fetchColumn() < 5) {
+            $is_scholarship_eligible = true;
+        }
+    }
+
+    if ($c['price'] == 0 || $is_scholarship_eligible) {
         $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'");
         $stmt->execute([$user['id'], $id]);
         
@@ -148,20 +162,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['payment_proof'])) {
                     <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 10px;">For: <?= htmlspecialchars($c['title']) ?></div>
                 </div>
 
+                <!-- Paystack Integration -->
+                <div class="payment-method" style="border: 2px solid var(--primary); background: var(--primary-glow);">
+                    <h3 style="color: var(--primary); font-weight: 800;">
+                        <i class="fas fa-credit-card"></i> Pay Online (Instant Activation)
+                    </h3>
+                    <p style="margin-bottom: 20px;">Securely pay with your Card, Bank, or M-Pesa using Paystack for instant course access.</p>
+                    
+                    <button id="paystack-btn" class="btn btn-primary btn-block btn-lg" style="background: #09a5db; border: none;">
+                        Pay with Paystack <i class="fas fa-bolt"></i>
+                    </button>
+                    
+                    <script src="https://js.paystack.co/v1/inline.js"></script>
+                    <script>
+                        const paystackBtn = document.getElementById('paystack-btn');
+                        paystackBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            
+                            let handler = PaystackPop.setup({
+                                key: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', // Replace with your Public Key
+                                email: '<?= $user['email'] ?>',
+                                amount: <?= $c['price'] * 100 ?>, // In Kobo/Cents
+                                currency: 'KES',
+                                ref: 'SDA-' + Math.floor((Math.random() * 1000000000) + 1),
+                                metadata: {
+                                    custom_fields: [
+                                        {
+                                            display_name: "Course ID",
+                                            variable_name: "course_id",
+                                            value: "<?= $id ?>"
+                                        },
+                                        {
+                                            display_name: "Student Name",
+                                            variable_name: "student_name",
+                                            value: "<?= $user['name'] ?>"
+                                        }
+                                    ]
+                                },
+                                callback: function(response) {
+                                    // Redirect to verification script
+                                    window.location.href = "verify-payment.php?reference=" + response.reference + "&course_id=<?= $id ?>";
+                                },
+                                onClose: function() {
+                                    SDA.showToast("Payment cancelled", "warning");
+                                }
+                            });
+                            handler.openIframe();
+                        });
+                    </script>
+                </div>
+
+                <div style="text-align: center; margin: 24px 0; color: var(--text-dim); font-weight: 700; font-size: 0.8rem;">
+                    — OR USE MANUAL METHODS —
+                </div>
+
                 <div class="payment-method">
                     <h3><i class="fas fa-mobile-alt"></i> M-Pesa Payment Instruction</h3>
                     <p>1. Go to your M-Pesa menu or App.</p>
-                    <p>2. Select <strong>Lipa Na M-Pesa</strong> > <strong>Paybill</strong> / <strong>Till</strong>.</p>
-                    <p>3. Use Paybill Number: <strong>123456</strong> (or Till: <strong>987654</strong>).</p>
-                    <p>4. Use Account Number: <strong>SKOPE-<?= str_pad($id, 4, '0', STR_PAD_LEFT) ?></strong>.</p>
+                    <p>2. Select <strong>Send Money</strong>.</p>
+                    <p>3. Enter Phone Number: <strong>0742380183</strong>.</p>
+                    <p>4. Name: <strong>Peter Sege</strong>.</p>
                     <p>5. Enter amount exactly: <strong>KES <?= number_format($c['price']) ?></strong>.</p>
                 </div>
                 
                 <div class="payment-method">
                     <h3><i class="fas fa-university"></i> Bank Transfer Instruction</h3>
-                    <p>Bank: <strong>Equity Bank</strong> / <strong>KCB</strong></p>
-                    <p>Account Name: <strong>Skope Digital Academy Ltd.</strong></p>
-                    <p>Account Number: <strong>0123 4567 8901</strong></p>
+                    <p>Bank: <strong>KCB Bank</strong></p>
+                    <p>Account Name: <strong>Peter Sege</strong></p>
+                    <p>Account Number: <strong>1318989760</strong></p>
                     <p>Reference: <strong><?= $user['name'] ?> - CID-<?= $id ?></strong></p>
                 </div>
 
@@ -191,9 +259,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['payment_proof'])) {
                         <textarea name="transaction_message" class="form-control" style="min-height: 80px;" placeholder="e.g. M-Pesa Code: RKJ123ABC"></textarea>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 24px;">Submit Proof of Payment <i class="fas fa-upload"></i></button>
+                    <button type="submit" class="btn btn-ghost btn-block" style="margin-top: 24px; border: 1px dashed var(--dark-border);">Submit Proof of Payment <i class="fas fa-upload"></i></button>
                     <div style="text-align: center; color: var(--text-dim); font-size: 0.8rem; margin-top: 16px;">
-                        Secure Payment System | Skope Digital Academy
+                        Manual verification may take up to 24 hours.
                     </div>
                 </form>
             </div>

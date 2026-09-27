@@ -46,11 +46,13 @@ function requireRole(string|array $roles, string $redirect = '/Skope Digital Aca
  */
 function currentUser(): array {
     return [
-        'id'     => $_SESSION['user_id'] ?? null,
-        'name'   => $_SESSION['user_name'] ?? '',
-        'email'  => $_SESSION['user_email'] ?? '',
-        'role'   => $_SESSION['role'] ?? '',
-        'avatar' => $_SESSION['avatar'] ?? null,
+        'id'            => $_SESSION['user_id'] ?? null,
+        'name'          => $_SESSION['user_name'] ?? '',
+        'email'         => $_SESSION['user_email'] ?? '',
+        'role'          => $_SESSION['role'] ?? '',
+        'avatar'        => $_SESSION['avatar'] ?? null,
+        'referral_code' => $_SESSION['referral_code'] ?? '',
+        'status'        => $_SESSION['status'] ?? 'pending',
     ];
 }
 
@@ -59,11 +61,13 @@ function currentUser(): array {
  */
 function loginUser(array $user): void {
     session_regenerate_id(true);
-    $_SESSION['user_id']    = $user['id'];
-    $_SESSION['user_name']  = $user['name'];
-    $_SESSION['user_email'] = $user['email'];
-    $_SESSION['role']       = $user['role'];
-    $_SESSION['avatar']     = $user['avatar'] ?? null;
+    $_SESSION['user_id']       = $user['id'];
+    $_SESSION['user_name']     = $user['name'];
+    $_SESSION['user_email']    = $user['email'];
+    $_SESSION['role']          = $user['role'];
+    $_SESSION['avatar']        = $user['avatar'] ?? null;
+    $_SESSION['referral_code']  = $user['referral_code'] ?? '';
+    $_SESSION['status']         = $user['status'] ?? 'pending';
 }
 
 /**

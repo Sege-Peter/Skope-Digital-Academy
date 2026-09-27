@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'This email is already registered.';
                 } else {
                     $hashed = password_hash($password, PASSWORD_BCRYPT);
-                    $status = ($role === 'tutor') ? 'pending' : 'active';
+                    $status = 'pending'; // All new users start as pending until payment/approval
                     
                     // Handle Referral
                     $referred_by = null;
@@ -65,10 +65,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pdo->prepare("UPDATE users SET admission_number = ? WHERE id = ?")->execute([$adm_number, $new_user_id]);
                         }
 
-                        if ($role === 'tutor') {
-                            $success = 'Registration successful! Your tutor account is pending admin approval.';
+                        // Log the user in to proceed to checkout
+                        $_SESSION['user_id'] = $new_user_id;
+                        $_SESSION['role'] = $role;
+                        $_SESSION['name'] = $name;
+
+                        if ($role === 'student') {
+                            header("Location: checkout.php?type=registration");
+                            exit;
                         } else {
-                            $success = 'Account created successfully! You can now log in.';
+                            $success = 'Registration successful! Your tutor account is pending admin approval.';
                         }
                     } else {
                         $error = 'Failed to create account. Please try again.';
@@ -206,7 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: inset 2px 2px 4px var(--shadow-dark), 
                        inset -2px -2px 4px var(--shadow-light);
         }
-        .input-group i {
+        .input-group i:not(.toggle-password) {
             position: absolute;
             left: 22px;
             top: 50%;
@@ -214,6 +220,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: var(--text-dim);
             font-size: 1rem;
         }
+        .toggle-password {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: 0.3s;
+            z-index: 10;
+        }
+        .toggle-password:hover { color: var(--primary-btn); }
 
         /* ══ BUTTON ══ */
         .btn-neu {
@@ -327,11 +344,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="input-group">
                         <i class="fas fa-lock" style="left: 18px;"></i>
-                        <input type="password" name="password" class="input-neu" placeholder="Password" style="padding-left: 45px;" required>
+                        <input type="password" name="password" id="password" class="input-neu" placeholder="Password" style="padding-left: 45px; padding-right: 40px;" required>
+                        <i class="fas fa-eye toggle-password" style="right: 15px;" onclick="togglePassword('password', this)"></i>
                     </div>
                     <div class="input-group">
                         <i class="fas fa-shield-alt" style="left: 18px;"></i>
-                        <input type="password" name="confirm_password" class="input-neu" placeholder="Confirm" style="padding-left: 45px;" required>
+                        <input type="password" name="confirm_password" id="confirm_password" class="input-neu" placeholder="Confirm" style="padding-left: 45px; padding-right: 40px;" required>
+                        <i class="fas fa-eye toggle-password" style="right: 15px;" onclick="togglePassword('confirm_password', this)"></i>
                     </div>
                 </div>
 
@@ -357,6 +376,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <script src="assets/js/main.js"></script>
     <script>
+        function togglePassword(inputId, icon) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
         function updateRoleUI(role) {
             document.getElementById('student-btn').classList.toggle('active', role === 'student');
             document.getElementById('tutor-btn').classList.toggle('active', role === 'tutor');

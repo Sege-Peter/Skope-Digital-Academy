@@ -29,6 +29,15 @@ if (strpos($current_path, '/student/') !== false && $user['role'] !== 'student')
 $student = ($user['role'] === 'student') ? $user : null;
 $tutor   = ($user['role'] === 'tutor') ? $user : null;
 $admin   = ($user['role'] === 'admin') ? $user : null;
+
+// Unread Notifications Count
+try {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications 
+                           WHERE (user_role = 'all' OR user_role = ? OR target_user_id = ?) 
+                           AND read_status = 0");
+    $stmt->execute([$user['role'], $user['id']]);
+    $unread_notif_count = (int)$stmt->fetchColumn();
+} catch (Exception $e) { $unread_notif_count = 0; }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -39,7 +48,8 @@ $admin   = ($user['role'] === 'admin') ? $user : null;
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="../assets/css/main.css">
+<link rel="stylesheet" href="../assets/css/main.css?v=<?= time() ?>">
+<link rel="stylesheet" href="../assets/css/admin.css?v=<?= time() ?>">
 <style>
     :root { --sidebar-w: 280px; }
     body { background: var(--bg-light); color: var(--text-primary); }
@@ -57,8 +67,8 @@ $admin   = ($user['role'] === 'admin') ? $user : null;
     @media (max-width: 1024px) {
         .sidebar { transform: translateX(-100%); }
         .sidebar.open { transform: translateX(0); }
-        .main-content { margin-left: 0; padding: 24px 20px 60px; }
-        .nav-toggle { display: flex !important; }
+        .main-content { margin-left: 0; padding: 20px; padding-top: 80px; }
+        .dash-toggle { display: flex !important; }
         .admin-header { flex-direction: column; align-items: flex-start; gap: 20px; margin-bottom: 32px; }
     }
     
@@ -68,6 +78,17 @@ $admin   = ($user['role'] === 'admin') ? $user : null;
     .table-card { background: white; border: 1px solid var(--dark-border); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
     .admin-table th { background: var(--bg-light); color: var(--text-dim); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 1px; font-weight: 800; padding: 16px 24px; text-align: left; }
     .admin-table td { padding: 18px 24px; border-top: 1px solid var(--dark-border); font-size: 0.92rem; color: var(--text-primary); }
+
+    /* ── Institutional Print Protocols ── */
+    @media print {
+        body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .sidebar, .sidebar-wrapper, .admin-header, .sidebar-overlay, .nav-toggle, .dash-toggle, .btn-sm, .screen-only, nav, header { display: none !important; }
+        .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .print-only { display: block !important; }
+        .table-card { border: none !important; box-shadow: none !important; }
+        * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
+    }
+    .print-only { display: none; }
 </style>
 </head>
 <body>

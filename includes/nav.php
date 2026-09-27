@@ -2,8 +2,8 @@
 
 <!-- Top Bar -->
 <div class="top-bar" style="background: #f8fafc; border-bottom: 1px solid #eee; padding: 10px 0; font-size: 0.85rem; color: #64748b;">
-    <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; gap: 24px;">
+    <div class="container" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
             <span style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-map-marker-alt" style="color: #FF8C00;"></i> Kisumu, Kenya</span>
             <span style="display: flex; align-items: center; gap: 8px;"><i class="fas fa-envelope" style="color: #FF8C00;"></i> info@skopedigital.ac.ke</span>
         </div>
@@ -19,6 +19,13 @@
 <nav class="navbar" id="navbar">
   <div class="navbar-inner">
     
+    <!-- Mobile Hamburger -->
+    <button class="nav-hamburger" id="navToggle" aria-label="Toggle Navigation" style="margin-right: 15px;">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
     <!-- Logo -->
     <a href="index.php" class="navbar-logo" style="display: flex; align-items: center; gap: 15px; text-decoration: none;">
       <img src="assets/images/Skope Digital  logo.png" alt="Skope Digital" style="height: 54px;">
@@ -34,6 +41,7 @@
       <li><a href="about.php">About Us</a></li>
       <li><a href="courses.php">Courses</a></li>
       <li><a href="scholarships.php">Scholarships</a></li>
+      <li><a href="donate.php" style="color: var(--sky-blue); font-weight: 800;">Support Us</a></li>
       <li><a href="contact.php">Contact Us</a></li>
     </ul>
 
@@ -48,13 +56,6 @@
             <a href="login.php" class="btn btn-primary btn-sm">Get Started</a>
         <?php endif; ?>
     </div>
-
-    <!-- Mobile Hamburger -->
-    <button class="nav-hamburger" id="navToggle" aria-label="Toggle Navigation">
-        <span></span>
-        <span></span>
-        <span></span>
-    </button>
   </div>
 </nav>
 
@@ -65,6 +66,7 @@
     <a href="about.php">About Us</a>
     <a href="courses.php">Courses</a>
     <a href="scholarships.php">Scholarships</a>
+    <a href="donate.php" style="color: #00BFFF; font-weight: 800;">Support Us</a>
     <a href="contact.php">Contact Us</a>
     <?php if ($user): ?>
       <a href="logout.php" style="color: var(--danger);">Logout</a>

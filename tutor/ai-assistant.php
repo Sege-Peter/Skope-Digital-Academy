@@ -3,16 +3,17 @@
  * AI Course Assistant — AJAX Handler
  * Generates quiz questions & lesson plans from course data.
  * No external API needed: intelligently constructs from course metadata.
- require_once '../includes/db.php';
-require_once '../includes/auth.php';
-require_once '../includes/ai_config.php';
+ */
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/ai-handler.php';
 
 header('Content-Type: application/json');
 
 // Auth check
 if (!isLoggedIn() || currentUser()['role'] !== 'tutor') {
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-    exit;
+    header('Content-Type: application/json');
+    die(json_encode(['success' => false, 'error' => 'Faculty Authorization Required']));
 }
 
 $tutor  = currentUser();
@@ -41,13 +42,14 @@ try {
 
         $aiPrompt = "Create a high-quality educational quiz with {$num_q} multiple choice questions for a course titled '{$courseTitle}'.
         Topic Focus: " . (empty($prompt) ? $courseDesc : $prompt) . "
-        
-        Format: JSON array of objects only. No conversational text.
-        Structure: [ { \"question\": \"text\", \"correct_answer\": \"text\", \"options\": [\"opt1\", \"opt2\", \"opt3\", \"opt4\"], \"points\": 10 } ]";
+        Return STRICTLY valid JSON ONLY. No backticks. No prefix.
+        Structure: { \"questions\": [ { \"question\": \"text\", \"correct_answer\": \"text\", \"options\": [\"opt1\", \"opt2\", \"opt3\", \"opt4\"], \"points\": 10 } ] }";
 
-        $response = callGemini($aiPrompt);
-        $jsonStr  = preg_replace('/```json\n|\n```|```/', '', $response);
-        $questions = json_decode($jsonStr, true);
+        $response = SDAC_AI::ask($aiPrompt, "You are the SDAC Exam Architect. Return valid JSON only.");
+        
+        $jsonStr = preg_replace('/^```json\s*|```$/', '', trim($response));
+        $dataObj = json_decode($jsonStr, true);
+        $questions = $dataObj['questions'] ?? null;
 
         if (!$questions) throw new Exception("Failed to generate a valid quiz structure.");
 
@@ -75,8 +77,7 @@ try {
     } elseif ($action === 'generate_lesson_plan') {
         $aiPrompt = "Generate a structured 6-week lesson roadmap for a course titled '{$courseTitle}'.
         Theme/Topic: " . (empty($prompt) ? $courseDesc : $prompt) . "
-        
-        Format: JSON object only. No conversational text.
+        Return STRICTLY valid JSON ONLY. No backticks. No prefix.
         Structure: {
           \"title\": \"Roadmap Title\", \"level\": \"Intermediate\", \"duration\": \"6 Weeks\",
           \"sections\": [
@@ -84,8 +85,9 @@ try {
           ]
         }";
 
-        $response = callGemini($aiPrompt);
-        $jsonStr  = preg_replace('/```json\n|\n```|```/', '', $response);
+        $response = SDAC_AI::ask($aiPrompt, "You are the SDAC Curriculum Architect. Return valid JSON only.");
+        
+        $jsonStr = preg_replace('/^```json\s*|```$/', '', trim($response));
         $plan = json_decode($jsonStr, true);
 
         if (!$plan) throw new Exception("Failed to generate a valid curriculum roadmap.");
@@ -97,6 +99,7 @@ try {
             'course_id' => $course_id,
             'message'  => "✅ Dynamic 6-week syllabus drafted!",
         ]);
+        
     } elseif ($action === 'save_lesson_plan') {
         $course_id = (int)$_POST['course_id'];
         $planData  = json_decode($_POST['plan_json'] ?? '[]', true);

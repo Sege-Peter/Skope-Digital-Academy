@@ -165,11 +165,34 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 [data-aos] { opacity: 0; transform: translateY(28px); transition: all 0.6s ease; }
 [data-aos].visible { opacity: 1; transform: translateY(0); }
 
-@media (max-width: 900px) {
+/* ══ MOBILE COMPONENT OVERRIDES ══ */
+@media (max-width: 991px) {
   .sch-grid { grid-template-columns: 1fr; }
   .kit-card { grid-template-columns: 1fr; padding: 40px; text-align: center; }
-  .kit-list { justify-content: center; }
-  .sch-stats { gap: 32px; }
+  .kit-list { justify-content: center; text-align: left; }
+  .sch-stats { flex-direction: column; gap: 32px; align-items: center; }
+  .sch-stats div[style*="width: 1px"] { display: none; }
+}
+
+@media (max-width: 850px) {
+  #donationModal .apply-modal-content { padding: 40px; border-radius: 32px; }
+  #donationModal .apply-modal-content > div { grid-template-columns: 1fr !important; gap: 40px !important; }
+}
+
+@media (max-width: 768px) {
+  .sch-hero { padding: 80px 0 60px; }
+  .sch-hero h1 { font-size: 2.2rem; }
+  .sch-hero p { font-size: 1rem; }
+  .sch-card { padding: 32px 24px; }
+}
+
+@media (max-width: 480px) {
+  .sch-amount-val { font-size: 1.1rem; }
+  .btn-apply { padding: 10px 18px; font-size: 0.82rem; }
+  .apply-modal-content { padding: 32px 20px !important; }
+  .apply-modal-content h2 { font-size: 1.6rem !important; }
+  #sch-paystack-btn { height: 64px !important; font-size: 1rem !important; }
+  .sch-amount-chip { padding: 12px !important; font-size: 0.95rem !important; }
 }
 </style>
 </head>
@@ -308,42 +331,111 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 
 <!-- Donation Modal -->
 <div class="apply-modal" id="donationModal" onclick="if(event.target==this) closeDonationModal()">
-  <div class="apply-modal-content" style="text-align: center;">
+  <div class="apply-modal-content" style="max-width: 900px; padding: 64px; border-radius: 40px;">
     <button class="close-modal" onclick="closeDonationModal()"><i class="fas fa-times"></i></button>
-    <div style="width: 80px; height: 80px; background: rgba(255,140,0,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: #FF8C00; font-size: 2rem;">
-      <i class="fas fa-heart"></i>
-    </div>
-    <h2 style="font-family:'Poppins',sans-serif; font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 12px;">Support Our Learners</h2>
-    <p style="color: #64748b; line-height: 1.6; margin-bottom: 32px;">Your contribution directly funds tuition and certifications for talented students in need.</p>
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-      <!-- M-PESA -->
-      <div style="background: #f8fafc; border: 1px dashed #00BFFF; border-radius: 20px; padding: 24px;">
-        <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: #00BFFF; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <i class="fas fa-mobile-screen-button"></i> M-PESA
+    <div style="display: grid; grid-template-columns: 1fr 1.1fr; gap: 60px; align-items: center;">
+      <!-- Left: Brand/Context -->
+      <div style="text-align: left;">
+        <div style="width: 80px; height: 80px; background: rgba(0,191,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 32px; color: #00BFFF; font-size: 2.2rem;">
+          <i class="fas fa-hand-holding-heart"></i>
         </div>
-        <div style="font-size: 1.1rem; font-weight: 900; color: #0f172a; margin-bottom: 2px;">0742380183</div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #475569;">Peter Sege</div>
+        <h2 style="font-family:'Poppins',sans-serif; font-size: 2.8rem; font-weight: 900; color: #0f172a; margin-bottom: 20px; line-height: 1.1; letter-spacing: -1.5px;">Support Our <span style="color: #00BFFF;">Learners.</span></h2>
+        <p style="color: #64748b; line-height: 1.7; font-size: 1.1rem; margin-bottom: 0;">Your contribution directly funds tuition, world-class certifications, and digital literacy tools for talented students in need.</p>
       </div>
-      <!-- PayPal -->
-      <div style="background: #f8fafc; border: 1px dashed #0070ba; border-radius: 20px; padding: 24px;">
-        <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: #0070ba; letter-spacing: 1.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <i class="fab fa-paypal"></i> PayPal
+
+      <!-- Right: Form -->
+      <div style="background: white; padding: 48px; border-radius: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.04); border: 1px solid #eef2f6; text-align: left;">
+        <label style="display: block; font-weight: 800; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 1.5px;">Select Amount (KES)</label>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+          <div class="sch-amount-chip" onclick="setDonationAmount(500, this)" style="background: #f8fafc; border: 2px solid #f1f5f9; padding: 18px; border-radius: 16px; font-weight: 800; cursor: pointer; text-align: center; transition: 0.3s; font-family: 'Poppins', sans-serif; font-size: 1.1rem; color: #1e293b;">500</div>
+          <div class="sch-amount-chip active" onclick="setDonationAmount(1000, this)" style="background: #f8fafc; border: 2px solid #00BFFF; color: #00BFFF; padding: 18px; border-radius: 16px; font-weight: 800; cursor: pointer; text-align: center; transition: 0.3s; font-family: 'Poppins', sans-serif; font-size: 1.1rem;">1,000</div>
+          <div class="sch-amount-chip" onclick="setDonationAmount(5000, this)" style="background: #f8fafc; border: 2px solid #f1f5f9; padding: 18px; border-radius: 16px; font-weight: 800; cursor: pointer; text-align: center; transition: 0.3s; font-family: 'Poppins', sans-serif; font-size: 1.1rem; color: #1e293b;">5,000</div>
         </div>
-        <div style="font-size: 0.85rem; font-weight: 900; color: #0f172a; margin-bottom: 2px; word-break: break-all;">segepeter71@gmail.com</div>
-        <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=segepeter71@gmail.com&currency_code=USD&item_name=Support+Skope+Digital+Academy+Learners" target="_blank" style="font-size: 0.75rem; color: #0070ba; font-weight: 800; text-decoration: none;">Donate Now <i class="fas fa-external-link-alt" style="font-size: 0.6rem;"></i></a>
+        
+        <div style="margin-bottom: 24px;">
+          <input type="number" id="sch-custom-amount" style="width: 100%; padding: 20px 24px; border-radius: 16px; border: 2px solid #f1f5f9; font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 1.4rem; outline: none; background: white; transition: 0.3s; color: #1e293b;" placeholder="0" value="1000">
+        </div>
+
+        <?php if(!$user): ?>
+        <input type="email" id="sch-donor-email" style="width: 100%; padding: 20px 24px; border-radius: 16px; border: 2px solid #f1f5f9; margin-bottom: 24px; font-family: inherit; font-weight: 600; font-size: 1rem; outline: none; background: white; color: #1e293b;" placeholder="Your Email Address" required>
+        <?php endif; ?>
+
+        <button id="sch-paystack-btn" onclick="payWithPaystack()" style="width: 100%; height: 78px; background: #00BFFF; color: white; border: none; border-radius: 20px; font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 1.25rem; cursor: pointer; transition: 0.3s; box-shadow: 0 15px 35px rgba(0,191,255,0.3); display: flex; align-items: center; justify-content: center; gap: 14px;">
+          Donate with Paystack <i class="fas fa-heart"></i>
+        </button>
+        
+        <div style="margin-top: 28px; font-size: 0.8rem; color: #94a3b8; text-align: center; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; opacity: 0.8;">
+          <i class="fas fa-lock" style="font-size: 0.7rem;"></i> Secured by Paystack.
+        </div>
       </div>
     </div>
-    
-    <a href="https://wa.me/254742380183?text=Hello%2C%20I've%20just%20made%20a%20contribution%20to%20support%20Skope%20Digital%20Academy%20learners.%20Here%20is%20my%20proof%3A" target="_blank" class="btn btn-primary" style="width: 100%; height: 58px; border-radius: 14px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
-      I've Made My Contribution <i class="fab fa-whatsapp" style="margin-left: 10px;"></i>
-    </a>
   </div>
 </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://js.paystack.co/v1/inline.js"></script>
 
 <?php require_once 'includes/footer.php'; ?>
 
 <script>
+function setDonationAmount(amt, el) {
+    document.querySelectorAll('.sch-amount-chip').forEach(c => {
+        c.style.background = '#f8fafc';
+        c.style.borderColor = '#e2e8f0';
+        c.style.color = '#0f172a';
+        c.classList.remove('active');
+    });
+    el.style.background = 'rgba(0,191,255,0.05)';
+    el.style.borderColor = '#00BFFF';
+    el.style.color = '#00BFFF';
+    el.classList.add('active');
+    document.getElementById('sch-custom-amount').value = amt;
+}
+
+function payWithPaystack() {
+    const amount = document.getElementById('sch-custom-amount').value;
+    const email = "<?= $user ? $user['email'] : '' ?>" || document.getElementById('sch-donor-email')?.value;
+    const btn = document.getElementById('sch-paystack-btn');
+
+    if (!amount || amount < 50) {
+        alert("Please enter a valid amount (Min KES 50)");
+        return;
+    }
+    if (!email || !email.includes('@')) {
+        alert("Please provide a valid email address.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing...';
+
+    let handler = PaystackPop.setup({
+        key: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', // Replace with your Public Key
+        email: email,
+        amount: amount * 100,
+        currency: 'KES',
+        ref: 'DON-' + Math.floor((Math.random() * 1000000000) + 1),
+        metadata: {
+            custom_fields: [
+                { display_name: "Payment Type", variable_name: "payment_type", value: "donation" },
+                { display_name: "Source", variable_name: "source", value: "scholarship_page" }
+            ]
+        },
+        callback: function(response) {
+            window.location.href = "verify-payment.php?reference=" + response.reference + "&type=donation&email=" + encodeURIComponent(email);
+        },
+        onClose: function() {
+            btn.disabled = false;
+            btn.innerHTML = 'Donate with Paystack <i class="fas fa-heart"></i>';
+        }
+    });
+    handler.openIframe();
+}
+
 function openDonationModal() {
     document.getElementById('donationModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -376,7 +468,11 @@ els.forEach(el => io.observe(el));
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('msg') === 'success') {
-        SDAC.showToast('Your scholarship application has been received. Our board will review your credentials shortly.', 'success');
+        if(typeof SDAC !== 'undefined') {
+            SDAC.showToast('Your scholarship application has been received. Our board will review your credentials shortly.', 'success');
+        } else {
+            alert('Your scholarship application has been received. Our board will review your credentials shortly.');
+        }
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
     }

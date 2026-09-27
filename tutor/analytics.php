@@ -1,16 +1,10 @@
 <?php
 $pageTitle = 'Sales & Impact Analytics';
-require_once '../includes/header.php';
-
-// Auth check (header.php usually handles this, but let's be safe)
-if ($user['role'] !== 'tutor') {
-    header("Location: ../index.php");
-    exit;
-}
+require_once 'includes/header.php'; // Corrected include path
 
 // Fetch Analytics Data
 try {
-    $tutor_id = $user['id'];
+    $tutor_id = $tutor['id'];
 
     // 1. Revenue Trends (Last 6 Months)
     $stmt = $pdo->prepare("SELECT 
@@ -59,121 +53,100 @@ try {
 }
 ?>
 
-<?php require_once '../includes/sidebar.php'; ?>
+<?php require_once 'includes/sidebar.php'; ?>
+
+<main class="main-content">
+<header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
+    <div class="greeting">
+        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Sales & Impact Analytics<span style="color: var(--primary);">.</span></h1>
+        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Monitor your revenue growth, course popularity, and student success metrics.</p>
+    </div>
+    <div style="display: flex; gap: 16px; align-items: center;">
+        <button onclick="window.print()" class="btn-premium" style="padding: 14px 28px; background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none;">
+            <i class="fas fa-file-export"></i> EXPORT REPORT
+        </button>
+        <a href="index.php" class="btn-premium" style="padding: 14px 28px;">
+            <i class="fas fa-th-large"></i> DASHBOARD
+        </a>
+    </div>
+</header>
 
 <style>
-    .analytics-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; margin-bottom: 40px; }
-    .chart-card { background: white; border: 1px solid var(--dark-border); border-radius: 24px; padding: 32px; box-shadow: var(--shadow-sm); }
-    .chart-container { position: relative; height: 320px; width: 100%; margin-top: 20px; }
-    
-    .data-card { background: white; border: 1px solid var(--dark-border); border-radius: 24px; padding: 28px; height: 100%; }
-    .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    
-    .ranking-list { list-style: none; }
-    .ranking-item { display: flex; align-items: center; gap: 15px; padding: 16px 0; border-bottom: 1px solid #f1f5f9; }
-    .ranking-item:last-child { border-bottom: none; }
-    .ranking-num { width: 32px; height: 32px; background: var(--bg-light); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--text-dim); font-size: 0.85rem; }
-    .ranking-item:nth-child(1) .ranking-num { background: var(--secondary-glow); color: var(--secondary); }
-    .ranking-item:nth-child(2) .ranking-num { background: var(--primary-glow); color: var(--primary); }
-    
-    .progress-pill { height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 8px; }
-    .progress-pill-fill { height: 100%; background: var(--primary); border-radius: 10px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0; }
-
-    /* ══ MOBILE ══ */
-    @media (max-width: 1100px) {
-        .analytics-grid { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 768px) {
-        .chart-card { padding: 20px; }
-        .chart-container { height: 260px; }
-        .admin-header { flex-direction: column; align-items: flex-start; gap: 16px; min-height: auto; padding: 20px 0; }
+    @media (max-width: 1024px) {
+        .analytics-grid { grid-template-columns: 1fr !important; }
     }
 </style>
 
-<main class="main-content">
-    <header class="admin-header">
-        <div>
-            <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Sales & Impact <span class="text-primary">Analytics</span></h1>
-            <p style="color: var(--text-dim); margin-top: 4px;">Track your revenue growth, course popularity, and student success metrics.</p>
-        </div>
-        <div style="display: flex; gap: 12px;">
-            <button class="btn btn-ghost btn-sm" onclick="window.print()"><i class="fas fa-file-export"></i> Export Report</button>
-            <a href="index.php" class="btn btn-primary btn-sm"><i class="fas fa-th-large"></i> Dashboard</a>
-        </div>
-    </header>
-
-    <!-- Revenue Curve & Top Courses -->
-    <div class="analytics-grid">
-        <div class="chart-card">
-            <div class="data-header">
-                <div>
-                    <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem;">Revenue Performance</h3>
-                    <p style="font-size: 0.8rem; color: var(--text-dim);">Historical earnings over the last 6 months</p>
-                </div>
-                <div style="text-align: right;">
-                    <span style="font-size: 0.75rem; color: var(--success); font-weight: 700;"><i class="fas fa-caret-up"></i> +18.4%</span>
-                </div>
+<div class="analytics-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px; margin-bottom: 40px;">
+    <div class="premium-card" style="padding: 40px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;">Revenue Performance</h3>
+                <p style="margin: 4px 0 0; color: var(--text-dim); font-size: 0.85rem; font-weight: 600;">Historical earnings over the last 6 months</p>
             </div>
-            <div class="chart-container">
-                <canvas id="revenueChart"></canvas>
+            <div style="text-align: right;">
+                <span style="font-size: 0.75rem; color: var(--success); font-weight: 900; background: #ECFDF5; padding: 6px 12px; border-radius: 50px;"><i class="fas fa-arrow-trend-up"></i> +18.4%</span>
             </div>
         </div>
-
-        <div class="data-card">
-            <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem; margin-bottom: 20px;">Top Performing Courses</h3>
-            <ul class="ranking-list">
-                <?php if(!empty($top_courses)): ?>
-                    <?php foreach($top_courses as $i => $c): ?>
-                    <li class="ranking-item">
-                        <div class="ranking-num"><?= $i+1 ?></div>
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?= htmlspecialchars($c['title']) ?></div>
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 2px;"><?= $c['student_count'] ?> Students Enrolled</div>
-                            <div class="progress-pill">
-                                <div class="progress-pill-fill" data-width="<?= ($c['student_count'] / ($top_courses[0]['student_count'] ?: 1)) * 100 ?>%"></div>
-                            </div>
-                        </div>
-                        <div style="text-align: right; font-weight: 800; font-size: 0.88rem; color: var(--primary);">$<?= number_format($c['total_rev'], 0) ?></div>
-                    </li>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p style="text-align:center; color:var(--text-dim); padding-top: 40px;">No course data yet.</p>
-                <?php endif; ?>
-            </ul>
+        <div style="height: 350px; width: 100%;">
+            <canvas id="revenueChart"></canvas>
         </div>
     </div>
 
-    <!-- Engagement Grids -->
-    <div class="analytics-grid" style="grid-template-columns: 1fr 1fr;">
-        <div class="chart-card">
-            <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem; margin-bottom: 20px;">Enrollment Trajectory</h3>
-            <div class="chart-container" style="height: 240px;">
-                <canvas id="enrollmentChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-card">
-            <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem; margin-bottom: 24px;">Quiz Completion & Mastery</h3>
-            <div style="display: flex; flex-direction: column; gap: 20px;">
-                <?php if(!empty($quiz_analytics)): ?>
-                    <?php foreach($quiz_analytics as $q): ?>
-                    <div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 6px;">
-                            <span style="font-weight: 600; color: var(--dark);"><?= htmlspecialchars($q['quiz_title']) ?></span>
-                            <span style="font-weight: 800; color: var(--secondary);"><?= round($q['avg_score']) ?>% Avg</span>
+    <div class="premium-card" style="padding: 40px;">
+        <h3 style="margin: 0 0 32px; font-size: 1.1rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;">Top Performing Tracks</h3>
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+            <?php if(!empty($top_courses)): ?>
+                <?php foreach($top_courses as $i => $c): ?>
+                <div style="display: flex; align-items: flex-start; gap: 16px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+                    <div style="width: 32px; height: 32px; background: #E0F7FF; color: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 0.8rem; flex-shrink: 0;"><?= $i+1 ?></div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h4 style="margin: 0; font-weight: 900; font-size: 0.9rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><?= htmlspecialchars($c['title']) ?></h4>
+                        <p style="margin: 4px 0 12px; font-size: 0.75rem; color: var(--text-dim); font-weight: 700;"><?= $c['student_count'] ?> Scholars</p>
+                        <div style="height: 6px; background: #f1f5f9; border-radius: 10px; overflow: hidden;">
+                            <div class="progress-pill-fill" style="height: 100%; background: var(--grad-primary); border-radius: 10px; transition: 1s cubic-bezier(0.4, 0, 0.2, 1); width: 0;" data-width="<?= ($c['student_count'] / ($top_courses[0]['student_count'] ?: 1)) * 100 ?>%"></div>
                         </div>
-                        <div class="progress-pill" style="height: 10px;">
-                            <div class="progress-pill-fill" style="background: var(--secondary); width: <?= $q['avg_score'] ?>%;"></div>
-                        </div>
-                        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px;">Based on <?= $q['attempt_count'] ?> verified attempts</div>
                     </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p style="text-align:center; color:var(--text-dim); padding-top: 40px;">No quiz metrics available.</p>
-                <?php endif; ?>
-            </div>
+                    <div style="text-align: right; font-weight: 950; font-size: 0.85rem; color: var(--primary);">KES <?= number_format($c['total_rev'], 0) ?></div>
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div style="text-align: center; color: var(--text-dim); padding: 40px 0;">No tracks available for analysis.</div>
+            <?php endif; ?>
         </div>
     </div>
+</div>
+
+<div class="analytics-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 64px;">
+    <div class="premium-card" style="padding: 40px;">
+        <h3 style="margin: 0 0 32px; font-size: 1.1rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;">Enrollment Trajectory</h3>
+        <div style="height: 300px; width: 100%;">
+            <canvas id="enrollmentChart"></canvas>
+        </div>
+    </div>
+
+    <div class="premium-card" style="padding: 40px;">
+        <h3 style="margin: 0 0 32px; font-size: 1.1rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;">Knowledge Mastery</h3>
+        <div style="display: flex; flex-direction: column; gap: 32px;">
+            <?php if(!empty($quiz_analytics)): ?>
+                <?php foreach($quiz_analytics as $q): ?>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-weight: 800; color: var(--text-main); font-size: 0.9rem;"><?= htmlspecialchars($q['quiz_title']) ?></span>
+                        <span style="font-weight: 950; color: var(--secondary); font-size: 1rem;"><?= round($q['avg_score']) ?>%</span>
+                    </div>
+                    <div style="height: 10px; background: #f1f5f9; border-radius: 10px; overflow: hidden; margin-bottom: 8px;">
+                        <div style="height: 100%; background: var(--secondary); border-radius: 10px; width: <?= $q['avg_score'] ?>%;"></div>
+                    </div>
+                    <p style="margin: 0; font-size: 0.7rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Based on <?= $q['attempt_count'] ?> Verified Attempts</p>
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div style="text-align: center; color: var(--text-dim); padding: 40px 0;">No assessment metrics available.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
 </main>
 
 <!-- Chart.js CDN -->

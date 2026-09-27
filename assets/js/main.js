@@ -81,20 +81,37 @@ function confirmAction(message, callback) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `
-    <div class="modal" style="max-width:420px;">
-      <div style="text-align:center;padding:8px 0;">
-        <div style="font-size:3rem;margin-bottom:16px;">⚠️</div>
-        <h3 style="margin-bottom:12px;">Confirm Action</h3>
-        <p style="color:var(--text-muted);margin-bottom:28px;">${message}</p>
-        <div style="display:flex;gap:12px;justify-content:center;">
-          <button id="confirmNo"  class="btn btn-ghost">Cancel</button>
-          <button id="confirmYes" class="btn btn-danger" style="background:var(--danger);border-color:var(--danger);color:#fff;">Confirm</button>
+    <div class="modal modal-sm">
+      <div class="modal-body" style="text-align:center; padding: 48px 32px;">
+        <div style="width: 80px; height: 80px; background: rgba(255,140,0,0.1); color: var(--secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin: 0 auto 24px;">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3 style="font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.4rem; color: var(--text-primary); margin-bottom: 12px;">Confirm Action</h3>
+        <p style="color: var(--text-dim); line-height: 1.6; font-size: 0.95rem; margin-bottom: 32px;">${message}</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <button id="confirmNo" class="btn btn-ghost" style="height: 54px; border-radius: 14px;">Cancel</button>
+          <button id="confirmYes" class="btn btn-primary" style="height: 54px; border-radius: 14px; background: var(--secondary); border-color: var(--secondary); box-shadow: 0 10px 20px rgba(255,140,0,0.2);">Confirm</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(overlay);
-  document.getElementById('confirmNo').onclick  = () => overlay.remove();
-  document.getElementById('confirmYes').onclick = () => { overlay.remove(); callback(); };
+  
+  // Fade in
+  requestAnimationFrame(() => overlay.style.opacity = '1');
+
+  document.getElementById('confirmNo').onclick  = () => {
+    overlay.style.opacity = '0';
+    setTimeout(() => overlay.remove(), 400);
+  };
+  
+  document.getElementById('confirmYes').onclick = () => {
+    overlay.style.opacity = '0';
+    setTimeout(() => {
+      overlay.remove();
+      callback();
+    }, 400);
+  };
 }
 
 // ── Format file size ───────────────────────────────────────────

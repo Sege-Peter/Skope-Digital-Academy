@@ -1,20 +1,19 @@
 <?php
 $pageTitle = 'Master Instructor Profile';
-require_once '../includes/header.php';
-requireRole('tutor');
+require_once 'includes/header.php';
 
 // 1. Fetch the most up-to-date user info from DB (since session may not have bio/phone)
 try {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->execute([$user['id']]);
-    $tutor = $stmt->fetch();
-    if (!$tutor) {
+    $stmt->execute([$tutor['id']]);
+    $tutor_data = $stmt->fetch();
+    if (!$tutor_data) {
         logoutUser();
         header('Location: ../login.php');
         exit;
     }
 } catch (Exception $e) {
-    $tutor = $user; // fallback
+    $tutor_data = $tutor; // fallback
 }
 
 $message = '';
@@ -27,15 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
 
     try {
         $stmt = $pdo->prepare("UPDATE users SET name = ?, phone = ?, bio = ? WHERE id = ?");
-        $stmt->execute([$name, $phone, $bio, $tutor['id']]);
+        $stmt->execute([$name, $phone, $bio, $tutor_data['id']]);
         
         // Refresh session data
         $_SESSION['user_name'] = $name;
         
         // Refresh local variable
-        $tutor['name'] = $name;
-        $tutor['phone'] = $phone;
-        $tutor['bio'] = $bio;
+        $tutor_data['name'] = $name;
+        $tutor_data['phone'] = $phone;
+        $tutor_data['bio'] = $bio;
         
         $message = "Your professional profile has been updated!";
     } catch (Exception $e) { $message = "Error: " . $e->getMessage(); }
@@ -53,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar'])) {
         exit;
     }
 
-    $filename = "AVATAR_" . $tutor['id'] . "_" . time() . "." . $ext;
+    $filename = "AVATAR_" . $tutor_data['id'] . "_" . time() . "." . $ext;
     $path = "../uploads/avatars/";
     
     if (!is_dir($path)) mkdir($path, 0777, true);
@@ -61,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar'])) {
     if (move_uploaded_file($file['tmp_name'], $path . $filename)) {
         try {
             $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-            $stmt->execute([$filename, $tutor['id']]);
+            $stmt->execute([$filename, $tutor_data['id']]);
             $_SESSION['avatar'] = $filename;
             echo json_encode(['success' => true, 'avatar' => $filename]);
         } catch (Exception $e) {
@@ -76,196 +75,151 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar'])) {
 // 4. Instructor Stats
 try {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM courses WHERE tutor_id = ?");
-    $stmt->execute([$tutor['id']]);
+    $stmt->execute([$tutor_data['id']]);
     $course_count = $stmt->fetchColumn();
 
     $stmt = $pdo->prepare("SELECT COUNT(p.id) FROM payments p 
                            JOIN courses c ON p.course_id = c.id 
                            WHERE c.tutor_id = ? AND p.status = 'verified'");
-    $stmt->execute([$tutor['id']]);
+    $stmt->execute([$tutor_data['id']]);
     $student_count = $stmt->fetchColumn();
 
     $stmt = $pdo->prepare("SELECT SUM(p.amount * 0.8) FROM payments p 
                            JOIN courses c ON p.course_id = c.id 
                            WHERE c.tutor_id = ? AND p.status = 'verified'");
-    $stmt->execute([$tutor['id']]);
+    $stmt->execute([$tutor_data['id']]);
     $total_earnings = $stmt->fetchColumn() ?: 0;
 
 } catch (Exception $e) { $course_count = $student_count = $total_earnings = 0; }
 ?>
 
-<?php require_once '../includes/sidebar.php'; ?>
+<?php require_once 'includes/sidebar.php'; ?>
 
 <style>
-    .profile-card-main {
-        background: white;
-        border: 1px solid var(--dark-border);
-        border-radius: 32px;
-        padding: 48px;
-        margin-bottom: 40px;
-        display: grid;
-        grid-template-columns: 320px 1fr;
-        gap: 60px;
-    }
-
-    .profile-left { text-align: center; border-right: 1px solid var(--dark-border); padding-right: 60px; }
-    
-    .avatar-upload-box {
-        width: 180px;
-        height: 180px;
-        border-radius: 60px;
-        background: var(--primary-glow);
-        margin: 0 auto 32px;
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 5rem;
-        font-weight: 800;
-        color: var(--primary);
-        overflow: hidden;
-        border: 4px solid white;
-        box-shadow: var(--shadow-lg);
-    }
-    .avatar-upload-box img { width: 100%; height: 100%; object-fit: cover; }
-    
-    .camera-btn {
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 44px;
-        height: 44px;
-        background: var(--secondary);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        border: 4px solid white;
-        font-size: 0.9rem;
-    }
-
-    .profile-stat-strip {
-        display: flex;
-        justify-content: center;
-        gap: 32px;
-        margin-top: 32px;
-    }
-    .p-stat { text-align: center; }
-    .p-stat-val { font-family: 'Poppins', sans-serif; font-size: 1.5rem; font-weight: 900; color: var(--dark); }
-    .p-stat-lbl { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 800; }
-
-    .form-section-title { font-family: 'Poppins', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--dark); margin-bottom: 32px; border-bottom: 2px solid var(--primary-glow); padding-bottom: 12px; }
-    
-    .profile-form-group { margin-bottom: 24px; }
-    .profile-form-group label { display: block; font-size: 0.72rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
-    .profile-form-input { 
-        width: 100%; padding: 14px 20px; border-radius: 16px; border: 1px solid var(--dark-border); background: #f8fafc; font-family: 'Inter', sans-serif; font-size: 0.95rem; color: var(--dark); transition: 0.3s;
-    }
-    .profile-form-input:focus { border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 5px var(--primary-glow); }
-
-    @media (max-width: 1100px) {
-        .profile-card-main { grid-template-columns: 1fr; padding: 32px; gap: 40px; }
-        .profile-left { border-right: none; border-bottom: 2px solid var(--primary-glow); padding-right: 0; padding-bottom: 40px; margin-bottom: 20px; }
+    @media (max-width: 1024px) {
+        .profile-layout { grid-template-columns: 1fr !important; gap: 32px; }
     }
 </style>
 
 <main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-            <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Professional <span class="text-primary">Portfolio</span></h1>
-                <p style="color: var(--text-dim); margin-top: 4px;">Update your credentials and brand identity for the students.</p>
-            </div>
-        </div>
-    </header>
+<header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
+    <div class="greeting">
+        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Professional Portfolio<span style="color: var(--primary);">.</span></h1>
+        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Update your <span style="color: var(--primary); font-weight: 700;">instructional credentials</span> and brand identity.</p>
+    </div>
+    <div style="display: flex; gap: 12px;">
+        <button type="reset" form="profileForm" class="btn-premium" style="background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none; font-size: 0.8rem; padding: 12px 24px;">
+            DISCARD CHANGES
+        </button>
+        <button type="submit" form="profileForm" class="btn-premium" style="padding: 12px 32px;">
+            <i class="fas fa-shield-check"></i> SAVE PORTFOLIO
+        </button>
+    </div>
+</header>
 
-    <?php if($message): ?>
-        <div style="padding: 16px 24px; background: #DCFCE7; color: #166534; border-radius: 16px; margin-bottom: 32px; display: flex; align-items: center; gap: 12px; border: 1px solid #BBF7D0;">
-            <i class="fas fa-check-circle"></i> <?= $message ?>
-        </div>
-    <?php endif; ?>
+<?php if($message): ?>
+    <div style="padding: 20px 32px; background: #ECFDF5; color: #065F46; border-radius: 20px; margin-bottom: 40px; display: flex; align-items: center; gap: 16px; border: 1px solid #D1FAE5; font-weight: 700;">
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: #10B981; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;"><i class="fas fa-check"></i></div>
+        <?= $message ?>
+    </div>
+<?php endif; ?>
 
-    <form method="POST" class="profile-card-main">
-        <div class="profile-left">
-            <div class="avatar-upload-box">
-                <?php if($tutor['avatar']): ?>
-                    <img src="../uploads/avatars/<?= htmlspecialchars($tutor['avatar']) ?>" alt="">
-                <?php else: ?>
-                    <?= strtoupper(substr($tutor['name'], 0, 1)) ?>
-                <?php endif; ?>
-                <div class="camera-btn" onclick="document.getElementById('avatarInput').click()"><i class="fas fa-camera"></i></div>
+<div class="profile-layout" style="display: grid; grid-template-columns: 380px 1fr; gap: 40px;">
+    <!-- Profile Sidebar -->
+    <div style="display: flex; flex-direction: column; gap: 40px;">
+        <div class="premium-card" style="padding: 48px 32px; text-align: center;">
+            <div style="position: relative; width: 200px; height: 200px; margin: 0 auto 32px;">
+                <div style="width: 100%; height: 100%; border-radius: 60px; background: #F8FAFC; border: 8px solid white; box-shadow: var(--shadow-premium); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 4rem; font-weight: 950; color: var(--primary);">
+                    <?php if($tutor_data['avatar']): ?>
+                        <img src="../uploads/avatars/<?= htmlspecialchars($tutor_data['avatar']) ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                    <?php else: ?>
+                        <?= strtoupper(substr($tutor_data['name'], 0, 1)) ?>
+                    <?php endif; ?>
+                </div>
+                <button onclick="document.getElementById('avatarInput').click()" style="position: absolute; bottom: 10px; right: 10px; width: 52px; height: 52px; border-radius: 20px; background: var(--primary); color: white; border: 4px solid white; cursor: pointer; font-size: 1.1rem; box-shadow: var(--shadow-sm); transition: 0.3s;" onmouseover="this.style.transform='scale(1.1)'">
+                    <i class="fas fa-camera"></i>
+                </button>
                 <input type="file" id="avatarInput" style="display: none;" accept="image/*" onchange="uploadAvatar(this)">
             </div>
             
-            <h2 style="font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 1.5rem; color: var(--dark);"><?= htmlspecialchars($tutor['name']) ?></h2>
-            <p style="color: var(--text-dim); font-size: 0.88rem; margin-top: 4px;">Professor Identity • Since <?= date('Y', strtotime($tutor['created_at'])) ?></p>
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;"><?= htmlspecialchars($tutor_data['name']) ?></h2>
+            <div style="display: inline-block; padding: 6px 14px; background: #F1F5F9; color: var(--text-dim); border-radius: 50px; font-size: 0.7rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 12px;">Professor Identity</div>
             
-            <div class="profile-stat-strip">
-                <div class="p-stat">
-                    <div class="p-stat-val"><?= $course_count ?></div>
-                    <div class="p-stat-lbl">Courses</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 48px; padding-top: 40px; border-top: 1px solid #F1F5F9;">
+                <div>
+                    <div style="font-size: 1.25rem; font-weight: 950; color: var(--text-main);"><?= $course_count ?></div>
+                    <div style="font-size: 0.6rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Courses</div>
                 </div>
-                <div class="p-stat">
-                    <div class="p-stat-val" style="color: var(--primary);"><?= $student_count ?></div>
-                    <div class="p-stat-lbl">Students</div>
+                <div>
+                    <div style="font-size: 1.25rem; font-weight: 950; color: var(--primary);"><?= $student_count ?></div>
+                    <div style="font-size: 0.6rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Scholars</div>
                 </div>
-                <div class="p-stat">
-                    <div class="p-stat-val" style="color: #10B981;"><?= number_format($total_earnings/1000, 1) ?>k</div>
-                    <div class="p-stat-lbl">Earnings</div>
-                </div>
-            </div>
-
-            <div style="margin-top: 48px; padding: 24px; background: #f8fafc; border-radius: 20px; border: 1px solid #e2e8f0;">
-                <div style="font-size: 0.65rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 12px;">Credential Rank</div>
-                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--secondary); font-weight: 900; font-size: 1.1rem;">
-                    <i class="fas fa-crown"></i> Elite Instructor
+                <div>
+                    <div style="font-size: 1.25rem; font-weight: 950; color: #10B981;">KES <?= number_format($total_earnings/1000, 1) ?>k</div>
+                    <div style="font-size: 0.6rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Impact</div>
                 </div>
             </div>
         </div>
 
-        <div class="profile-right">
-            <h3 class="form-section-title">Master Credentials</h3>
-            
+        <div class="premium-card" style="padding: 32px; background: var(--grad-premium); color: white;">
+            <div style="font-size: 0.65rem; font-weight: 950; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.6); margin-bottom: 20px;">Institutional Rank</div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #FFD700;"><i class="fas fa-award"></i></div>
+                <div>
+                    <div style="font-weight: 950; font-size: 1.1rem; letter-spacing: -0.3px;">Elite Academic</div>
+                    <div style="font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.7);">Level 5 Instruction Hub</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Form -->
+    <div class="premium-card" style="padding: 48px;">
+        <form id="profileForm" method="POST">
             <input type="hidden" name="update_profile" value="1">
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                <div class="profile-form-group">
-                    <label>Full Professional Name</label>
-                    <input type="text" name="name" class="profile-form-input" value="<?= htmlspecialchars($tutor['name']) ?>" required>
+            <h3 style="margin: 0 0 40px; font-size: 1.25rem; font-weight: 950; color: var(--text-main); display: flex; align-items: center; gap: 12px;">
+                <span style="width: 8px; height: 32px; background: var(--primary); border-radius: 4px;"></span>
+                Master Credentials
+            </h3>
+
+            <div class="grid-2" style="margin-bottom: 32px;">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Full Professional Name</label>
+                    <input type="text" name="name" style="width: 100%; padding: 16px 24px; border-radius: 16px; border: 1.5px solid #F1F5F9; background: #F8FAFC; font-size: 1rem; font-weight: 700; color: var(--text-main); outline: none; transition: 0.3s;" value="<?= htmlspecialchars($tutor_data['name']) ?>" required onfocus="this.style.borderColor='var(--primary)'; this.style.background='white'">
                 </div>
-                <div class="profile-form-group">
-                    <label>Contact Email (Secured)</label>
-                    <input type="email" class="profile-form-input" value="<?= htmlspecialchars($tutor['email']) ?>" disabled style="opacity: 0.6; cursor: not-allowed;">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Institutional Email (Secured)</label>
+                    <input type="email" style="width: 100%; padding: 16px 24px; border-radius: 16px; border: 1.5px solid #F1F5F9; background: #F1F5F9; font-size: 1rem; font-weight: 700; color: var(--text-dim); outline: none; cursor: not-allowed;" value="<?= htmlspecialchars($tutor_data['email']) ?>" disabled>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                <div class="profile-form-group">
-                    <label>Phone Number</label>
-                    <input type="text" name="phone" class="profile-form-input" value="<?= htmlspecialchars($tutor['phone'] ?? '+254 ') ?>">
+            <div class="grid-2" style="margin-bottom: 32px;">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Direct Contact Node</label>
+                    <input type="text" name="phone" style="width: 100%; padding: 16px 24px; border-radius: 16px; border: 1.5px solid #F1F5F9; background: #F8FAFC; font-size: 1rem; font-weight: 700; color: var(--text-main); outline: none; transition: 0.3s;" value="<?= htmlspecialchars($tutor_data['phone'] ?? '') ?>" placeholder="+254 7XX XXX XXX" onfocus="this.style.borderColor='var(--primary)'; this.style.background='white'">
                 </div>
-                <div class="profile-form-group">
-                    <label>Official Title</label>
-                    <input type="text" class="profile-form-input" value="Certified Academic Instructor" disabled style="opacity: 0.6;">
+                <div>
+                    <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Professional Rank</label>
+                    <input type="text" style="width: 100%; padding: 16px 24px; border-radius: 16px; border: 1.5px solid #F1F5F9; background: #F1F5F9; font-size: 1rem; font-weight: 700; color: var(--text-dim); outline: none;" value="Certified Academic Instructor" disabled>
                 </div>
             </div>
 
-            <div class="profile-form-group">
-                <label>Professional Biography / Mission Statement</label>
-                <textarea name="bio" class="profile-form-input" style="min-height: 160px; resize: none;" placeholder="Introduce yourself to your future students and share your expertise..."><?= htmlspecialchars($tutor['bio'] ?? '') ?></textarea>
+            <div style="margin-bottom: 40px;">
+                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Instructional Mission Statement / Biography</label>
+                <textarea name="bio" style="width: 100%; min-height: 200px; padding: 24px; border-radius: 16px; border: 1.5px solid #F1F5F9; background: #F8FAFC; font-family: inherit; font-size: 1rem; font-weight: 600; color: var(--text-main); outline: none; resize: none; transition: 0.3s;" placeholder="Share your academic mission and professional expertise with your scholars..." onfocus="this.style.borderColor='var(--primary)'; this.style.background='white'"><?= htmlspecialchars($tutor_data['bio'] ?? '') ?></textarea>
             </div>
 
-            <div style="display: flex; gap: 16px; margin-top: 40px;">
-                <button type="submit" class="btn btn-primary" style="padding: 18px 48px; border-radius: 18px; font-weight: 800; font-size: 1rem;">
-                    Save Professional Profile
-                </button>
-                <button type="reset" class="btn btn-ghost" style="padding: 18px 32px; border-radius: 18px;">Discard Changes</button>
+            <div style="padding: 24px; background: #FFFBEB; border: 1px solid #FEF3C7; border-radius: 20px; display: flex; gap: 20px; align-items: flex-start;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: white; color: #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: var(--shadow-sm);"><i class="fas fa-info-circle"></i></div>
+                <div>
+                    <div style="font-weight: 950; font-size: 0.9rem; color: #92400E; margin-bottom: 4px;">Public Branding Note</div>
+                    <p style="margin: 0; font-size: 0.85rem; color: #B45309; line-height: 1.6; font-weight: 600;">Your professional name and mission statement are visible to all scholars on their dashboard and course enrollment pages.</p>
+                </div>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
+</div>
 </main>
 
 <script>
@@ -285,11 +239,7 @@ try {
             if (data.success) {
                 location.reload();
             } else {
-                if (window.SDA && window.SDA.showToast) {
-                    SDA.showToast(data.message || "Upload failed", "danger");
-                } else {
-                    alert(data.message || "Upload failed");
-                }
+                alert(data.message || "Upload failed");
             }
         } catch (e) { 
             console.error(e);
