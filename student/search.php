@@ -42,7 +42,7 @@ require_once 'includes/layout-top.php';
         </div>
         <h3 style="font-weight: 800; margin: 0 0 8px;">No results found</h3>
         <p style="color: var(--text-dim); margin-bottom: 24px;">We couldn't find anything matching your query. Try different keywords.</p>
-        <a href="index.php" class="btn-premium" style="display: inline-block;">Return to Dashboard</a>
+        <a href="./" class="btn-premium" style="display: inline-block;">Return to Dashboard</a>
     </div>
 <?php else: ?>
 
@@ -52,7 +52,7 @@ require_once 'includes/layout-top.php';
         <h4 style="font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 24px;"><i class="fas fa-graduation-cap"></i> Academic Courses</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px;">
             <?php foreach($courses as $c): ?>
-            <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: 0.3s;" onclick="window.location.href='classroom.php?id=<?= $c['id'] ?>'">
+            <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: 0.3s;" onclick="window.location.href='classroom?id=<?= $c['id'] ?>'">
                 <div style="height: 160px; position: relative;">
                     <img src="../<?= $c['thumbnail'] ? 'uploads/courses/'.$c['thumbnail'] : 'assets/images/course-placeholder.jpg' ?>" style="width: 100%; height: 100%; object-fit: cover;">
                     <span style="position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); color: white; padding: 4px 10px; border-radius: 8px; font-size: 0.65rem; font-weight: 800;"><?= htmlspecialchars($c['category_name'] ?: 'Academy') ?></span>
@@ -77,7 +77,7 @@ require_once 'includes/layout-top.php';
         <h4 style="font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 24px;"><i class="fas fa-play-circle"></i> Lesson Modules</h4>
         <div style="display: flex; flex-direction: column; gap: 12px;">
             <?php foreach($lessons as $l): ?>
-            <a href="classroom.php?id=<?= $l['course_id'] ?>&lesson=<?= $l['id'] ?>" style="display: flex; align-items: center; gap: 20px; padding: 16px 24px; background: white; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: inherit; transition: 0.2s;">
+            <a href="classroom?id=<?= $l['course_id'] ?>&lesson=<?= $l['id'] ?>" style="display: flex; align-items: center; gap: 20px; padding: 16px 24px; background: white; border: 1px solid var(--border); border-radius: 16px; text-decoration: none; color: inherit; transition: 0.2s;">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: #E0F7FF; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
                     <i class="fas <?= $l['lesson_type'] == 'video' ? 'fa-play' : 'fa-file-alt' ?>"></i>
                 </div>

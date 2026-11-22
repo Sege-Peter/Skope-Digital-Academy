@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     try {
         $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ?, bio = ? WHERE id = ?");
         $stmt->execute([$name, $email, $phone, $bio, $student['id']]);
-        header('Location: profile.php?success=1');
+        header('Location: profile?success=1');
         exit;
     } catch(Exception $e) { $error = "Could not update profile."; }
 }
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar'])) {
     if (move_uploaded_file($file['tmp_name'], $target)) {
         $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
         $stmt->execute([$newName, $student['id']]);
-        header('Location: profile.php?avatar_success=1');
+        header('Location: profile?avatar_success=1');
         exit;
     }
 }

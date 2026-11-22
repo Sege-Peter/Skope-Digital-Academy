@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -93,7 +93,7 @@ try {
             <button class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none;" onclick="window.print()">
                 <i class="fas fa-file-invoice"></i> Generate Intelligence Report
             </button>
-            <a href="announcements.php" class="btn-premium" style="text-decoration: none;">
+            <a href="announcements" class="btn-premium" style="text-decoration: none;">
                 <i class="fas fa-broadcast-tower"></i> New Broadcast
             </a>
         </div>
@@ -114,7 +114,7 @@ try {
             <div class="premium-card" style="border-bottom: 4px solid var(--warning);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
                     <div class="stat-icon" style="background: var(--warning-glow); color: var(--warning);"><i class="fas fa-shield-check"></i></div>
-                    <a href="verifications.php" class="avatar-sm" style="width: 32px; height: 32px; background: var(--bg-main); border: none; color: var(--warning); cursor: pointer;"><i class="fas fa-arrow-right"></i></a>
+                    <a href="verifications" class="avatar-sm" style="width: 32px; height: 32px; background: var(--bg-main); border: none; color: var(--warning); cursor: pointer;"><i class="fas fa-arrow-right"></i></a>
                 </div>
                 <div class="stat-label">PENDING FISCAL AUDITS</div>
                 <div class="stat-value" style="font-size: 1.8rem; color: var(--warning);"><?= $pending_payments ?></div>
@@ -150,7 +150,7 @@ try {
                         <h3 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.3px;">Stakeholder Intelligence</h3>
                         <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-top: 4px;">Real-time monitoring of institutional onboarding.</p>
                     </div>
-                    <a href="users.php" class="badge-premium" style="background: var(--bg-main); color: var(--primary); border: 1.5px solid var(--primary-glow); text-decoration: none;">FULL REGISTRY</a>
+                    <a href="users" class="badge-premium" style="background: var(--bg-main); color: var(--primary); border: 1.5px solid var(--primary-glow); text-decoration: none;">FULL REGISTRY</a>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="premium-table">
@@ -188,7 +188,7 @@ try {
                                 </td>
                                 <td style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;"><?= date('M j, Y', strtotime($u['created_at'])) ?></td>
                                 <td style="text-align: right;">
-                                    <a href="user-profile.php?id=<?= $u['id'] ?>" class="avatar-sm" style="width: 28px; height: 28px; background: transparent; border-color: var(--border-light); color: var(--text-muted); cursor: pointer;">
+                                    <a href="user-profile?id=<?= $u['id'] ?>" class="avatar-sm" style="width: 28px; height: 28px; background: transparent; border-color: var(--border-light); color: var(--text-muted); cursor: pointer;">
                                         <i class="fas fa-chevron-right" style="font-size: 0.6rem;"></i>
                                     </a>
                                 </td>

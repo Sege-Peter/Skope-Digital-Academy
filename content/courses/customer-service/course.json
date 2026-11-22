@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Customer Service",
+  "short": "Customer Service",
+  "description": "For school leavers who want to work with people – in shops, offices, call centres or remote support roles. You will learn how to listen, communicate on phone, WhatsApp and email, handle complaints and difficult customers calmly, and use feedback to help a business grow.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 20,
+  "outcomes": [
+    "Explain why good service matters and show a service mindset",
+    "Listen actively and ask the right questions to understand a customer",
+    "Communicate professionally by phone, WhatsApp and email",
+    "Handle complaints and difficult customers calmly using a clear method",
+    "Collect and use customer feedback in a small business",
+    "Prepare for customer service and remote support jobs"
+  ]
+}

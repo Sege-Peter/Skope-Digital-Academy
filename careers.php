@@ -27,6 +27,7 @@ $user = isLoggedIn() ? currentUser() : null;
     .culture-section { padding: 100px 0; background: white; }
     .culture-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
     .culture-card { text-align: center; }
+    @media (max-width: 768px) { .culture-grid { grid-template-columns: 1fr; gap: 32px; } .culture-section { padding: 64px 0; } }
     .culture-icon { font-size: 2.5rem; color: var(--secondary); margin-bottom: 24px; }
 </style>
 </head>
@@ -51,7 +52,7 @@ $user = isLoggedIn() ? currentUser() : null;
             <div class="culture-card">
                 <div class="culture-icon"><i class="fas fa-magic"></i></div>
                 <h3 style="margin-bottom: 16px;">Innovation First</h3>
-                <p style="color: var(--text-muted); line-height: 1.8;">We constanty push the boundaries of what's possible with AI and educational technology.</p>
+                <p style="color: var(--text-muted); line-height: 1.8;">We constantly push the boundaries of what's possible with AI and educational technology.</p>
             </div>
             <div class="culture-card">
                 <div class="culture-icon"><i class="fas fa-globe-africa"></i></div>
@@ -84,7 +85,7 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-tag"></i> Academic Team</span>
                     </div>
                 </div>
-                <a href="#" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20Senior%20Learning%20Experience%20Designer" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div class="job-card">
@@ -96,7 +97,7 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-robot"></i> Technology</span>
                     </div>
                 </div>
-                <a href="#" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20AI%20Content%20Strategy%20Lead" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div class="job-card">
@@ -108,7 +109,7 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-user-graduate"></i> Operations</span>
                     </div>
                 </div>
-                <a href="#" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20Student%20Success%20Coordinator" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div style="text-align: center; margin-top: 60px;">

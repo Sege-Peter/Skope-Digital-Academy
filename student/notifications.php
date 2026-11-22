@@ -3,13 +3,13 @@ $pageTitle = 'Institutional Intelligence';
 require_once '../includes/header.php';
 
 // Auth Check: Student only
-if ($user['role'] !== 'student') { header('Location: ../login.php'); exit; }
+if ($user['role'] !== 'student') { header('Location: ../login'); exit; }
 
 // 1. Mark all as read if requested
 if (isset($_GET['mark_all_read'])) {
     $stmt = $pdo->prepare("UPDATE notifications SET read_status = 1 WHERE (user_role = 'student' OR user_role = 'all' OR target_user_id = ?) AND read_status = 0");
     $stmt->execute([$user['id']]);
-    header('Location: notifications.php');
+    header('Location: notifications');
     exit;
 }
 

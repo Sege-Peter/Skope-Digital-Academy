@@ -452,10 +452,10 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         </div>
 
         <div class="cta-row">
-          <a href="courses.php" class="btn-cta-primary">
+          <a href="courses" class="btn-cta-primary">
             <i class="fas fa-rocket"></i> Start Learning Free
           </a>
-          <a href="register.php?role=tutor" class="btn-cta-outline">
+          <a href="register?role=tutor" class="btn-cta-outline">
             <i class="fas fa-chalkboard-teacher"></i> Become a Tutor
           </a>
         </div>
@@ -491,7 +491,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
             <p style="color:#475569; font-size:0.92rem; line-height:1.7; margin-bottom:24px;">
               <?= nl2br(htmlspecialchars($featured_scholarship['description'])) ?>
             </p>
-            <a href="scholarships.php?id=<?= $featured_scholarship['id'] ?>" class="btn-cta-primary" style="width:100%; justify-content:center;">
+            <a href="scholarships?id=<?= $featured_scholarship['id'] ?>" class="btn-cta-primary" style="width:100%; justify-content:center;">
               <i class="fas fa-graduation-cap"></i> View Active Scholarships
             </a>
             <div class="schol-deadline">
@@ -565,7 +565,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
       ];
       foreach($chips as [$ico,$clr,$name]):
       ?>
-      <a href="courses.php?search=<?= urlencode($name) ?>" class="ai-chip">
+      <a href="courses?search=<?= urlencode($name) ?>" class="ai-chip">
         <i class="<?= $ico ?>" style="color:<?= $clr ?>;font-size:0.85rem;"></i>
         <?= $name ?>
       </a>
@@ -667,7 +667,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <h2 class="sec-heading" style="margin-bottom:10px;">Top Trending <span style="color:#00BFFF;">Courses</span></h2>
         <p style="color:#64748B;font-size:0.92rem;">Hand‑picked by AI based on real job market demand and learner success rates.</p>
       </div>
-      <a href="courses.php" style="display:inline-flex;align-items:center;gap:8px;color:#00BFFF;font-weight:700;text-decoration:none;font-size:0.92rem;border:1.5px solid #00BFFF;padding:10px 22px;border-radius:10px;transition:0.2s;"
+      <a href="courses" style="display:inline-flex;align-items:center;gap:8px;color:#00BFFF;font-weight:700;text-decoration:none;font-size:0.92rem;border:1.5px solid #00BFFF;padding:10px 22px;border-radius:10px;transition:0.2s;"
          onmouseover="this.style.background='#00BFFF';this.style.color='white'"
          onmouseout="this.style.background='transparent';this.style.color='#00BFFF'">
          Browse Full Catalog <i class="fas fa-arrow-right"></i>
@@ -705,7 +705,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
             </div>
             <div class="c-footer">
               <span class="c-price">KES <?= number_format($c['price']) ?></span>
-              <a href="course-details.php?id=<?= $c['id'] ?>" class="btn-cta-primary" style="padding:10px 20px;border-radius:10px;font-size:0.82rem;">
+              <a href="course-details?id=<?= $c['id'] ?>" class="btn-cta-primary" style="padding:10px 20px;border-radius:10px;font-size:0.82rem;">
                 Enroll Now
               </a>
             </div>
@@ -717,7 +717,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
           <i class="fas fa-book-open" style="font-size:3rem;color:#E2E8F0;margin-bottom:16px;"></i>
           <h3 style="color:#94a3b8;">Courses Are Being Curated</h3>
           <p style="color:#94a3b8;margin-top:8px;font-size:0.9rem;">Our academic team is handpicking world-class content. Check back very soon!</p>
-          <a href="contact.php" class="btn-cta-primary" style="margin-top:24px;">Notify Me When Ready</a>
+          <a href="contact" class="btn-cta-primary" style="margin-top:24px;">Notify Me When Ready</a>
         </div>
       <?php endif; ?>
     </div>
@@ -766,7 +766,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <p style="font-size: 1.1rem; opacity: 0.85; line-height: 1.6; margin-bottom: 0;">Your contribution directly funds tuition and certifications for talented students in need. Join us in breaking the barriers to elite digital education.</p>
       </div>
       <div style="display: flex; gap: 16px;">
-        <a href="donate.php" class="btn-premium" style="background: #00BFFF; border: none; padding: 20px 48px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,191,255,0.25);">Donate Now <i class="fas fa-heart" style="margin-left: 10px;"></i></a>
+        <a href="donate" class="btn-premium" style="background: #00BFFF; border: none; padding: 20px 48px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,191,255,0.25);">Donate Now <i class="fas fa-heart" style="margin-left: 10px;"></i></a>
       </div>
     </div>
   </div>

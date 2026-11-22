@@ -65,7 +65,7 @@ try {
         <button onclick="window.print()" class="btn-premium" style="padding: 14px 28px; background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none;">
             <i class="fas fa-file-export"></i> EXPORT REPORT
         </button>
-        <a href="index.php" class="btn-premium" style="padding: 14px 28px;">
+        <a href="./" class="btn-premium" style="padding: 14px 28px;">
             <i class="fas fa-th-large"></i> DASHBOARD
         </a>
     </div>

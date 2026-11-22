@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Mathematics Refresher",
+  "short": "Maths Refresher",
+  "description": "A friendly refresher of the maths you actually use at work and in business, with worked examples in Kenya shillings. Ideal for school leavers preparing for jobs, college, a side hustle or aptitude tests.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 23,
+  "outcomes": [
+    "Work confidently with fractions, decimals and percentages",
+    "Calculate discounts, percentage change, profit and profit margins",
+    "Compare loans and savings using simple and compound interest",
+    "Use ratios, proportions, averages and unit conversions in everyday tasks",
+    "Read tables and graphs and make quick estimates",
+    "Set up and solve simple equations for real problems"
+  ]
+}

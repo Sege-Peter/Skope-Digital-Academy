@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Financial Literacy",
+  "short": "Money Skills",
+  "description": "For school leavers earning or about to earn their first money. Learn to budget, save, use mobile money safely, borrow wisely, understand interest, spot get-rich-quick scams and protect yourself with insurance.",
+  "category": "Financial Literacy",
+  "level": "beginner",
+  "order": 19,
+  "outcomes": [
+    "Tell needs from wants and set clear money goals",
+    "Make a monthly budget and track your spending",
+    "Build savings and an emergency fund, including through chamas and SACCOs",
+    "Use M-Pesa and other mobile money safely and avoid common frauds",
+    "Work out the true cost of a loan and the difference between simple and compound interest",
+    "Recognise pyramid and get-rich-quick schemes and understand insurance basics"
+  ]
+}

@@ -216,51 +216,51 @@
     </div>
 
     <nav class="tsd-nav">
-        <a href="index.php" class="tsd-menu-item <?= $current_page == 'index.php' ? 'active' : '' ?>">
+        <a href="./" class="tsd-menu-item <?= $current_page == 'index.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-th-large"></i></span>
             <span class="tsd-label">Command Center</span>
         </a>
 
         <div class="tsd-section-label">Institutional</div>
-        <a href="courses.php" class="tsd-menu-item <?= $current_page == 'courses.php' ? 'active' : '' ?>">
+        <a href="courses" class="tsd-menu-item <?= $current_page == 'courses.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-book-open"></i></span>
             <span class="tsd-label">Course Registry</span>
         </a>
-        <a href="lessons.php" class="tsd-menu-item <?= ($current_page == 'lessons.php') ? 'active' : '' ?>">
+        <a href="lessons" class="tsd-menu-item <?= ($current_page == 'lessons.php') ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-layer-group"></i></span>
             <span class="tsd-label">Curriculum Arc</span>
         </a>
-        <a href="quizzes.php" class="tsd-menu-item <?= $current_page == 'quizzes.php' ? 'active' : '' ?>">
+        <a href="quizzes" class="tsd-menu-item <?= $current_page == 'quizzes.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-brain"></i></span>
             <span class="tsd-label">Assessments</span>
         </a>
-        <a href="assignments.php" class="tsd-menu-item <?= $current_page == 'assignments.php' ? 'active' : '' ?>">
+        <a href="assignments" class="tsd-menu-item <?= $current_page == 'assignments.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-laptop-code"></i></span>
             <span class="tsd-label">Project Audits</span>
         </a>
-        <a href="analytics.php" class="tsd-menu-item <?= $current_page == 'analytics.php' ? 'active' : '' ?>">
+        <a href="analytics" class="tsd-menu-item <?= $current_page == 'analytics.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-chart-pie"></i></span>
             <span class="tsd-label">Performance</span>
         </a>
 
         <div class="tsd-section-label">Faculty</div>
-        <a href="students.php" class="tsd-menu-item <?= $current_page == 'students.php' ? 'active' : '' ?>">
+        <a href="students" class="tsd-menu-item <?= $current_page == 'students.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-user-graduate"></i></span>
             <span class="tsd-label">Scholars</span>
         </a>
-        <a href="revenue.php" class="tsd-menu-item <?= $current_page == 'revenue.php' ? 'active' : '' ?>">
+        <a href="revenue" class="tsd-menu-item <?= $current_page == 'revenue.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-wallet"></i></span>
             <span class="tsd-label">Revenue Share</span>
         </a>
-        <a href="leaderboard.php" class="tsd-menu-item <?= $current_page == 'leaderboard.php' ? 'active' : '' ?>">
+        <a href="leaderboard" class="tsd-menu-item <?= $current_page == 'leaderboard.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-trophy"></i></span>
             <span class="tsd-label">Hall of Fame</span>
         </a>
-        <a href="notifications.php" class="tsd-menu-item <?= $current_page == 'notifications.php' ? 'active' : '' ?>">
+        <a href="notifications" class="tsd-menu-item <?= $current_page == 'notifications.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-bell"></i></span>
             <span class="tsd-label">Alerts Center</span>
         </a>
-        <a href="profile.php" class="tsd-menu-item <?= $current_page == 'profile.php' ? 'active' : '' ?>">
+        <a href="profile" class="tsd-menu-item <?= $current_page == 'profile.php' ? 'active' : '' ?>">
             <span class="tsd-icon"><i class="fas fa-id-card"></i></span>
             <span class="tsd-label">Master Profile</span>
         </a>
@@ -274,7 +274,7 @@
                 <div class="tsd-user-role">Faculty Elite</div>
             </div>
         </div>
-        <a href="../logout.php" class="tsd-logout-btn">
+        <a href="../logout" class="tsd-logout-btn">
             <i class="fas fa-power-off"></i> Secure Logoff
         </a>
     </div>

@@ -9,7 +9,7 @@ $msg = '';
 // Mark as read
 if (isset($_GET['read']) && is_numeric($_GET['read'])) {
     $pdo->prepare("UPDATE contact_messages SET status = 'read', read_at = NOW() WHERE id = ? AND status = 'unread'")->execute([$_GET['read']]);
-    header("Location: messages.php?view=" . $_GET['read']);
+    header("Location: messages?view=" . $_GET['read']);
     exit;
 }
 
@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_replied'])) {
 // Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_msg'])) {
     $pdo->prepare("DELETE FROM contact_messages WHERE id = ?")->execute([intval($_POST['msg_id'])]);
-    header("Location: messages.php?deleted=1");
+    header("Location: messages?deleted=1");
     exit;
 }
 
@@ -302,10 +302,10 @@ if ($view_id) {
                     <?php endif; ?>
                 </h1>
                 <div class="filter-tabs">
-                    <a href="messages.php" class="filter-tab <?= $filter == 'all' ? 'active' : '' ?>">All</a>
-                    <a href="messages.php?filter=unread" class="filter-tab <?= $filter == 'unread' ? 'active' : '' ?>">Unread</a>
-                    <a href="messages.php?filter=read" class="filter-tab <?= $filter == 'read' ? 'active' : '' ?>">Read</a>
-                    <a href="messages.php?filter=replied" class="filter-tab <?= $filter == 'replied' ? 'active' : '' ?>">Replied</a>
+                    <a href="messages" class="filter-tab <?= $filter == 'all' ? 'active' : '' ?>">All</a>
+                    <a href="messages?filter=unread" class="filter-tab <?= $filter == 'unread' ? 'active' : '' ?>">Unread</a>
+                    <a href="messages?filter=read" class="filter-tab <?= $filter == 'read' ? 'active' : '' ?>">Read</a>
+                    <a href="messages?filter=replied" class="filter-tab <?= $filter == 'replied' ? 'active' : '' ?>">Replied</a>
                 </div>
             </div>
 
@@ -317,7 +317,7 @@ if ($view_id) {
                     </div>
                 <?php else: ?>
                     <?php foreach ($messages as $m): ?>
-                    <a href="messages.php?view=<?= $m['id'] ?>&filter=<?= $filter ?>&read=<?= $m['id'] ?>"
+                    <a href="messages?view=<?= $m['id'] ?>&filter=<?= $filter ?>&read=<?= $m['id'] ?>"
                        class="msg-row <?= $m['status'] ?> <?= ($view_id == $m['id']) ? 'active' : '' ?>"
                        style="display: flex;">
                         <div class="msg-avatar"><?= strtoupper(substr($m['name'], 0, 1)) ?></div>

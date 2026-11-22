@@ -11,26 +11,31 @@ if (isset($_GET['verify_id'])) {
     try {
         $pdo->beginTransaction();
         
-        // 1. Update payment status
-        $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_at = NOW(), verified_by = ? WHERE id = ?");
+        // 1. Update payment status (only once: a verified payment is never credited twice)
+        $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_at = NOW(), verified_by = ? WHERE id = ? AND status = 'pending'");
         $stmt->execute([$admin['id'], $verify_id]);
-        
-        // 2. Fetch student and course info for this payment
-        $stmt = $pdo->prepare("SELECT student_id, course_id FROM payments WHERE id = ?");
+        $newly_verified = $stmt->rowCount() > 0;
+
+        // 2. Fetch student, course and chosen track for this payment
+        $stmt = $pdo->prepare("SELECT student_id, course_id, amount, learning_mode, cohort_id, payment_type, certificate_id FROM payments WHERE id = ?");
         $stmt->execute([$verify_id]);
-        $payment = $stmt->fetch();
-        
-        if ($payment) {
+        $payment = $newly_verified ? $stmt->fetch() : null;
+
+        if ($payment && $payment['payment_type'] === 'certificate' && $payment['certificate_id']) {
+            // Certificate fee: unlock the learner's certificate (no enrollment change).
+            require_once __DIR__ . '/../includes/progress.php';
+            unlock_certificate($pdo, (int)$payment['certificate_id'], (float)$payment['amount']);
+        } elseif ($payment && $payment['course_id']) {
             require_once '../includes/gamified_logic.php';
-            
-            // 3. Create or Update Enrollment
-            $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'");
-            $stmt->execute([$payment['student_id'], $payment['course_id']]);
-            
-            // 4. Update Course Enrolled Count
-            $stmt = $pdo->prepare("UPDATE courses SET enrolled_count = enrolled_count + 1 WHERE id = ?");
-            $stmt->execute([$payment['course_id']]);
-            
+            require_once __DIR__ . '/../includes/learning.php';
+
+            // 3-4. Activate the enrollment on the track the learner paid for (credits the amount, counts the seat)
+            $cstmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+            $cstmt->execute([$payment['course_id']]);
+            $pcourse = $cstmt->fetch();
+            $pmode = in_array($payment['learning_mode'], SDA_MODES, true) ? $payment['learning_mode'] : course_modes($pcourse)[0];
+            enroll_student($pdo, (int)$payment['student_id'], $pcourse, $pmode, $payment['cohort_id'] ? (int)$payment['cohort_id'] : null, (float)$payment['amount']);
+
             // 5. Referral Reward (4% of amount)
             $stmt = $pdo->prepare("SELECT amount FROM payments WHERE id = ?");
             $stmt->execute([$verify_id]);
@@ -286,9 +291,9 @@ try {
                 <tbody>
                     <?php foreach($payments as $p): ?>
                     <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 0.75rem; font-weight: 700;"><?= $p['transaction_ref'] ?></td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 0.75rem; font-weight: 700;"><?= htmlspecialchars($p['paystack_reference'] ?? ('PAY-' . $p['id'])) ?></td>
                         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700;"><?= htmlspecialchars($p['student_name']) ?></td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><?= htmlspecialchars($p['course_title']) ?></td>
+                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
                         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 800; color: #1e293b;">KES <?= number_format($p['amount']) ?></td>
                         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">
                             <span style="font-size: 0.65rem; font-weight: 900; color: <?= $p['status'] === 'verified' ? '#166534' : '#92400e' ?>;">
@@ -351,7 +356,7 @@ try {
                                     </div>
                                 </div>
                             </td>
-                            <td><?= htmlspecialchars($p['course_title']) ?></td>
+                            <td><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
                             <td><span style="font-weight:800;color:#0f172a;font-family:'Poppins',sans-serif;">KES <?= number_format($p['amount']) ?></span></td>
                             <td>
                                 <?php if($p['proof_file']): ?>

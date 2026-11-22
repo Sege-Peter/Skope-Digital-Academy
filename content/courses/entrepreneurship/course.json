@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Entrepreneurship",
+  "short": "Entrepreneurship",
+  "description": "For school leavers who want to start a small business of their own. Learn to find and test an idea, start with little capital, price and market your product, keep records and grow step by step.",
+  "category": "Business",
+  "level": "beginner",
+  "order": 16,
+  "outcomes": [
+    "Find business ideas from real problems around you",
+    "Test an idea with real customers before spending much money",
+    "Describe a simple business model and set a price that makes a profit",
+    "Market a small business on a tight budget",
+    "Keep basic records and know the general steps to register a business",
+    "Avoid the common mistakes that sink new businesses"
+  ]
+}

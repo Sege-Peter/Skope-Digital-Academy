@@ -4,7 +4,7 @@ require_once 'includes/auth.php';
 
 // If no session UID, someone got here incorrectly. Redirect to login.
 if (empty($_SESSION['force_password_change_uid'])) {
-    header("Location: login.php");
+    header("Location: login");
     exit;
 }
 
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Store a temp session message 
                 $_SESSION['login_success'] = "Password updated successfully. Please log in.";
-                header("Location: login.php?msg=pw_updated");
+                header("Location: login?msg=pw_updated");
                 exit;
 
             } catch (Exception $e) {
@@ -205,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div id="error-msg"><i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <form action="force_password_change.php" method="POST" id="updateForm">
+        <form action="force_password_change" method="POST" id="updateForm">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">
 
             <div class="input-group">

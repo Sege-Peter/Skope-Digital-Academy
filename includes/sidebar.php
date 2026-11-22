@@ -12,7 +12,7 @@
 <aside class="sidebar" id="dashSidebar">
     <!-- Branding Hub -->
     <div class="sidebar-brand-container">
-        <a href="../index.php" class="sidebar-logo">
+        <a href="../" class="sidebar-logo">
             <img src="../assets/images/Skope Digital  logo.png" style="height: 36px;" alt="Skope Digital Academy Logo">
             <div class="brand-text">
                 <span class="main">SKOPE <span class="accent">DIGITAL</span></span>
@@ -25,7 +25,7 @@
     <nav class="sidebar-nav-scroll">
         <ul class="sidebar-menu">
             <li>
-                <a href="index.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : '' ?>">
+                <a href="./" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active' : '' ?>">
                     <i class="fas fa-th-large"></i> <span>Dashboard Overview</span>
                 </a>
             </li>
@@ -33,12 +33,12 @@
             <?php if ($user['role'] === 'student'): ?>
                 <li class="menu-divider">Academics</li>
                 <li>
-                    <a href="courses.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
+                    <a href="courses" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
                         <i class="fas fa-book-open"></i> <span>My Learning Path</span>
                     </a>
                 </li>
                 <li>
-                    <a href="notifications.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
+                    <a href="notifications" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
                         <i class="fas fa-bell"></i> <span>System Alerts</span>
                         <?php if($unread_notif_count > 0): ?>
                             <span class="notif-badge-sidebar"><?= $unread_notif_count ?></span>
@@ -46,49 +46,49 @@
                     </a>
                 </li>
                 <li>
-                    <a href="quizzes.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'quizzes.php' ? 'active' : '' ?>">
+                    <a href="quizzes" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'quizzes.php' ? 'active' : '' ?>">
                         <i class="fas fa-brain"></i> <span>Quiz Inventory</span>
                     </a>
                 </li>
                 <li>
-                    <a href="assignments.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'assignments.php' ? 'active' : '' ?>">
+                    <a href="assignments" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'assignments.php' ? 'active' : '' ?>">
                         <i class="fas fa-tasks"></i> <span>Project Backlog</span>
                     </a>
                 </li>
                 <li>
-                    <a href="profile.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
+                    <a href="profile" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
                         <i class="fas fa-user"></i> <span>My Profile</span>
                     </a>
                 </li>
                 <li class="menu-divider">Achievements</li>
                 <li>
-                    <a href="certificates.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'certificates.php' ? 'active' : '' ?>">
+                    <a href="certificates" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'certificates.php' ? 'active' : '' ?>">
                         <i class="fas fa-award"></i> <span>Credentials</span>
                     </a>
                 </li>
                 <li>
-                    <a href="badges.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'badges.php' ? 'active' : '' ?>">
+                    <a href="badges" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'badges.php' ? 'active' : '' ?>">
                         <i class="fas fa-medal"></i> <span>Merit Badges</span>
                     </a>
                 </li>
                 <li class="menu-divider">Network & Legacy</li>
                 <li>
-                    <a href="referral.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'referral.php' ? 'active' : '' ?>">
+                    <a href="referral" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'referral.php' ? 'active' : '' ?>">
                         <i class="fas fa-network-wired"></i> <span>Referral Network</span>
                     </a>
                 </li>
                 <li>
-                    <a href="transcript.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'transcript.php' ? 'active' : '' ?>">
+                    <a href="transcript" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'transcript.php' ? 'active' : '' ?>">
                         <i class="fas fa-scroll"></i> <span>Academic Transcript</span>
                     </a>
                 </li>
                 <li>
-                    <a href="leaderboard.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
+                    <a href="leaderboard" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
                         <i class="fas fa-trophy"></i> <span>Hall of Fame</span>
                     </a>
                 </li>
                 <li>
-                    <a href="mentor.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'mentor.php' ? 'active' : '' ?>">
+                    <a href="mentor" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'mentor.php' ? 'active' : '' ?>">
                         <i class="fas fa-robot"></i> <span>Scholarly AI</span>
                     </a>
                 </li>
@@ -97,12 +97,12 @@
             <?php if ($user['role'] === 'tutor'): ?>
                 <li class="menu-divider">Curriculum Control</li>
                 <li>
-                    <a href="courses.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
+                    <a href="courses" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
                         <i class="fas fa-chalkboard-teacher"></i> <span>Track Management</span>
                     </a>
                 </li>
                 <li>
-                    <a href="notifications.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
+                    <a href="notifications" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
                         <i class="fas fa-bell"></i> <span>Alerts Center</span>
                         <?php if($unread_notif_count > 0): ?>
                             <span class="notif-badge-sidebar"><?= $unread_notif_count ?></span>
@@ -110,38 +110,38 @@
                     </a>
                 </li>
                 <li>
-                    <a href="students.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'students.php' ? 'active' : '' ?>">
+                    <a href="students" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'students.php' ? 'active' : '' ?>">
                         <i class="fas fa-users"></i> <span>Student Roster</span>
                     </a>
                 </li>
                 <li>
-                    <a href="assignments.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'assignments.php' ? 'active' : '' ?>">
+                    <a href="assignments" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'assignments.php' ? 'active' : '' ?>">
                         <i class="fas fa-file-signature"></i> <span>Assessments</span>
                     </a>
                 </li>
                 <li class="menu-divider">Financials & Impact</li>
                 <li>
-                    <a href="award_student.php" class="menu-link <?= (strpos(basename($_SERVER['PHP_SELF']), 'award') !== false) ? 'active' : '' ?>">
+                    <a href="award_student" class="menu-link <?= (strpos(basename($_SERVER['PHP_SELF']), 'award') !== false) ? 'active' : '' ?>">
                         <i class="fas fa-trophy"></i> <span>Award Scholars</span>
                     </a>
                 </li>
                 <li>
-                    <a href="analytics.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'analytics.php' ? 'active' : '' ?>">
+                    <a href="analytics" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'analytics.php' ? 'active' : '' ?>">
                         <i class="fas fa-chart-line"></i> <span>Clinical Analytics</span>
                     </a>
                 </li>
                 <li>
-                    <a href="leaderboard.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
+                    <a href="leaderboard" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
                         <i class="fas fa-crown"></i> <span>Performance Hall</span>
                     </a>
                 </li>
                 <li>
-                    <a href="revenue.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'revenue.php' ? 'active' : '' ?>">
+                    <a href="revenue" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'revenue.php' ? 'active' : '' ?>">
                         <i class="fas fa-wallet"></i> <span>Revenue Hub</span>
                     </a>
                 </li>
                 <li>
-                    <a href="profile.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
+                    <a href="profile" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
                         <i class="fas fa-user-circle"></i> <span>Instructor Profile</span>
                     </a>
                 </li>
@@ -150,43 +150,43 @@
             <?php if ($user['role'] === 'admin'): ?>
                 <li class="menu-divider">Institutional Oversight</li>
                 <li>
-                    <a href="courses.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
+                    <a href="courses" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'courses.php' ? 'active' : '' ?>">
                         <i class="fas fa-layer-group"></i> <span>Catalog Audit</span>
                     </a>
                 </li>
                 <li>
-                    <a href="users.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : '' ?>">
+                    <a href="users" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : '' ?>">
                         <i class="fas fa-users-cog"></i> <span>Identity Governance</span>
                     </a>
                 </li>
                 <li>
-                    <a href="verifications.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'verifications.php' ? 'active' : '' ?>">
+                    <a href="verifications" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'verifications.php' ? 'active' : '' ?>">
                         <i class="fas fa-check-double"></i> <span>Revenue Audit</span>
                     </a>
                 </li>
                 <li>
-                    <a href="payroll.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'payroll.php' ? 'active' : '' ?>">
+                    <a href="payroll" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'payroll.php' ? 'active' : '' ?>">
                         <i class="fas fa-file-invoice-dollar"></i> <span>Payroll Hub</span>
                     </a>
                 </li>
                 <li>
-                    <a href="leaderboard.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
+                    <a href="leaderboard" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : '' ?>">
                         <i class="fas fa-medal"></i> <span>Merit Registry</span>
                     </a>
                 </li>
                 <li class="menu-divider">Operations</li>
                 <li>
-                    <a href="announcements.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'announcements.php' ? 'active' : '' ?>">
+                    <a href="announcements" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'announcements.php' ? 'active' : '' ?>">
                         <i class="fas fa-bullhorn"></i> <span>Global Notices</span>
                     </a>
                 </li>
                 <li>
-                    <a href="scholarships.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'scholarships.php' ? 'active' : '' ?>">
+                    <a href="scholarships" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'scholarships.php' ? 'active' : '' ?>">
                         <i class="fas fa-hand-holding-heart"></i> <span>Scholarships</span>
                     </a>
                 </li>
                 <li>
-                    <a href="tickets.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'tickets.php' ? 'active' : '' ?>">
+                    <a href="tickets" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'tickets.php' ? 'active' : '' ?>">
                         <i class="fas fa-envelope-open-text"></i> <span>Support Desk</span>
                     </a>
                 </li>
@@ -196,7 +196,7 @@
                         $unread_contact = $pdo->query("SELECT COUNT(*) FROM contact_messages WHERE status = 'unread'")->fetchColumn();
                     } catch (Exception $e) { $unread_contact = 0; }
                     ?>
-                    <a href="messages.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'messages.php' ? 'active' : '' ?>">
+                    <a href="messages" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'messages.php' ? 'active' : '' ?>">
                         <i class="fas fa-inbox"></i>
                         <span>Contact Inbox</span>
                         <?php if ($unread_contact > 0): ?>
@@ -205,12 +205,12 @@
                     </a>
                 </li>
                 <li>
-                    <a href="notifications.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
+                    <a href="notifications" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'notifications.php' ? 'active' : '' ?>">
                         <i class="fas fa-bell"></i> <span>System Alerts</span>
                     </a>
                 </li>
                 <li>
-                    <a href="profile.php" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
+                    <a href="profile" class="menu-link <?= basename($_SERVER['PHP_SELF']) == 'profile.php' ? 'active' : '' ?>">
                         <i class="fas fa-user-shield"></i> <span>Admin Profile</span>
                     </a>
                 </li>
@@ -229,7 +229,7 @@
                 <span class="role"><?= $user['role'] ?> Quarters</span>
             </div>
         </div>
-        <a href="../logout.php" class="logout-pill" title="Secure Exit">
+        <a href="../logout" class="logout-pill" title="Secure Exit">
             <i class="fas fa-power-off"></i> <span>Secure Logoff</span>
         </a>
     </div>

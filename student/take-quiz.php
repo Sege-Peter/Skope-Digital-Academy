@@ -3,7 +3,7 @@ $pageTitle = 'Examination Center';
 require_once 'includes/header.php';
 
 $qid = (int)($_GET['id'] ?? 0);
-if (!$qid) { header('Location: quizzes.php'); exit; }
+if (!$qid) { header('Location: quizzes'); exit; }
 
 try {
     // 1. Fetch Quiz Info
@@ -13,7 +13,7 @@ try {
                            WHERE q.id = ?");
     $stmt->execute([$qid]);
     $quiz = $stmt->fetch();
-    if (!$quiz) { header('Location: quizzes.php'); exit; }
+    if (!$quiz) { header('Location: quizzes'); exit; }
 
     // 2. Fetch Questions
     $stmt = $pdo->prepare("SELECT id, question, type, options_json, points 
@@ -30,7 +30,7 @@ try {
 
 } catch (Exception $e) { 
     error_log($e->getMessage());
-    header('Location: quizzes.php'); 
+    header('Location: quizzes'); 
     exit; 
 }
 
@@ -263,7 +263,7 @@ require_once 'includes/sidebar.php';
             </div>
 
             <div style="margin-top: 60px;">
-                <a href="quizzes.php" class="btn-premium">Done</a>
+                <a href="quizzes" class="btn-premium">Done</a>
                 <button class="btn-premium" style="background: #f1f5f9; color: var(--text-main); margin-left:15px;" onclick="location.reload()">Re-attempt</button>
             </div>
         </div>
@@ -382,7 +382,7 @@ function submitQuiz() {
         finalAnswers[qIds[idx]] = answers[idx];
     }
 
-    fetch('submit-quiz-handler.php', {
+    fetch('submit-quiz-handler', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quiz_id: <?= $qid ?>, answers: finalAnswers })

@@ -27,7 +27,7 @@
     </button>
 
     <!-- Logo -->
-    <a href="index.php" class="navbar-logo" style="display: flex; align-items: center; gap: 15px; text-decoration: none;">
+    <a href="./" class="navbar-logo" style="display: flex; align-items: center; gap: 15px; text-decoration: none;">
       <img src="assets/images/Skope Digital  logo.png" alt="Skope Digital" style="height: 54px;">
       <div style="line-height: 1.1;">
         <div style="font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.2rem; color: #0f172a; letter-spacing: -0.5px;">SKOPE <span style="color:#FF8C00">DIGITAL</span></div>
@@ -37,12 +37,12 @@
 
     <!-- Desktop Navigation -->
     <ul class="navbar-menu">
-      <li><a href="index.php">Home</a></li>
-      <li><a href="about.php">About Us</a></li>
-      <li><a href="courses.php">Courses</a></li>
-      <li><a href="scholarships.php">Scholarships</a></li>
-      <li><a href="donate.php" style="color: var(--sky-blue); font-weight: 800;">Support Us</a></li>
-      <li><a href="contact.php">Contact Us</a></li>
+      <li><a href="./">Home</a></li>
+      <li><a href="about">About Us</a></li>
+      <li><a href="courses">Courses</a></li>
+      <li><a href="scholarships">Scholarships</a></li>
+      <li><a href="donate" style="color: var(--sky-blue); font-weight: 800;">Support Us</a></li>
+      <li><a href="contact">Contact Us</a></li>
     </ul>
 
     <!-- Desktop Actions -->
@@ -51,9 +51,9 @@
             <i class="fab fa-whatsapp"></i> Community
         </a>
         <?php if (isset($user) && $user): ?>
-            <a href="<?= htmlspecialchars($user['role']) ?>/index.php" class="btn btn-primary btn-sm">Portal</a>
+            <a href="<?= htmlspecialchars($user['role']) ?>/" class="btn btn-primary btn-sm">Portal</a>
         <?php else: ?>
-            <a href="login.php" class="btn btn-primary btn-sm">Get Started</a>
+            <a href="login" class="btn btn-primary btn-sm">Get Started</a>
         <?php endif; ?>
     </div>
   </div>
@@ -62,21 +62,21 @@
 <!-- Mobile Slide-Down Menu -->
 <div class="mobile-menu" id="mobileMenu">
   <div style="display: flex; flex-direction: column; gap: 8px;">
-    <a href="index.php">Home</a>
-    <a href="about.php">About Us</a>
-    <a href="courses.php">Courses</a>
-    <a href="scholarships.php">Scholarships</a>
-    <a href="donate.php" style="color: #00BFFF; font-weight: 800;">Support Us</a>
-    <a href="contact.php">Contact Us</a>
+    <a href="./">Home</a>
+    <a href="about">About Us</a>
+    <a href="courses">Courses</a>
+    <a href="scholarships">Scholarships</a>
+    <a href="donate" style="color: #00BFFF; font-weight: 800;">Support Us</a>
+    <a href="contact">Contact Us</a>
     <?php if ($user): ?>
-      <a href="logout.php" style="color: var(--danger);">Logout</a>
+      <a href="logout" style="color: var(--danger);">Logout</a>
     <?php endif; ?>
   </div>
   <div class="mobile-cta">
     <?php if ($user): ?>
-      <a href="<?= htmlspecialchars($user['role']) ?>/index.php" class="btn btn-primary btn-block" style="background: #FF8C00; border: none;">Enter My Portal</a>
+      <a href="<?= htmlspecialchars($user['role']) ?>/" class="btn btn-primary btn-block" style="background: #FF8C00; border: none;">Enter My Portal</a>
     <?php else: ?>
-      <a href="login.php" class="btn btn-primary btn-block" style="background: #FF8C00; border: none;">Get Started</a>
+      <a href="login" class="btn btn-primary btn-block" style="background: #FF8C00; border: none;">Get Started</a>
     <?php endif; ?>
   </div>
 </div>

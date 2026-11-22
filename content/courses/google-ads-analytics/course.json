@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Google Ads and Analytics",
+  "short": "Google Ads",
+  "description": "A beginner course for school leavers who want to understand paid search advertising and website analytics. You will learn how Google search ads work, how to plan keywords, campaigns, ads and budgets, and how to read analytics reports so you can help businesses spend their advertising money wisely and honestly.",
+  "category": "Business",
+  "level": "beginner",
+  "order": 15,
+  "outcomes": [
+    "Explain how search ads, the ad auction and pay-per-click work",
+    "Research keywords and choose match types and negative keywords",
+    "Plan a campaign with ad groups, ad copy, a budget and a bidding approach",
+    "Judge whether a landing page is ready for paid traffic",
+    "Understand users, sessions, traffic sources and conversions in Google Analytics",
+    "Read a simple report and advise a client ethically"
+  ]
+}

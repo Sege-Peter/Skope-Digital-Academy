@@ -1,4 +1,5 @@
 <?php
+ob_start(); // pages may redirect after the header has started output
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 

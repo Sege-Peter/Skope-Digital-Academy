@@ -1,0 +1,8 @@
+{
+  "title": "CSS Tutorial",
+  "short": "CSS",
+  "description": "Learn to style web pages with CSS, from colours, fonts and the box model to Flexbox, Grid, animations and responsive design. Every lesson has live examples you can edit and run.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 2
+}

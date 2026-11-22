@@ -11,6 +11,25 @@ Options -Indexes
     RewriteRule ^includes/.*$ - [F,L]
     RewriteRule ^\.env$ - [F,L]
     RewriteRule ^\.git/.*$ - [F,L]
+
+    # ── Extensionless URLs ──────────────────────────────────────
+    # 1. Old links: send browsers from page.php to page (GET/HEAD only, so
+    #    form posts and payment webhooks are never redirected). Query strings carry over.
+    #    folder/index.php -> folder/
+    RewriteCond %{THE_REQUEST} ^(GET|HEAD)\s([^?\s]*/)index\.php[?\s]
+    RewriteRule (^|/)index\.php$ %2 [R=301,L,NE]
+    RewriteCond %{THE_REQUEST} ^(GET|HEAD)\s([^?\s]+)\.php[?\s]
+    RewriteRule \.php$ %2 [R=301,L,NE]
+
+    # Tutorial pages: learn/<tutorial>/<lesson>
+    RewriteRule ^learn/([a-z0-9-]+)/?$ learn.php?c=$1 [L,QSA]
+    RewriteRule ^learn/([a-z0-9-]+)/leaderboard/?$ learn.php?c=$1&view=leaderboard [L,QSA]
+    RewriteRule ^learn/([a-z0-9-]+)/([a-z0-9-]+)/?$ learn.php?c=$1&l=$2 [L,QSA]
+
+    # 2. Clean URL -> the PHP file that serves it (internal, invisible to the browser).
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+?)/?$ $1.php [L]
 </IfModule>
 
 # Security Headers (Only if mod_headers is enabled)

@@ -187,6 +187,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 }
 
 @media (max-width: 480px) {
+  .sch-hero h1 { font-size: 1.85rem; }
   .sch-amount-val { font-size: 1.1rem; }
   .btn-apply { padding: 10px 18px; font-size: 0.82rem; }
   .apply-modal-content { padding: 32px 20px !important; }
@@ -300,12 +301,12 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
         <h4 style="font-family:'Poppins',sans-serif; font-weight: 800; font-size: 1.15rem; color: #0f172a; margin-bottom: 12px;">Authentication Required</h4>
         <p style="color: #64748b; margin-bottom: 32px; line-height: 1.6; font-size: 0.95rem;">To track your application and verify your academic credits, you must be signed in to your student account.</p>
         <div style="display: flex; gap: 12px; justify-content: center;">
-          <a href="login.php" class="btn btn-primary">Sign In</a>
-          <a href="register.php" class="btn btn-ghost" style="border: 1px solid #e2e8f0; color: #64748b;">Create Account</a>
+          <a href="login" class="btn btn-primary">Sign In</a>
+          <a href="register" class="btn btn-ghost" style="border: 1px solid #e2e8f0; color: #64748b;">Create Account</a>
         </div>
       </div>
     <?php else: ?>
-      <form action="apply-handler.php" method="POST" enctype="multipart/form-data">
+      <form action="apply-handler" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="scholarship_id" id="modal_sid">
         <div style="margin-bottom: 24px;">
           <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 10px;">Why do you deserve this scholarship?</label>
@@ -426,7 +427,7 @@ function payWithPaystack() {
             ]
         },
         callback: function(response) {
-            window.location.href = "verify-payment.php?reference=" + response.reference + "&type=donation&email=" + encodeURIComponent(email);
+            window.location.href = "verify-payment?reference=" + response.reference + "&type=donation&email=" + encodeURIComponent(email);
         },
         onClose: function() {
             btn.disabled = false;

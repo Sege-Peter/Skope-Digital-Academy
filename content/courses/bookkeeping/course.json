@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Bookkeeping",
+  "short": "Bookkeeping",
+  "description": "For school leavers who want to keep proper business records or offer bookkeeping to small businesses. Learn receipts and invoices, the cash book, double entry, ledgers, a simple trial balance and spreadsheet bookkeeping.",
+  "category": "Financial Literacy",
+  "level": "beginner",
+  "order": 21,
+  "outcomes": [
+    "Explain why accurate records matter to a business",
+    "Write clear receipts and invoices and file source documents",
+    "Keep a cash book with a running balance and separate sales and expense records",
+    "Record transactions using double entry, post them to ledgers and draw up a simple trial balance",
+    "Use a spreadsheet to keep books and prepare a monthly summary",
+    "Offer basic bookkeeping as a paid service to small businesses"
+  ]
+}

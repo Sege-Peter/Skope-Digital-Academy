@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Data Analytics",
+  "short": "Data Analytics",
+  "description": "A beginner course for school leavers who want to turn numbers into decisions. You will clean data, analyse it in a spreadsheet, calculate simple statistics, build clear charts, and take your first steps in SQL and Python for data.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 7,
+  "outcomes": [
+    "Explain what a data analyst does and the main types of data",
+    "Clean messy data and organise it into a tidy table",
+    "Use SUM, AVERAGE, COUNTIF, sorting, filtering and pivot tables in a spreadsheet",
+    "Calculate and interpret mean, median, mode and range",
+    "Choose the right chart and present a short data story",
+    "Write basic SQL queries and simple Python code to answer business questions"
+  ]
+}

@@ -103,11 +103,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enroll_student'])) {
             sendStudentWelcomeEmail($s_email, $s_name, $c_title_mail, $temp_pass);
         }
 
-        header("Location: students.php?msg=" . urlencode($enroll_msg) . "&err=" . urlencode($enroll_err));
+        header("Location: students?msg=" . urlencode($enroll_msg) . "&err=" . urlencode($enroll_err));
         exit;
 
     } catch (Exception $e) {
-        header("Location: students.php?err=" . urlencode($e->getMessage()));
+        header("Location: students?err=" . urlencode($e->getMessage()));
         exit;
     }
 }
@@ -169,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             }
             fclose($handle);
             $enroll_msg = "CSV Import Complete: $success_count enrolled, $error_count skipped.";
-            header("Location: students.php?msg=" . urlencode($enroll_msg));
+            header("Location: students?msg=" . urlencode($enroll_msg));
             exit;
         }
     }
@@ -232,14 +232,14 @@ try {
         <button onclick="document.getElementById('importModal').style.display='flex'" class="btn-premium" style="padding: 12px 24px; background: var(--secondary); border: none;">
             <i class="fas fa-file-csv"></i> BULK IMPORT
         </button>
-        <a href="export_students.php?course_filter=<?= urlencode($course_filter) ?>" class="btn-premium" style="padding: 12px 24px; background: #10B981; border: none; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+        <a href="export_students?course_filter=<?= urlencode($course_filter) ?>" class="btn-premium" style="padding: 12px 24px; background: #10B981; border: none; text-decoration: none; display: flex; align-items: center; justify-content: center;">
             <i class="fas fa-file-export"></i> EXPORT
         </a>
     </div>
 </header>
 
 <div class="premium-card" style="padding: 24px 32px; margin-bottom: 40px;">
-    <form method="GET" action="students.php" class="grid-3" style="align-items: flex-end;">
+    <form method="GET" action="students" class="grid-3" style="align-items: flex-end;">
         <div>
             <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Scholar Identity Search</label>
             <div style="position: relative;">
@@ -330,8 +330,8 @@ try {
                         </td>
                         <td style="padding: 24px 32px; text-align: right;">
                             <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                <a href="student_profile.php?id=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); text-decoration: none; transition: 0.2s;" onmouseover="this.style.color='var(--primary)'; this.style.borderColor='var(--primary)';" title="View Profile"><i class="fas fa-user-graduate"></i></a>
-                                <a href="../impersonate.php?action=start&uid=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10B981; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='#ECFDF5';" title="Secure Proxy Login"><i class="fas fa-fingerprint"></i></a>
+                                <a href="student_profile?id=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); text-decoration: none; transition: 0.2s;" onmouseover="this.style.color='var(--primary)'; this.style.borderColor='var(--primary)';" title="View Profile"><i class="fas fa-user-graduate"></i></a>
+                                <a href="../impersonate?action=start&uid=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10B981; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='#ECFDF5';" title="Secure Proxy Login"><i class="fas fa-fingerprint"></i></a>
                             </div>
                         </td>
                     </tr>

@@ -6,75 +6,64 @@ $course_id = (int)($_GET['id'] ?? 0);
 $lesson_id = (int)($_GET['lesson'] ?? 0);
 
 if (!$course_id) { 
-    header('Location: index.php'); 
+    header('Location: ./'); 
     exit; 
 }
 
+require_once __DIR__ . '/../includes/learning.php';
+
 try {
-    // 1. Check enrollment
-    $stmt = $pdo->prepare("SELECT e.*, c.title, c.description, c.tutor_id, u.name as tutor_name, u.avatar as tutor_avatar
+    // 1. Check enrollment (completed learners keep access to review)
+    $stmt = $pdo->prepare("SELECT e.*, c.title, c.description, c.tutor_id, c.learning_modes, c.price, c.structured_price, c.sale_price, c.sale_ends_at,
+                                  u.name as tutor_name, u.avatar as tutor_avatar, co.name AS cohort_name
                            FROM enrollments e 
                            JOIN courses c ON e.course_id = c.id 
                            JOIN users u ON c.tutor_id = u.id
-                           WHERE e.student_id = ? AND e.course_id = ? AND e.status = 'active'");
+                           LEFT JOIN course_cohorts co ON co.id = e.cohort_id
+                           WHERE e.student_id = ? AND e.course_id = ? AND e.status IN ('active','completed')");
     $stmt->execute([$student['id'], $course_id]);
     $enrollment = $stmt->fetch();
     
     if (!$enrollment) {
-        header('Location: ../course-details.php?id=' . $course_id . '&msg=not_enrolled');
+        header('Location: ../enroll?id=' . $course_id);
+        exit;
+    }
+    $is_structured = $enrollment['learning_mode'] === 'structured';
+
+    // Tutorial-library and free skills courses use the full reader (exercises, quizzes, Try it,
+    // auto-tracking). It applies the same track rules (weekly release, due dates, locks).
+    $lib = $pdo->prepare("SELECT id, slug, source FROM courses WHERE id = ?");
+    $lib->execute([$course_id]);
+    $libCourse = $lib->fetch();
+    if ($libCourse && in_array($libCourse['source'], ['tutorial', 'course'], true)) {
+        $ls = $pdo->prepare("SELECT id, slug FROM lessons WHERE id = ? AND course_id = ?");
+        $ls->execute([$lesson_id, $course_id]);
+        $toLesson = $ls->fetch() ?: null;
+        header('Location: ' . sda_base_href() . learn_url($libCourse, $toLesson));
         exit;
     }
 
-    // 2. Fetch all lessons with completion status and group by week
-    $stmt = $pdo->prepare("SELECT l.*, q.id as attached_quiz_id, q.title as attached_quiz_title,
-                           (SELECT status FROM lesson_progress WHERE student_id = ? AND lesson_id = l.id) as progress_status,
-                           (SELECT score FROM quiz_attempts WHERE student_id = ? AND quiz_id = q.id ORDER BY score DESC LIMIT 1) as quiz_score
-                           FROM lessons l 
-                           LEFT JOIN quizzes q ON q.linked_lesson_id = l.id
-                           WHERE l.course_id = ? 
-                           ORDER BY l.week_num ASC, l.order_num ASC");
-    $stmt->execute([$student['id'], $student['id'], $course_id]);
-    $lessons = $stmt->fetchAll();
+    // 2. Lessons with progress, then the track's schedule (self-paced: open; structured: weekly + sequential + quiz gates)
+    $lessons = apply_lesson_schedule(load_course_lessons($pdo, $course_id, (int)$student['id']), $enrollment);
 
     $lessons_by_week = [];
-    foreach($lessons as $idx => &$l) {
-        $l['is_locked'] = false;
-        $l['lock_reason'] = '';
-
-        if (!empty($l['release_date'])) {
-            $release_ts = strtotime($l['release_date']);
-            if ($release_ts > time()) {
-                $l['is_locked'] = true;
-                $l['lock_reason'] = 'Locked until ' . date('M d, Y', $release_ts);
-            }
-        }
-
-        if (!$l['is_locked'] && $idx > 0) {
-            $prev = $lessons[$idx - 1];
-            $prev_completed = ($prev['progress_status'] === 'completed');
-            $prev_quiz_passed = true;
-            if ($prev['attached_quiz_id']) {
-                $prev_quiz_passed = ($prev['quiz_score'] >= 70); 
-            }
-            if (!$prev_completed || !$prev_quiz_passed) {
-                $l['is_locked'] = true;
-                $l['lock_reason'] = !$prev_completed ? 'Complete previous lesson first' : 'Pass previous quiz first';
-            }
-        }
-        $lessons_by_week[$l['week_num']][] = $l;
-    }
+    foreach ($lessons as $l) { $lessons_by_week[$l['week_num']][] = $l; }
 
     $active_lesson = null;
-    if ($lesson_id) {
-        foreach($lessons as $l) { if($l['id'] == $lesson_id) { $active_lesson = $l; break; } }
-    }
-    
+    $active_idx = 0;
+    foreach ($lessons as $i => $l) { if ($l['id'] == $lesson_id) { $active_lesson = $l; $active_idx = $i; break; } }
+
     if (!$active_lesson && !empty($lessons)) {
-        header("Location: classroom.php?id=$course_id&lesson=" . $lessons[0]['id']);
+        // Resume at the first open lesson not yet completed.
+        $resume = $lessons[0];
+        foreach ($lessons as $l) { if (!$l['is_locked'] && $l['progress_status'] !== 'completed') { $resume = $l; break; } }
+        header("Location: classroom?id=$course_id&lesson=" . $resume['id']);
         exit;
     }
+    $prev_lesson = $active_lesson && $active_idx > 0 ? $lessons[$active_idx - 1] : null;
+    $next_lesson = $active_lesson && $active_idx < count($lessons) - 1 ? $lessons[$active_idx + 1] : null;
 
-    if ($active_lesson && (!$active_lesson['progress_status'] || $active_lesson['progress_status'] === 'not_started')) {
+    if ($active_lesson && !$active_lesson['is_locked'] && (!$active_lesson['progress_status'] || $active_lesson['progress_status'] === 'not_started')) {
         $stmt = $pdo->prepare("INSERT INTO lesson_progress (student_id, lesson_id, course_id, status) 
                                VALUES (?, ?, ?, 'in_progress') 
                                ON DUPLICATE KEY UPDATE status = IF(status = 'completed', 'completed', 'in_progress')");
@@ -83,44 +72,38 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_lesson'])) {
         $l_to_complete = (int)$_POST['complete_lesson'];
-        $stmt = $pdo->prepare("UPDATE lesson_progress SET status = 'completed', completed_at = NOW() 
-                               WHERE student_id = ? AND lesson_id = ?");
-        $stmt->execute([$student['id'], $l_to_complete]);
-        
-        $total_lessons = count($lessons);
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM lesson_progress WHERE student_id = ? AND course_id = ? AND status = 'completed'");
-        $stmt->execute([$student['id'], $course_id]);
-        $completed_count = $stmt->fetchColumn();
-        $new_progress = ($total_lessons > 0) ? ($completed_count / $total_lessons) * 100 : 0;
-        
-        $stmt = $pdo->prepare("UPDATE enrollments SET progress_percent = ? WHERE id = ?");
-        $stmt->execute([$new_progress, $enrollment['id']]);
-
-        if ($new_progress >= 100) {
-            $upd = $pdo->prepare("UPDATE enrollments SET status = 'completed', completed_at = NOW() WHERE id = ?");
-            $upd->execute([$enrollment['id']]);
+        $target = null;
+        foreach ($lessons as $l) { if ($l['id'] == $l_to_complete) { $target = $l; break; } }
+        if (verifyCsrf() && $target && !$target['is_locked']) {
+            complete_lesson($pdo, $enrollment, $l_to_complete);
+            $go = (!empty($_POST['and_next']) && $next_lesson) ? $next_lesson['id'] : $l_to_complete;
+            header("Location: classroom?id=$course_id&lesson=$go&success=1");
+        } else {
+            header("Location: classroom?id=$course_id&lesson=$l_to_complete");
         }
-        header("Location: classroom.php?id=$course_id&lesson=$l_to_complete&success=1");
         exit;
     }
 
     // 5. Fetch linked C.A.T Assessment (Quiz type 'cat')
     $stmt = $pdo->prepare("SELECT * FROM quizzes WHERE (linked_lesson_id = ? OR (course_id = ? AND linked_week_num = ?)) AND type = 'cat' LIMIT 1");
-    $stmt->execute([$active_lesson['id'], $course_id, $active_lesson['week_num']]);
+    $stmt->execute([$active_lesson['id'] ?? 0, $course_id, $active_lesson['week_num'] ?? 0]);
     $cat_quiz = $stmt->fetch();
 
-    // 6. Check progress status for checkboxes
-    $stmt = $pdo->prepare("SELECT status FROM lesson_progress WHERE student_id = ? AND lesson_id = ?");
-    $stmt->execute([$student['id'], $active_lesson['id']]);
-    $lesson_done = ($stmt->fetchColumn() === 'completed');
+    $lesson_done = ($active_lesson['progress_status'] ?? '') === 'completed';
 
 } catch (Exception $e) { 
     error_log($e->getMessage()); 
-    $lessons = []; $active_lesson = null; $cat_quiz = null; $lesson_done = false; 
+    $lessons = []; $lessons_by_week = []; $active_lesson = null; $cat_quiz = null; $lesson_done = false; $prev_lesson = $next_lesson = null; $is_structured = false;
 }
 
 require_once 'includes/layout-top.php';
+if (!$active_lesson) {
+    echo '<div class="premium-card" style="padding:40px;margin:20px 0"><h2>' . e($enrollment['title'] ?? 'Course') . '</h2><p>Lessons for this course are being prepared. Check back soon.</p><a href="courses">Back to my courses</a></div>';
+    require_once 'includes/layout-bottom.php';
+    exit;
+}
 ?>
+<link rel="stylesheet" href="../assets/css/learn.css">
 
 <style>
     :root { 
@@ -128,6 +111,11 @@ require_once 'includes/layout-top.php';
         --glass: rgba(255, 255, 255, 0.8);
         --glass-border: rgba(255, 255, 255, 0.5);
     }
+    .track-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 18px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; font-size: .85rem; }
+    .track-bar .track-meta { color: #64748b; font-weight: 600; }
+    .track-bar .track-link { font-weight: 800; color: var(--primary); text-decoration: none; }
+    .lesson-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 28px; padding: 18px 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; }
+    .lesson-item.is-locked { opacity: .55; }
     .studio-container { display: grid; grid-template-columns: 1fr 400px; gap: 40px; min-height: 90vh; transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); padding-bottom: 60px; }
     .studio-container.focus-mode { grid-template-columns: 1fr 0; gap: 0; }
     .studio-container.focus-mode .playlist-card { opacity: 0; pointer-events: none; transform: translateX(40px); }
@@ -219,7 +207,7 @@ require_once 'includes/layout-top.php';
     <div class="studio-main">
         <div class="studio-hero">
             <nav class="breadcrumb" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 0.72rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.2px;">
-                <a href="courses.php" style="text-decoration: none; color: #94a3b8; transition: 0.2s;">Learning Path</a> 
+                <a href="courses" style="text-decoration: none; color: #94a3b8; transition: 0.2s;">Learning Path</a> 
                 <i class="fas fa-chevron-right" style="font-size: 0.55rem; color: #cbd5e1; opacity: 0.6;"></i>
                 <span style="color: var(--primary); opacity: 0.9; cursor: default;"><?= htmlspecialchars($enrollment['title']) ?></span> 
                 <i class="fas fa-chevron-right" style="font-size: 0.55rem; color: #cbd5e1; opacity: 0.6;"></i>
@@ -233,9 +221,33 @@ require_once 'includes/layout-top.php';
             </div>
         </div>
 
+        <div class="track-bar">
+            <span class="lr-pill <?= $is_structured ? 'struct' : 'self' ?>"><i class="fas <?= $is_structured ? 'fa-calendar-week' : 'fa-person-walking' ?>"></i> <?= e(mode_label($enrollment['learning_mode'])) ?></span>
+            <?php if ($is_structured): ?>
+                <span class="track-meta"><?= $enrollment['cohort_name'] ? e($enrollment['cohort_name']) . ' · ' : '' ?>Started <?= date('M j, Y', strtotime($enrollment['starts_on'] ?: 'today')) ?></span>
+                <?php if (!empty($active_lesson['due_at'])): ?><span class="track-meta"><i class="far fa-clock"></i> This lesson is due <?= date('D, M j', $active_lesson['due_at']) ?></span><?php endif; ?>
+            <?php else: ?>
+                <span class="track-meta">Every lesson is open. Go in any order.</span>
+            <?php endif; ?>
+            <?php if (!empty($enrollment['expires_at'])): ?><span class="track-meta">Access until <?= date('M j, Y', strtotime($enrollment['expires_at'])) ?></span><?php endif; ?>
+            <?php if (count(course_modes($enrollment)) > 1): ?><a class="track-link" href="../enroll?id=<?= $course_id ?>">Change track</a><?php endif; ?>
+            <a class="track-link" href="../learn?course=<?= $course_id ?>&lesson=<?= (int)$active_lesson['id'] ?>">Reading view</a>
+        </div>
+
+        <?php if (!empty($active_lesson['is_locked'])): ?>
+            <div class="lr-notice lock" style="margin-top:20px"><i class="fas fa-lock"></i><div>
+                <strong><?= e($active_lesson['lock_reason']) ?></strong>
+                <?= $is_structured ? 'You are on the structured track, so lessons open on a weekly schedule and in order.' : '' ?>
+                <?php if ($is_structured && in_array('self_paced', course_modes($enrollment), true)): ?>
+                    Prefer to go faster? <a href="../enroll?id=<?= $course_id ?>&mode=self_paced">Switch to self-paced</a>.
+                <?php endif; ?>
+                <?php if ($prev_lesson): ?><div style="margin-top:12px"><a class="lr-btn lr-btn-primary" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Back to <?= e($prev_lesson['title']) ?></a></div><?php endif; ?>
+            </div></div>
+        <?php else: ?>
+
         <div class="video-theater">
             <?php 
-            $is_quiz_lesson = ($active_lesson && ($active_lesson['lesson_type'] === 'quiz' || strpos(strtoupper($active_lesson['title']), 'QUIZ') !== false));
+            $is_quiz_lesson = ($active_lesson && !empty($active_lesson['attached_quiz_id']) && ($active_lesson['lesson_type'] === 'quiz' || strpos(strtoupper($active_lesson['title']), 'QUIZ') !== false));
             $media_url = $active_lesson['video_url'] ?: $active_lesson['file_url'];
             $pdf_url = $active_lesson['pdf_resource'];
 
@@ -247,11 +259,11 @@ require_once 'includes/layout-top.php';
                     </div>
                     <h2 style="font-weight: 950; letter-spacing: -1.5px; margin-bottom: 8px;">KNOWLEDGE CHALLENGE UNLOCKED</h2>
                     <p style="opacity: 0.7; margin-bottom: 32px; font-weight: 500;">Please proceed to the assessment to validate your module mastery.</p>
-                    <a href="take-quiz.php?id=<?= $active_lesson['attached_quiz_id'] ?: '4' ?>" class="btn-premium" style="padding: 18px 48px; border-radius: 50px;">START CHALLENGE NOW</a>
+                    <a href="take-quiz?id=<?= (int)$active_lesson['attached_quiz_id'] ?>" class="btn-premium" style="padding: 18px 48px; border-radius: 50px;">START CHALLENGE NOW</a>
                 </div>
             <?php elseif($media_url): ?>
                 <?php if(strpos($media_url, 'youtube') !== false || strpos($media_url, 'vimeo') !== false): ?>
-                    <iframe width="100%" height="100%" src="<?= strpos($media_url, 'youtube') !== false ? str_replace('watch?v=', 'embed/', $media_url) : $media_url ?>" frameborder="0" allowfullscreen></iframe>
+                    <iframe width="100%" height="100%" src="<?= e(video_embed_url($media_url)) ?>" frameborder="0" allowfullscreen></iframe>
                 <?php else: ?>
                     <video controls style="width: 100%; height: 100%;"><source src="../<?= htmlspecialchars($media_url) ?>" type="video/mp4"></video>
                 <?php endif; ?>
@@ -290,6 +302,7 @@ require_once 'includes/layout-top.php';
                         <span class="resource-info">Digital Resource (Academic Material)</span>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
                         <input type="hidden" name="complete_lesson" value="<?= $active_lesson['id'] ?>">
                         <button type="submit" class="mark-done-btn <?= $lesson_done ? 'done' : '' ?>">
                             <?= $lesson_done ? 'Done' : 'Mark as done' ?>
@@ -310,7 +323,7 @@ require_once 'includes/layout-top.php';
                 <div class="resource-item">
                     <div class="resource-icon"><i class="far fa-file-alt" style="color: #8b5cf6;"></i></div>
                     <div class="resource-meta">
-                        <a href="take-quiz.php?id=<?= $cat_quiz['id'] ?>" class="resource-title"><?= htmlspecialchars($cat_quiz['title']) ?></a>
+                        <a href="take-quiz?id=<?= $cat_quiz['id'] ?>" class="resource-title"><?= htmlspecialchars($cat_quiz['title']) ?></a>
                         <span class="resource-info">Time Allocation: <?= $cat_quiz['time_limit_mins'] ?> mins | Min. Score: <?= $cat_quiz['pass_score'] ?>%</span>
                         
                         <?php 
@@ -340,9 +353,13 @@ require_once 'includes/layout-top.php';
                             <p style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-dim);">Core concepts & strategic objectives</p>
                         </div>
                     </div>
-                    <div style="line-height: 2; color: var(--text-main); font-size: 1rem; font-weight: 500;">
-                        <?= nl2br(htmlspecialchars($active_lesson['content'] ?? 'This lecture focuses on the foundational concepts of the module. Please follow along with the media above.')) ?>
+                    <div class="lr-content">
+                        <?= trim((string)$active_lesson['content']) !== '' ? render_lesson_text($active_lesson['content']) : '<p>Follow along with the media above.</p>' ?>
                     </div>
+                    <?php if (!empty($active_lesson['code_example'])): ?>
+                    <div class="lr-example"><h3>Example</h3><pre><code><?= e($active_lesson['code_example']) ?></code></pre>
+                        <a class="lr-btn lr-btn-ok" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><?= tryit_runnable($active_lesson['code_lang']) ? 'Try it yourself' : 'Open in editor' ?> <i class="fas fa-arrow-up-right-from-square"></i></a></div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="studio-sidebar-meta">
@@ -354,7 +371,7 @@ require_once 'includes/layout-top.php';
                         <h6 style="margin: 0; font-weight: 950; font-size: 1.1rem; letter-spacing: -0.5px;"><?= htmlspecialchars($enrollment['tutor_name']) ?></h6>
                         <span style="font-size: 0.65rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-top: 4px;">Faculty Lead</span>
                         <div style="margin-top: 24px;">
-                            <a href="messages.php?to=<?= $enrollment['tutor_id'] ?>" class="btn-action" style="display: block; width: 100%; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; font-size: 0.75rem; font-weight: 950; border-radius: 12px; transition: 0.3s; text-decoration: none; color: #1e293b; text-align: center;"><i class="fas fa-envelope"></i> MESSAGE TUTOR</a>
+                            <a href="messages?to=<?= $enrollment['tutor_id'] ?>" class="btn-action" style="display: block; width: 100%; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; font-size: 0.75rem; font-weight: 950; border-radius: 12px; transition: 0.3s; text-decoration: none; color: #1e293b; text-align: center;"><i class="fas fa-envelope"></i> MESSAGE TUTOR</a>
                         </div>
                     </div>
 
@@ -363,6 +380,22 @@ require_once 'includes/layout-top.php';
                     </button>
                 </div>
             </div>
+            <div class="lesson-actions">
+                <?php if ($prev_lesson): ?><a class="lr-btn lr-btn-ghost" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Previous</a><?php endif; ?>
+                <?php if (!empty($active_lesson['code_example'])): ?><a class="lr-btn lr-btn-ghost" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><i class="fas fa-code"></i> Try it yourself</a><?php endif; ?>
+                <span style="flex:1"></span>
+                <?php if ($lesson_done): ?>
+                    <span class="lr-pill free"><i class="fas fa-check"></i> Completed</span>
+                    <?php if ($next_lesson): ?><a class="lr-btn lr-btn-primary" href="?id=<?= $course_id ?>&lesson=<?= (int)$next_lesson['id'] ?>">Next <i class="fas fa-chevron-right"></i></a><?php endif; ?>
+                <?php else: ?>
+                    <form method="POST" style="margin:0">
+                        <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+                        <input type="hidden" name="complete_lesson" value="<?= (int)$active_lesson['id'] ?>">
+                        <button class="lr-btn lr-btn-ok" name="and_next" value="1"><i class="fas fa-check"></i> Mark complete<?= $next_lesson ? ' &amp; continue' : '' ?></button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <aside class="playlist-card">
@@ -384,18 +417,18 @@ require_once 'includes/layout-top.php';
                 foreach($wlessons as $l) { if($active_lesson && $l['id'] == $active_lesson['id']) { $is_active_week = true; break; } }
             ?>
                 <div class="pillar-divider" onclick="toggleWeek(<?= $wnum ?>)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-                    <span>Level Pillar <?= $wnum ?></span>
+                    <span><?= $is_structured ? 'Week' : 'Module' ?> <?= $wnum ?><?php if ($is_structured && !empty($wlessons[0]['opens_at'])): ?> · <?= $wlessons[0]['opens_at'] > time() ? 'opens ' : 'opened ' ?><?= date('M j', $wlessons[0]['opens_at']) ?><?php endif; ?></span>
                     <i class="fas fa-chevron-<?= $is_active_week ? 'down' : 'right' ?>" id="week-icon-<?= $wnum ?>" style="font-size: 0.7rem; opacity: 0.5;"></i>
                 </div>
                 <div id="week-content-<?= $wnum ?>" style="display: <?= $is_active_week ? 'block' : 'none' ?>;">
                     <?php foreach($wlessons as $l): ?>
-                        <a href="?id=<?= $course_id ?>&lesson=<?= $l['id'] ?>" class="lesson-item <?= ($active_lesson && $l['id'] == $active_lesson['id']) ? 'active' : '' ?> <?= $l['progress_status'] === 'completed' ? 'completed' : '' ?>">
+                        <a href="?id=<?= $course_id ?>&lesson=<?= $l['id'] ?>" class="lesson-item <?= ($active_lesson && $l['id'] == $active_lesson['id']) ? 'active' : '' ?> <?= $l['progress_status'] === 'completed' ? 'completed' : '' ?> <?= $l['is_locked'] ? 'is-locked' : '' ?>" <?= $l['is_locked'] ? 'title="' . e($l['lock_reason']) . '"' : '' ?>>
                             <div class="item-num"><?= $l['order_num'] ?></div>
                             <div class="lesson-info">
                                 <h6 style="margin: 0; color: var(--text-main); font-weight: 900; font-size: 0.9rem; line-height: 1.3;"><?= htmlspecialchars($l['title']) ?></h6>
                                 <div class="lesson-meta-label">
                                     <i class="<?= $l['lesson_type'] == 'video' ? 'fas fa-play-circle' : 'far fa-file-alt' ?>"></i> 
-                                    <?= $l['duration_mins'] ?? '15' ?>m Explorer
+                                    <?= $l['is_locked'] ? '<i class="fas fa-lock"></i> ' . e($l['lock_reason']) : (int)($l['duration_mins'] ?: 15) . ' min' ?>
                                 </div>
                             </div>
                             <div class="item-check"><i class="fas fa-check"></i></div>
@@ -484,7 +517,7 @@ require_once 'includes/layout-top.php';
         formData.append('query', q.value);
         formData.append('context', 'Classroom Mode. Lesson: <?= addslashes($active_lesson["title"]) ?>. Module Content: <?= addslashes(substr(strip_tags($active_lesson["content"]), 0, 500)) ?>');
 
-        fetch('../includes/ai_controller.php', { method: 'POST', body: formData })
+        fetch('../includes/ai_controller', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
                 aiStatus.innerHTML = data.response || 'System calibration required. Please retry.';

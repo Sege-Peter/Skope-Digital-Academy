@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Introduction to Artificial Intelligence",
+  "short": "AI Basics",
+  "description": "A plain-English start in artificial intelligence for school leavers. Learn what AI really is, how chatbots like ChatGPT and Gemini work, how to write good prompts, and how to use AI tools safely and responsibly for study, work and freelance income.",
+  "category": "Artificial Inteligence",
+  "level": "beginner",
+  "order": 5,
+  "outcomes": [
+    "Explain what AI, machine learning and generative AI are in simple words",
+    "Write clear prompts that get useful answers from AI chatbots",
+    "Use AI tools to speed up writing, design and virtual assistant tasks",
+    "Spot hallucinations and bias, and check AI answers before using them",
+    "Protect your privacy and use AI honestly at school and at work",
+    "Choose a realistic next step towards an AI-related career"
+  ]
+}

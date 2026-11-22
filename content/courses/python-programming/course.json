@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Python Programming",
+  "short": "Python",
+  "description": "A four-week, project-based Python course for school leavers with little or no coding experience. Each week you build small, useful programs – a tip and VAT calculator, a shopping list, a grades analyser, a quiz game and an expense tracker – and finish with skills you can show to clients and employers.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 12,
+  "outcomes": [
+    "Write and run Python programs that use variables, numbers and text",
+    "Store and process data with lists and dictionaries",
+    "Make decisions and repeat work with if statements and loops",
+    "Organise code into functions and use standard library modules",
+    "Save and read data in text and CSV files",
+    "Build a small expense tracker you can add to your portfolio"
+  ]
+}

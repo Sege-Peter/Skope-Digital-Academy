@@ -2,8 +2,9 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/paystack.php';
+require_once 'includes/learning.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit; }
+if (!isLoggedIn()) { header('Location: login'); exit; }
 
 $user = currentUser();
 $type = $_GET['type'] ?? 'course';
@@ -12,31 +13,49 @@ $id = (int)($_GET['id'] ?? 0);
 $title = "Payment";
 $amount = 0;
 $desc = "";
+$mode = '';
+$cohort_id = 0;
 
 if ($type === 'course') {
-    $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ? AND status = 'published'");
     $stmt->execute([$id]);
     $course = $stmt->fetch();
-    if (!$course) { die("Course not found"); }
+    if (!$course) { header('Location: courses'); exit; }
+    [$mode, $cohort, $err] = resolve_mode_choice($pdo, $course, $_GET['mode'] ?? null, $_GET['cohort'] ?? null);
+    if ($err) { header('Location: enroll?id=' . $id); exit; }
+    $cohort_id = (int)$cohort;
+    $existing = get_enrollment($pdo, (int)$user['id'], $id);
+    $amount = amount_due($course, $mode, $existing);
     $title = "Payment for " . $course['title'];
-    $amount = $course['price'];
-    $desc = "Enrollment fee for " . $course['title'];
+    $desc = mode_label($mode) . " – " . $course['title'];
+} elseif ($type === 'certificate') {
+    require_once 'includes/progress.php';
+    $st = $pdo->prepare("SELECT c.*, co.title AS course_title FROM certificates c LEFT JOIN courses co ON co.id = c.course_id WHERE c.id = ? AND c.student_id = ?");
+    $st->execute([$id, $user['id']]);
+    $cert = $st->fetch();
+    if (!$cert) { header('Location: student/achievements'); exit; }
+    if ($cert['status'] !== 'pending') { header('Location: certificate?code=' . rawurlencode($cert['verification_code'])); exit; }
+    $amount = (float)$cert['fee'];
+    $title = "Unlock your certificate";
+    $desc = "Certificate for " . $cert['course_title'];
 } elseif ($type === 'registration') {
     $title = "Registration Fee";
-    $amount = 10; // Hardcoded default registration fee for now
+    $amount = (float)setting('registration_fee');
     $desc = "Account activation fee for " . $user['name'];
 } else {
     die("Invalid payment type");
 }
 
 if ($amount <= 0) {
-    // If free, handle enrollment/activation immediately
-    if ($type === 'course') {
-        $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'")->execute([$user['id'], $id]);
-        header("Location: student/classroom.php?id=$id");
+    if ($type === 'certificate') {
+        unlock_certificate($pdo, (int)$cert['id'], 0);
+        header('Location: certificate?code=' . rawurlencode($cert['verification_code']));
+    } elseif ($type === 'course') {
+        // Free or already covered: confirm on the enrollment page (POST + CSRF), never on a GET.
+        header("Location: enroll?id=$id&mode=" . urlencode($mode) . "&cohort=$cohort_id");
     } else {
         $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ?")->execute([$user['id']]);
-        header("Location: student/index.php");
+        header("Location: student/");
     }
     exit;
 }
@@ -68,10 +87,10 @@ if ($amount <= 0) {
         <div class="icon-circle">
             <i class="fas <?= $type === 'course' ? 'fa-graduation-cap' : 'fa-user-check' ?>"></i>
         </div>
-        <h1><?= $title ?></h1>
-        <p class="desc"><?= $desc ?></p>
+        <h1><?= e($title) ?></h1>
+        <p class="desc"><?= e($desc) ?></p>
         
-        <div class="price"><span>KES</span> <?= number_format($amount) ?></div>
+        <div class="price"><span><?= e(setting('currency')) ?></span> <?= number_format($amount, 2) ?></div>
         
         <button id="pay-button" class="btn-pay">
             Pay with Paystack <i class="fas fa-arrow-right"></i>
@@ -85,23 +104,35 @@ if ($amount <= 0) {
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <script>
         const payButton = document.getElementById('pay-button');
+        const pay = <?= json_encode([
+            'key' => PAYSTACK_PUBLIC_KEY,
+            'email' => $user['email'],
+            'amount' => (int)round($amount * 100),
+            'currency' => setting('currency'),
+            'type' => $type,
+            'id' => $id,
+            'mode' => $mode,
+            'cohort' => $cohort_id,
+        ]) ?>;
         payButton.addEventListener('click', function(e) {
             e.preventDefault();
-            
             let handler = PaystackPop.setup({
-                key: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-                email: '<?= $user['email'] ?>',
-                amount: <?= $amount * 100 ?>,
-                currency: 'KES',
-                ref: 'SDA-' + Math.floor((Math.random() * 1000000000) + 1),
+                key: pay.key,
+                email: pay.email,
+                amount: pay.amount,
+                currency: pay.currency,
+                ref: 'SDA-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
                 metadata: {
+                    payment_type: pay.type, item_id: pay.id, learning_mode: pay.mode, cohort_id: pay.cohort,
                     custom_fields: [
-                        { display_name: "Payment Type", variable_name: "payment_type", value: "<?= $type ?>" },
-                        { display_name: "Item ID", variable_name: "item_id", value: "<?= $id ?>" }
+                        { display_name: "Payment Type", variable_name: "payment_type", value: pay.type },
+                        { display_name: "Item ID", variable_name: "item_id", value: String(pay.id) },
+                        { display_name: "Learning track", variable_name: "learning_mode", value: pay.mode }
                     ]
                 },
                 callback: function(response) {
-                    window.location.href = "verify-payment.php?reference=" + response.reference + "&type=<?= $type ?>&id=<?= $id ?>";
+                    const q = new URLSearchParams({ reference: response.reference, type: pay.type, id: pay.id, mode: pay.mode, cohort: pay.cohort });
+                    window.location.href = "verify-payment?" + q.toString();
                 }
             });
             handler.openIframe();

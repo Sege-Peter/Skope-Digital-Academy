@@ -65,341 +65,215 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $pdo->prepare("UPDATE users SET admission_number = ? WHERE id = ?")->execute([$adm_number, $new_user_id]);
                         }
 
-                        // Log the user in to proceed to checkout
-                        $_SESSION['user_id'] = $new_user_id;
-                        $_SESSION['role'] = $role;
-                        $_SESSION['name'] = $name;
-
                         if ($role === 'student') {
-                            header("Location: checkout.php?type=registration");
+                            // Sign the student in properly (fresh session id, full profile) and go to the activation fee.
+                            $row = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                            $row->execute([$new_user_id]);
+                            loginUser($row->fetch());
+                            header("Location: checkout?type=registration");
                             exit;
-                        } else {
-                            $success = 'Registration successful! Your tutor account is pending admin approval.';
                         }
+                        // Tutors stay signed out until an admin approves the account.
+                        $success = 'Thanks for applying to teach with us! An admin will review your tutor account and email you once it is approved.';
                     } else {
                         $error = 'Failed to create account. Please try again.';
                     }
                 }
             } catch (Exception $e) {
-                $error = 'A system error occurred: ' . $e->getMessage();
+                $error = 'Something went wrong creating your account. Please try again.';
                 error_log($e->getMessage());
             }
         }
     }
 }
 ?>
+<?php
+require_once __DIR__ . '/includes/learning.php';
+$fee = (float)setting('registration_fee');
+$role_in = in_array($_POST['role'] ?? '', ['student', 'tutor'], true) ? $_POST['role'] : (($_GET['role'] ?? '') === 'tutor' ? 'tutor' : 'student');
+$ref = $_POST['ref_code'] ?? $_GET['ref'] ?? '';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up – Skope Digital Academy</title>
+    <title>Create Account – Skope Digital Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/auth.css?v=5">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
-    <style>
-        :root {
-            --base: #f1f3f6;
-            --shadow-dark: #d1d9e6;
-            --shadow-light: #ffffff;
-            --primary-btn: #67b7d1;
-            --primary-btn-hover: #5aa9c3;
-            --text-main: #31456a;
-            --text-dim: #64748b;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--base);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-            color: var(--text-main);
-        }
-
-        .neu-card {
-            width: 100%;
-            max-width: 500px;
-            background: var(--base);
-            border-radius: 50px;
-            padding: 50px 40px;
-            box-shadow: 20px 20px 60px var(--shadow-dark), 
-                       -20px -20px 60px var(--shadow-light);
-            text-align: center;
-        }
-
-        /* ══ LOGO ══ */
-        .logo-wrapper {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 30px;
-            background: var(--base);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 6px 6px 12px var(--shadow-dark), 
-                       -6px -6px 12px var(--shadow-light);
-            padding: 4px;
-            border: 3px solid var(--base);
-        }
-        .logo-wrapper .logo-inner {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            overflow: hidden;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .logo-wrapper img {
-            width: 70%;
-            height: 70%;
-            object-fit: contain;
-            filter: brightness(0) invert(1);
-        }
-
-        /* ══ ROLE PICKER ══ */
-        .role-picker { display: flex; gap: 15px; margin-bottom: 25px; }
-        .role-opt {
-            flex: 1;
-            height: 54px;
-            background: var(--base);
-            border-radius: 27px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            font-weight: 700;
-            font-size: 0.85rem;
-            cursor: pointer;
-            box-shadow: 4px 4px 8px var(--shadow-dark), 
-                       -4px -4px 8px var(--shadow-light);
-            transition: 0.3s;
-            position: relative;
-        }
-        .role-opt.active {
-            box-shadow: inset 4px 4px 8px var(--shadow-dark), 
-                       inset -4px -4px 8px var(--shadow-light);
-            color: var(--primary-btn);
-        }
-        .role-opt input { position: absolute; opacity: 0; }
-
-        /* ══ INPUTS ══ */
-        .input-group { position: relative; margin-bottom: 20px; }
-        .input-neu {
-            width: 100%;
-            height: 56px;
-            background: var(--base);
-            border: none;
-            outline: none;
-            border-radius: 28px;
-            padding: 0 45px 0 55px;
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            box-shadow: inset 5px 5px 10px var(--shadow-dark), 
-                       inset -5px -5px 10px var(--shadow-light);
-            transition: 0.3s;
-        }
-        .input-neu:focus {
-            box-shadow: inset 2px 2px 4px var(--shadow-dark), 
-                       inset -2px -2px 4px var(--shadow-light);
-        }
-        .input-group i:not(.toggle-password) {
-            position: absolute;
-            left: 22px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-dim);
-            font-size: 1rem;
-        }
-        .toggle-password {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: 0.3s;
-            z-index: 10;
-        }
-        .toggle-password:hover { color: var(--primary-btn); }
-
-        /* ══ BUTTON ══ */
-        .btn-neu {
-            width: 100%;
-            height: 60px;
-            background: var(--primary-btn);
-            color: #fff;
-            border: none;
-            border-radius: 30px;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 1.1rem;
-            margin-top: 10px;
-            cursor: pointer;
-            box-shadow: 6px 6px 12px var(--shadow-dark), 
-                       -6px -6px 12px var(--shadow-light);
-            transition: 0.3s;
-        }
-        .btn-neu:hover {
-            background: var(--primary-btn-hover);
-            transform: translateY(-2px);
-        }
-        .btn-neu:active {
-            transform: translateY(0);
-            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .terms-check {
-            margin: 20px 0;
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            color: var(--text-dim);
-            font-weight: 600;
-        }
-        .terms-check input { accent-color: var(--primary-btn); width: 18px; height: 18px; }
-        .terms-check a { color: var(--text-main); font-weight: 700; }
-
-        .auth-links { margin-top: 30px; font-size: 0.9rem; color: var(--text-dim); font-weight: 600; }
-        .auth-links a { color: var(--text-main); font-weight: 700; text-decoration: none; }
-        
-        .back-home { margin-top: 25px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-        .back-home a { color: var(--text-dim); text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.3s; }
-        .back-home a:hover { color: var(--primary-btn); }
-
-        .success-overlay {
-            background: #fff;
-            padding: 30px;
-            border-radius: 30px;
-            box-shadow: 10px 10px 20px var(--shadow-dark), -10px -10px 20px var(--shadow-light);
-        }
-
-        @media (max-width: 480px) {
-            .neu-card { padding: 40px 25px; border-radius: 40px; }
-            .role-picker { flex-direction: column; }
-        }
-    </style>
 </head>
-<body>
-
-    <div class="neu-card">
-        <div class="logo-wrapper">
-            <div class="logo-inner">
-                <img src="assets/images/Skope Digital  logo.png" alt="Logo">
-            </div>
+<body class="auth-compact">
+<div class="auth">
+    <aside class="auth-brand">
+        <a class="auth-logo" href="./">
+            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
+        </a>
+        <div class="auth-pitch">
+            <h1>Start learning.<br><span>Build real skills.</span></h1>
+            <p>Join learners across Kenya and East Africa building careers in tech, one lesson at a time.</p>
+            <ul class="auth-points">
+                <li><i class="fas fa-code"></i><div><strong>Learn by doing</strong><span>Every lesson has examples you can edit and run in your browser.</span></div></li>
+                <li><i class="fas fa-route"></i><div><strong>Self-paced or structured</strong><span>Go at your own speed, or join a weekly cohort with deadlines.</span></div></li>
+                <li><i class="fas fa-chalkboard-user"></i><div><strong>Teach with us</strong><span>Tutors build courses and reach new students.</span></div></li>
+            </ul>
         </div>
+        <div class="auth-visual" aria-hidden="true">
+            <img class="photo" src="assets/images/elearning%20aesthetic.jpeg" alt="">
+            <div class="float-card cert"><span class="fi"><i class="fas fa-award"></i></span><span><b>Certificate earned</b><small>HTML Tutorial · just now</small></span></div>
+            <div class="float-card progress"><span class="fi"><i class="fab fa-python"></i></span><span style="flex:1"><b>Continue learning</b><small>Python · Lesson 12 of 24</small><span class="bar"><span></span></span></span></div>
+        </div>
+        <div class="auth-trust"><span><i class="fas fa-book-open"></i> 6 free tutorials</span><span><i class="fas fa-code"></i> Live code editor</span><span><i class="fas fa-location-dot"></i> Kisumu, Kenya</span></div>
+    </aside>
 
+    <main class="auth-main">
+        <div class="auth-card">
         <?php if ($success): ?>
-            <div class="success-overlay">
-                <i class="fas fa-check-circle" style="font-size: 3rem; color: #10b981; margin-bottom: 20px;"></i>
-                <h2 style="font-size: 1.5rem; margin-bottom: 10px;">Registration Successful!</h2>
-                <p style="color: var(--text-dim); margin-bottom: 25px;"><?= htmlspecialchars($success) ?></p>
-                <a href="login.php" class="btn-neu" style="display: flex; align-items: center; justify-content: center; text-decoration: none;">Go to Login</a>
+            <div class="done">
+                <div class="auth-icon"><i class="fas fa-circle-check"></i></div>
+                <h2>Application received</h2>
+                <p><?= htmlspecialchars($success) ?></p>
+                <a class="submit" href="login"><i class="fas fa-right-to-bracket"></i> Go to sign in</a>
+                <div class="auth-foot"><a href="learn"><i class="fas fa-book-open"></i> Browse the free tutorials meanwhile</a></div>
             </div>
         <?php else: ?>
-            <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem; margin-bottom: 30px;">Create Account</h1>
+            <h2>Create your account</h2>
 
             <?php if ($error): ?>
-                <div style="margin-bottom: 20px; font-size: 0.85rem; color: #ef4444; font-weight: 700;">
-                    <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
-                </div>
+                <div class="alert err" role="alert"><i class="fas fa-circle-exclamation"></i><span><?= htmlspecialchars($error) ?><?= $error === 'This email is already registered.' ? ' <a href="login">Sign in instead</a> or <a href="forgot-password">reset your password</a>.' : '' ?></span></div>
+            <?php elseif ($ref !== ''): ?>
+                <div class="alert info" role="status"><i class="fas fa-gift"></i><span>You were invited by a Skope learner. Welcome!</span></div>
             <?php endif; ?>
 
-            <form action="register.php" method="POST" id="regForm">
+            <form action="register" method="POST" id="regForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">
-                <input type="hidden" name="ref_code" value="<?= htmlspecialchars($_GET['ref'] ?? '') ?>">
+                <input type="hidden" name="ref_code" value="<?= htmlspecialchars($ref) ?>">
 
-                <div class="role-picker">
-                    <label class="role-opt active" id="student-btn">
-                        <input type="radio" name="role" value="student" checked onchange="updateRoleUI('student')">
-                        <i class="fas fa-user-graduate"></i> Student
+                <fieldset class="roles">
+                    <legend class="sr-only">I want to</legend>
+                    <label class="role">
+                        <input type="radio" name="role" value="student" <?= $role_in === 'student' ? 'checked' : '' ?>>
+                        <span><strong><i class="fas fa-user-graduate"></i> Learn</strong><small><?= $fee > 0 ? 'One-time activation fee of ' . htmlspecialchars(money($fee)) : 'Free to join' ?></small></span>
                     </label>
-                    <label class="role-opt" id="tutor-btn">
-                        <input type="radio" name="role" value="tutor" onchange="updateRoleUI('tutor')">
-                        <i class="fas fa-chalkboard-teacher"></i> Tutor
+                    <label class="role">
+                        <input type="radio" name="role" value="tutor" <?= $role_in === 'tutor' ? 'checked' : '' ?>>
+                        <span><strong><i class="fas fa-chalkboard-user"></i> Teach</strong><small>Reviewed by an admin before you can sign in</small></span>
                     </label>
-                </div>
+                </fieldset>
 
-                <div class="input-group">
-                    <i class="fas fa-signature"></i>
-                    <input type="text" name="full_name" class="input-neu" placeholder="Mzalendo (Full Name)" value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>" required>
-                </div>
-
-                <div class="input-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" class="input-neu" placeholder="Official Email Address" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="input-group">
-                        <i class="fas fa-lock" style="left: 18px;"></i>
-                        <input type="password" name="password" id="password" class="input-neu" placeholder="Password" style="padding-left: 45px; padding-right: 40px;" required>
-                        <i class="fas fa-eye toggle-password" style="right: 15px;" onclick="togglePassword('password', this)"></i>
-                    </div>
-                    <div class="input-group">
-                        <i class="fas fa-shield-alt" style="left: 18px;"></i>
-                        <input type="password" name="confirm_password" id="confirm_password" class="input-neu" placeholder="Confirm" style="padding-left: 45px; padding-right: 40px;" required>
-                        <i class="fas fa-eye toggle-password" style="right: 15px;" onclick="togglePassword('confirm_password', this)"></i>
+                <div class="grid2">
+                <div class="field">
+                    <div class="field-top"><label for="full_name">Full name</label></div>
+                    <div class="control">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="full_name" name="full_name" placeholder="e.g. Amina Otieno" autocomplete="name" maxlength="120" value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>" required>
                     </div>
                 </div>
 
-                <label class="terms-check">
-                    <input type="checkbox" name="terms" required>
-                    <span>Accept <a href="terms.php">Terms</a> & <a href="privacy.php">Privacy</a></span>
+                <div class="field">
+                    <div class="field-top"><label for="email">Email address</label></div>
+                    <div class="control">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
+                    </div>
+                </div>
+                </div>
+
+                <div class="grid2">
+                <div class="field">
+                    <div class="field-top"><label for="password">Password</label></div>
+                    <div class="control">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required aria-describedby="pwHint">
+                        <button type="button" class="peek" data-for="password" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="meter" id="meter" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                    <div class="hint" id="pwHint">8+ characters; mix letters, numbers &amp; symbols.</div>
+                </div>
+
+                <div class="field">
+                    <div class="field-top"><label for="confirm_password">Confirm password</label></div>
+                    <div class="control">
+                        <i class="fas fa-shield-halved"></i>
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Type it again" autocomplete="new-password" required>
+                        <button type="button" class="peek" data-for="confirm_password" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="hint" id="matchHint" aria-live="polite"></div>
+                </div>
+                </div>
+
+                <label class="check">
+                    <input type="checkbox" name="terms" <?= isset($_POST['terms']) ? 'checked' : '' ?> required>
+                    <span>I agree to the <a href="terms" target="_blank">Terms of Service</a> and <a href="privacy" target="_blank">Privacy Policy</a>.</span>
                 </label>
 
-                <button type="submit" class="btn-neu" id="regBtn">Sign Up Now</button>
+                <button type="submit" class="submit" id="regBtn"><i class="fas fa-user-plus"></i> <span>Create account</span></button>
             </form>
 
-            <div class="auth-links">
-                Already member? <a href="login.php">Sign In</a>
-            </div>
-
-            <div class="back-home">
-                <a href="index.php">
-                    <i class="fas fa-arrow-left"></i> Back to Homepage
-                </a>
-            </div>
+            <div class="auth-switch">Already have an account? <a href="login">Sign in</a></div>
+            <div class="auth-foot"><a href="./"><i class="fas fa-arrow-left"></i> Back to homepage</a></div>
         <?php endif; ?>
-    </div>
+        </div>
+    </main>
+</div>
 
-    <script src="assets/js/main.js"></script>
-    <script>
-        function togglePassword(inputId, icon) {
-            const input = document.getElementById(inputId);
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        }
+<script>
+(() => {
+    const form = document.getElementById('regForm');
+    if (!form) return;
+    const pw = document.getElementById('password');
+    const cf = document.getElementById('confirm_password');
+    const meter = document.getElementById('meter');
+    const pwHint = document.getElementById('pwHint');
+    const matchHint = document.getElementById('matchHint');
+    const btnText = document.querySelector('#regBtn span');
 
-        function updateRoleUI(role) {
-            document.getElementById('student-btn').classList.toggle('active', role === 'student');
-            document.getElementById('tutor-btn').classList.toggle('active', role === 'tutor');
-            document.getElementById('regBtn').textContent = role === 'student' ? 'Sign Up Now' : 'Join as Tutor';
-        }
+    document.querySelectorAll('.peek').forEach((b) => b.addEventListener('click', () => {
+        const input = document.getElementById(b.dataset.for);
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        b.innerHTML = '<i class="fas ' + (show ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
+    }));
 
-        document.getElementById('regForm')?.addEventListener('submit', function() {
-            const btn = document.getElementById('regBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-            btn.style.opacity = '0.8';
-        });
-    </script>
+    const strength = (v) => {
+        if (!v) return 0;
+        let s = v.length >= 8 ? 1 : 0;
+        if (v.length >= 12) s++;
+        if (/[a-z]/.test(v) && /[A-Z]/.test(v)) s++;
+        if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) s++;
+        return Math.max(v.length ? 1 : 0, Math.min(4, s));
+    };
+    const labels = ['', 'Too weak', 'Okay', 'Good', 'Strong'];
+    const check = () => {
+        const s = strength(pw.value);
+        meter.dataset.s = s;
+        if (!pw.value) { pwHint.className = 'hint'; pwHint.textContent = '8+ characters; mix letters, numbers & symbols.'; }
+        else if (pw.value.length < 8) { pwHint.className = 'hint bad'; pwHint.textContent = `${8 - pw.value.length} more character${8 - pw.value.length === 1 ? '' : 's'} needed`; }
+        else { pwHint.className = 'hint ' + (s >= 3 ? 'good' : 'warn'); pwHint.textContent = 'Strength: ' + labels[s]; }
+        if (!cf.value) { matchHint.textContent = ''; cf.classList.remove('bad'); }
+        else if (cf.value === pw.value) { matchHint.className = 'hint good'; matchHint.textContent = '✓ Passwords match'; cf.classList.remove('bad'); }
+        else { matchHint.className = 'hint bad'; matchHint.textContent = 'Passwords don\'t match yet'; cf.classList.add('bad'); }
+    };
+    pw.addEventListener('input', check);
+    cf.addEventListener('input', check);
+
+    const setRole = () => { btnText.textContent = form.role.value === 'tutor' ? 'Apply to teach' : 'Create account'; };
+    form.querySelectorAll('input[name="role"]').forEach((r) => r.addEventListener('change', setRole));
+    setRole();
+
+    form.addEventListener('submit', (ev) => {
+        cf.setCustomValidity(cf.value && cf.value !== pw.value ? 'Passwords do not match' : '');
+        if (!form.checkValidity()) { ev.preventDefault(); form.reportValidity(); return; }
+        const btn = document.getElementById('regBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating your account…';
+    });
+    window.addEventListener('pageshow', () => { const btn = document.getElementById('regBtn'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> <span>' + (form.role.value === 'tutor' ? 'Apply to teach' : 'Create account') + '</span>'; });
+})();
+</script>
 </body>
 </html>

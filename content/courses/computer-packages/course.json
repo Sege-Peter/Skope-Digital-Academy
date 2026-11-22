@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Computer Packages (Word, Excel, PowerPoint)",
+  "short": "Computer Packages",
+  "description": "A practical beginner course for school leavers who want to use a computer with confidence at work or in a cyber café. You will learn file basics, Microsoft Word, Excel and PowerPoint (plus their free Google equivalents) and how to earn by typing and formatting documents for others.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 9,
+  "outcomes": [
+    "Organise files and folders and use common keyboard shortcuts",
+    "Type and format professional letters, CVs and reports in Word",
+    "Build spreadsheets with formulas, functions, sorting, filtering and charts in Excel",
+    "Create and present a clear slide show in PowerPoint",
+    "Do the same work for free in Google Docs, Sheets and Slides",
+    "Offer typing and document services to paying customers"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "CV Writing and Interview Skills",
+  "short": "CV & Interviews",
+  "description": "For school leavers looking for their first job, internship or attachment. You will write a strong CV even with little experience, apply safely, and walk into interviews prepared and confident.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 3,
+  "outcomes": [
+    "Write a clear one- or two-page CV that shows your skills and achievements",
+    "Write a short cover letter tailored to a specific job",
+    "Set up a professional LinkedIn profile",
+    "Search for jobs safely and spot common job scams",
+    "Answer common interview questions using the STAR method",
+    "Handle online interviews and follow up professionally"
+  ]
+}

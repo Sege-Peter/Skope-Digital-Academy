@@ -4,19 +4,19 @@ require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
 $uid = (int)($_GET['id'] ?? 0);
-if (!$uid) { header('Location: users.php'); exit; }
+if (!$uid) { header('Location: users'); exit; }
 
 try {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$uid]);
     $u = $stmt->fetch();
 
-    if (!$u) { header('Location: users.php'); exit; }
+    if (!$u) { header('Location: users'); exit; }
 
     // Fetch Academic Progress
     if ($u['role'] === 'student') {
@@ -51,11 +51,11 @@ try {
         </div>
         
         <div style="display: flex; gap: 16px;">
-            <a href="users.php" class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; text-decoration: none;">
+            <a href="users" class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; text-decoration: none;">
                 <i class="fas fa-arrow-left"></i> Return to Registry
             </a>
             <?php if ($u['status'] === 'pending'): ?>
-                <button onclick="SDA.confirmAction('Authorize this stakeholder account?', () => { window.location.href='users.php?action=approve&uid=<?= $u['id'] ?>' })" class="btn-premium">
+                <button onclick="SDA.confirmAction('Authorize this stakeholder account?', () => { window.location.href='users?action=approve&uid=<?= $u['id'] ?>' })" class="btn-premium">
                     <i class="fas fa-user-check"></i> Authorize Identity
                 </button>
             <?php endif; ?>

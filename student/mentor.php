@@ -170,7 +170,7 @@ function sendMessage() {
     formData.append('query', text);
     formData.append('context', "Course: <?= addslashes($lastCourse['title'] ?? 'None') ?>. Performance: <?= round($performance) ?>%. User: <?= addslashes($student['name']) ?>");
 
-    fetch('../includes/ai_controller.php', { method: 'POST', body: formData })
+    fetch('../includes/ai_controller', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
             document.getElementById('typing-indicator').remove();

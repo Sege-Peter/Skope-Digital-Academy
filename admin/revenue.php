@@ -1,11 +1,11 @@
 <?php
 $pageTitle = 'Revenue Intelligence Analysis';
 require_once 'includes/header.php';
-require_once 'includes/ai-handler.php';
+require_once __DIR__ . '/../includes/ai-handler.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -87,7 +87,7 @@ $ai_insight = SDAC_AI::revenueInsight([
         </div>
         
         <div style="display: flex; gap: 16px; align-items: center;">
-            <select onchange="location.href='revenue.php?year=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
+            <select onchange="location.href='revenue?year=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
                 <?php for($i = date('Y'); $i >= 2023; $i--): ?>
                     <option value="<?= $i ?>" <?= $sel_year == $i ? 'selected' : '' ?>>Fiscal Year <?= $i ?></option>
                 <?php endfor; ?>

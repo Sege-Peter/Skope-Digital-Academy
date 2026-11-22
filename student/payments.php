@@ -27,7 +27,7 @@ require_once 'includes/layout-top.php';
         <p style="color: var(--text-dim); margin-top: 4px;">Track your curriculum investments and course acquisitions.</p>
     </div>
     <div>
-        <a href="../courses.php" class="btn-premium" style="display: flex; gap: 8px; align-items: center; padding: 12px 24px; border-radius: 12px;"><i class="fas fa-plus"></i> New Enrollment</a>
+        <a href="../courses" class="btn-premium" style="display: flex; gap: 8px; align-items: center; padding: 12px 24px; border-radius: 12px;"><i class="fas fa-plus"></i> New Enrollment</a>
     </div>
 </header>
 

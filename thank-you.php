@@ -42,7 +42,7 @@ $message = ($type === 'donation')
         <?php endif; ?>
 
         <div>
-            <a href="index.php" class="btn-home">Return to Homepage</a>
+            <a href="./" class="btn-home">Return to Homepage</a>
         </div>
     </div>
 </body>

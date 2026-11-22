@@ -96,7 +96,7 @@ require_once 'includes/layout-top.php';
                         <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 800;">Score ≥ <?= $q['pass_score'] ?>%</span>
                     <?php endif; ?>
                 </div>
-                <a href="take-quiz.php?id=<?= $q['id'] ?>" class="btn-premium" style="padding: 14px 28px; border-radius: 16px; font-size: 0.75rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.5px; border: none; background: <?= $q['best_score'] !== null ? '#f8fafc' : 'var(--grad-primary)' ?>; color: <?= $q['best_score'] !== null ? '#475569' : 'white' ?>; border: <?= $q['best_score'] !== null ? '1px solid #e2e8f0' : 'none' ?>; min-width: 130px; text-align: center;">
+                <a href="take-quiz?id=<?= $q['id'] ?>" class="btn-premium" style="padding: 14px 28px; border-radius: 16px; font-size: 0.75rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.5px; border: none; background: <?= $q['best_score'] !== null ? '#f8fafc' : 'var(--grad-primary)' ?>; color: <?= $q['best_score'] !== null ? '#475569' : 'white' ?>; border: <?= $q['best_score'] !== null ? '1px solid #e2e8f0' : 'none' ?>; min-width: 130px; text-align: center;">
                     <?= $q['best_score'] !== null ? 'Retake Path' : 'Start Challenge' ?>
                 </a>
             </div>
@@ -111,7 +111,7 @@ require_once 'includes/layout-top.php';
             </div>
             <h3 style="font-weight: 950; font-size: 1.8rem; color: var(--text-main); margin-bottom: 16px;">The Path is Empty</h3>
             <p style="color: var(--text-dim); max-width: 450px; margin: 0 auto 32px; line-height: 1.7; font-weight: 500;">No assessments are currently active for your enrolled modules. Focus on completing your learning curriculum first.</p>
-            <a href="courses.php" class="btn-premium" style="min-width: 240px;">Explore Course Modules</a>
+            <a href="courses" class="btn-premium" style="min-width: 240px;">Explore Course Modules</a>
         </div>
     <?php endif; ?>
 </div>

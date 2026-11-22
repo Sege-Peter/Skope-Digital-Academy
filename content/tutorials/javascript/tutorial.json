@@ -1,0 +1,8 @@
+{
+  "title": "JavaScript Tutorial",
+  "short": "JavaScript",
+  "description": "Learn JavaScript, the programming language of the web, from your first line of code to the DOM, events and async/await. Every lesson has examples you can run and edit in your browser.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 3
+}

@@ -6,7 +6,7 @@ $tutor = currentUser();
 
 $student_id = (int)($_GET['id'] ?? 0);
 if (!$student_id) {
-    header('Location: students.php');
+    header('Location: students');
     exit;
 }
 
@@ -73,7 +73,7 @@ try {
 <main class="main-content">
 <header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
     <div class="greeting">
-        <a href="students.php" style="color: var(--text-dim); font-size: 0.85rem; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+        <a href="students" style="color: var(--text-dim); font-size: 0.85rem; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
             <i class="fas fa-arrow-left"></i> Back to Scholar Roster
         </a>
         <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Performance Profile<span style="color: var(--primary);">.</span></h1>
@@ -83,7 +83,7 @@ try {
         <button class="btn-premium" onclick="window.print()" style="background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none; font-size: 0.8rem; padding: 12px 24px;">
             <i class="fas fa-file-pdf"></i> EXPORT DOSSIER
         </button>
-        <a href="award_student.php?id=<?= $student_id ?>" class="btn-premium" style="padding: 12px 32px;">
+        <a href="award_student?id=<?= $student_id ?>" class="btn-premium" style="padding: 12px 32px;">
             <i class="fas fa-trophy"></i> AWARD MERIT
         </a>
     </div>
@@ -223,7 +223,7 @@ try {
                             <?= $a['score'] !== null ? round($a['score']) . ' <span style="color:#94A3B8; font-size:0.8rem; font-weight:700;">/ ' . $a['max_score'] . '</span>' : '<span style="color:#CBD5E1;">PENDING</span>' ?>
                         </td>
                         <td style="padding: 24px 40px; text-align: right;">
-                            <a href="assignments.php?id=<?= $a['assignment_id'] ?>" class="btn-premium" style="padding: 8px 16px; font-size: 0.7rem; background: white; color: var(--primary); border: 1px solid var(--primary); box-shadow: none;">VIEW PROJECT</a>
+                            <a href="assignments?id=<?= $a['assignment_id'] ?>" class="btn-premium" style="padding: 8px 16px; font-size: 0.7rem; background: white; color: var(--primary); border: 1px solid var(--primary); box-shadow: none;">VIEW PROJECT</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

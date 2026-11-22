@@ -9,7 +9,7 @@ try {
     $tutor_data = $stmt->fetch();
     if (!$tutor_data) {
         logoutUser();
-        header('Location: ../login.php');
+        header('Location: ../login');
         exit;
     }
 } catch (Exception $e) {
@@ -230,7 +230,7 @@ try {
         formData.append('avatar', input.files[0]);
         
         try {
-            const res = await fetch('profile.php', {
+            const res = await fetch('profile', {
                 method: 'POST',
                 body: formData
             });

@@ -104,7 +104,7 @@ $cal_events        = $portal_cal_events;
             <i class="fas fa-bars-staggered"></i>
         </button>
         
-        <form action="search.php" method="GET" class="search-box mobile-search" style="display: flex; align-items: center; gap: 8px;">
+        <form action="search" method="GET" class="search-box mobile-search" style="display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-search" style="color: var(--text-dim); font-size: 0.8rem;"></i>
             <input type="text" name="q" placeholder="Quick find..." value="<?= htmlspecialchars($q ?? '') ?>" style="background: none; border: none; outline: none; flex: 1; font-size: 0.85rem; font-weight: 500;">
         </form>
@@ -134,7 +134,7 @@ $cal_events        = $portal_cal_events;
                         </div>
                     <?php endforeach; endif; ?>
                     </div>
-                    <a href="notifications.php" style="display: block; text-align: center; margin-top: 12px; font-size: 0.75rem; font-weight: 800; color: var(--primary); text-decoration: none; padding: 10px; background: var(--primary-light); border-radius: 10px;">View All</a>
+                    <a href="notifications" style="display: block; text-align: center; margin-top: 12px; font-size: 0.75rem; font-weight: 800; color: var(--primary); text-decoration: none; padding: 10px; background: var(--primary-light); border-radius: 10px;">View All</a>
                 </div>
             </div>
 
@@ -151,9 +151,9 @@ $cal_events        = $portal_cal_events;
                 </div>
 
                 <div id="mobileDropdown" style="display: none; flex-direction: column; position: absolute; top: 48px; right: 0; background: white; border: 1px solid var(--border); border-radius: 16px; padding: 8px; width: 200px; box-shadow: var(--shadow-premium); z-index: 1000;">
-                    <a href="profile.php" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--text-main); text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-user-cog" style="color: var(--primary);"></i> Settings</a>
+                    <a href="profile" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--text-main); text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-user-cog" style="color: var(--primary);"></i> Settings</a>
                     <div style="height: 1px; background: #f1f5f9; margin: 4px 0;"></div>
-                    <a href="../logout.php" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: #ef4444; text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-power-off"></i> Logout</a>
+                    <a href="../logout" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: #ef4444; text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-power-off"></i> Logout</a>
                 </div>
             </div>
         </div>

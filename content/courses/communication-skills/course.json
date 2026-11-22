@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Communication Skills",
+  "short": "Communication",
+  "description": "For school leavers who want to speak, write and listen with confidence at work, in business and online. You will practise everyday communication skills that employers and clients value in every job.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 22,
+  "outcomes": [
+    "Listen actively and ask good questions",
+    "Speak clearly and confidently, including in short presentations",
+    "Use body language that builds trust",
+    "Write professional emails and WhatsApp messages",
+    "Give and receive feedback and work well in a team",
+    "Communicate professionally online and at the workplace"
+  ]
+}

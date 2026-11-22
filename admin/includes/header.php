@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 requireRole('admin');
 
 $admin = currentUser();
+$user  = $admin; // admin pages refer to the signed-in user as $user
 ?>
 <!DOCTYPE html>
 <html lang="en">

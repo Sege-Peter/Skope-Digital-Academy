@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Software Development",
+  "short": "Software Dev",
+  "description": "For school leavers who can write a little code and want to understand how real software is built and shipped. In four weeks you will learn the full development process, from requirements and design to Git, testing, teamwork and deployment, and how to build a portfolio that gets you junior or freelance work.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 4,
+  "outcomes": [
+    "Explain what software developers do and the stages of the software development life cycle",
+    "Turn a client's idea into clear requirements and user stories",
+    "Plan features with wireframes and flowcharts before writing code",
+    "Track your work with Git and share it on GitHub",
+    "Test and debug code calmly and work in an Agile team",
+    "Deploy a simple project and build a portfolio that wins junior or freelance work"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Typing Skills",
+  "short": "Typing",
+  "description": "For school leavers who want to type fast, accurately and comfortably, a skill needed in almost every office and online job. In four weeks you will learn touch typing from the home row up, measure your speed and accuracy with built-in practice tools, and prepare for data-entry and transcription work.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 24,
+  "outcomes": [
+    "Set up a healthy typing posture and workspace",
+    "Touch type all letter rows, numbers and common symbols without looking",
+    "Measure your words per minute (WPM) and accuracy correctly",
+    "Follow a daily practice routine that steadily improves speed",
+    "Use keyboard shortcuts that save time in everyday work",
+    "Apply typing skills to data-entry and transcription jobs and avoid job scams"
+  ]
+}

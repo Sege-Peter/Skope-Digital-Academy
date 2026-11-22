@@ -226,7 +226,7 @@ try {
             <h3 id="modalTitle" style="font-size:1.3rem;font-weight:900;letter-spacing:-0.5px;margin:0;">Post New Scheme</h3>
             <button onclick="document.getElementById('schForm').style.display='none'" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fas fa-times"></i></button>
         </div>
-        <form method="POST" action="scholarships.php">
+        <form method="POST" action="scholarships">
             <input type="hidden" name="scholarship_id" id="sch_id">
             <div style="margin-bottom:24px;">
                 <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Scheme Identity</label>
@@ -311,7 +311,7 @@ try {
 
     function confirmDelete(sid) {
         SDA.confirmAction("Are you sure you want to decommission this institutional grant? All associated registry data will be archived.", () => {
-            window.location.href = `scholarships.php?action=delete&sid=${sid}`;
+            window.location.href = `scholarships?action=delete&sid=${sid}`;
         }, "Security Clearance", "Confirm Purge");
     }
 

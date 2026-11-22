@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Web Design",
+  "short": "Web Design",
+  "description": "A project-based course for school leavers who want to design websites for small businesses. Over four weeks you will plan, build, style and publish a mobile-friendly website for a local business, then learn how to sell web design as a service.",
+  "category": "Design",
+  "level": "beginner",
+  "order": 13,
+  "outcomes": [
+    "Plan a website for a local business: goals, pages and content",
+    "Build well-structured pages with HTML and style them with CSS",
+    "Choose readable colours and fonts and lay out pages with Flexbox",
+    "Make sites that work well on phones, load fast and are accessible",
+    "Add a contact or order form and publish a site online",
+    "Price and sell simple web design services to local clients"
+  ]
+}

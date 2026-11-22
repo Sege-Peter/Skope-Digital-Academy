@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -69,10 +69,10 @@ try {
         <div class="premium-card glass-effect" style="padding: 16px 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-right: 12px;">Resolution Queue:</span>
-                <a href="tickets.php?status=all" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'all' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'all' ? 'white' : '#64748b' ?>;">FULL STREAM</a>
-                <a href="tickets.php?status=open" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'open' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'open' ? 'white' : '#64748b' ?>;">OPEN QUEUE</a>
-                <a href="tickets.php?status=in_progress" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'in_progress' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'in_progress' ? 'white' : '#64748b' ?>;">ACTIVE CASES</a>
-                <a href="tickets.php?status=closed" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'closed' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'closed' ? 'white' : '#64748b' ?>;">ARCHIVED</a>
+                <a href="tickets?status=all" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'all' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'all' ? 'white' : '#64748b' ?>;">FULL STREAM</a>
+                <a href="tickets?status=open" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'open' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'open' ? 'white' : '#64748b' ?>;">OPEN QUEUE</a>
+                <a href="tickets?status=in_progress" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'in_progress' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'in_progress' ? 'white' : '#64748b' ?>;">ACTIVE CASES</a>
+                <a href="tickets?status=closed" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'closed' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'closed' ? 'white' : '#64748b' ?>;">ARCHIVED</a>
             </div>
         </div>
 
@@ -132,7 +132,7 @@ try {
                 </div>
                 <h3 style="font-size: 1.4rem; font-weight: 900; color: var(--text-main); margin-bottom: 8px; letter-spacing: -0.5px;">Institutional Queue Cleared</h3>
                 <p style="color: var(--text-muted); max-width: 380px; margin: 0 auto; font-size: 0.95rem; font-weight: 600;">All stakeholder support requests have been addressed and synchronized with the academy's resolution protocols.</p>
-                <a href="index.php" class="btn-premium" style="margin-top: 32px; text-decoration: none;">Return to Command Center</a>
+                <a href="./" class="btn-premium" style="margin-top: 32px; text-decoration: none;">Return to Command Center</a>
             </div>
             <?php endif; ?>
         </div>

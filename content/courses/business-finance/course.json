@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Business Finance",
+  "short": "Business Finance",
+  "description": "For young people running or planning a small business. Learn to understand your costs, price for profit, manage cash flow, budget, read simple financial statements and choose funding wisely.",
+  "category": "Business",
+  "level": "beginner",
+  "order": 17,
+  "outcomes": [
+    "Separate personal and business money and pay yourself properly",
+    "Tell fixed costs from variable costs and work out your break-even point",
+    "Plan cash flow so you never run out of money for stock",
+    "Prepare a simple monthly business budget",
+    "Understand a basic profit and loss statement and balance sheet",
+    "Compare funding options such as savings, chamas, SACCOs and loans, and their risks"
+  ]
+}

@@ -2,6 +2,7 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/paystack.php';
+require_once 'includes/learning.php';
 
 // No strict isLoggedIn() check here to allow guest donations and handle verification if session is lost
 
@@ -10,7 +11,7 @@ $type      = $_GET['type'] ?? 'course';
 $item_id   = (int)($_GET['id'] ?? $_GET['course_id'] ?? 0);
 
 if (!$reference || (!$item_id && $type !== 'donation')) {
-    header('Location: index.php?msg=invalid_payment');
+    header('Location: ./?msg=invalid_payment');
     exit;
 }
 
@@ -26,21 +27,60 @@ try {
         
         $pdo->beginTransaction();
         
+        // A Paystack reference can only ever be credited once.
+        $dup = $pdo->prepare("SELECT COUNT(*) FROM payments WHERE paystack_reference = ?");
+        $dup->execute([$reference]);
+        if ($dup->fetchColumn() > 0) {
+            $pdo->rollBack();
+            header($type === 'course' ? "Location: student/classroom?id=$item_id" : "Location: ./");
+            exit;
+        }
+
         if ($type === 'course') {
-            // 1. Record the payment
-            $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at) VALUES (?, ?, ?, 'verified', ?, ?, 'course', NOW())");
-            $stmt->execute([$user['id'], $item_id, $amount, "Paystack Ref: " . $reference, $reference]);
-            
-            // 2. Enroll the student
-            $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'");
-            $stmt->execute([$user['id'], $item_id]);
-            
-            // 3. Update course enrollment count
-            $stmt = $pdo->prepare("UPDATE courses SET enrolled_count = enrolled_count + 1 WHERE id = ?");
+            if (!$user) { $pdo->rollBack(); header('Location: login'); exit; }
+            $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
             $stmt->execute([$item_id]);
-            
+            $course = $stmt->fetch();
+            if (!$course) throw new RuntimeException("Paid for unknown course $item_id (ref $reference)");
+            [$mode, $cohort_id] = resolve_mode_choice($pdo, $course, $_GET['mode'] ?? null, $_GET['cohort'] ?? null);
+            $due = amount_due($course, $mode, get_enrollment($pdo, (int)$user['id'], $item_id));
+            $currency_ok = strtoupper($result['data']['currency'] ?? setting('currency')) === strtoupper(setting('currency'));
+            $ok = $currency_ok && $amount + 0.001 >= $due;
+
+            // 1. Record the payment (underpaid / wrong currency → pending for an admin to review)
+            $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at, learning_mode, cohort_id) VALUES (?, ?, ?, ?, ?, ?, 'course', IF(? = 'verified', NOW(), NULL), ?, ?)");
+            $status = $ok ? 'verified' : 'pending';
+            $stmt->execute([$user['id'], $item_id, $amount, $status,
+                            "Paystack Ref: " . $reference . ($ok ? '' : " – paid $amount, due $due; needs review"),
+                            $reference, $status, $mode, $cohort_id]);
+            if (!$ok) {
+                $pdo->commit();
+                header("Location: enroll?id=$item_id");
+                exit;
+            }
+
+            // 2. Enroll the student on the chosen track
+            enroll_student($pdo, (int)$user['id'], $course, $mode, $cohort_id, $amount);
+
             $pdo->commit();
-            header("Location: student/classroom.php?id=$item_id&welcome=1");
+            header("Location: student/classroom?id=$item_id&welcome=1");
+        } elseif ($type === 'certificate') {
+            if (!$user) { $pdo->rollBack(); header('Location: login'); exit; }
+            require_once 'includes/progress.php';
+            $st = $pdo->prepare("SELECT * FROM certificates WHERE id = ? AND student_id = ?");
+            $st->execute([$item_id, $user['id']]);
+            $cert = $st->fetch();
+            if (!$cert) throw new RuntimeException("Certificate payment for unknown certificate $item_id (ref $reference)");
+            $currency_ok = strtoupper($result['data']['currency'] ?? setting('currency')) === strtoupper(setting('currency'));
+            $ok = $currency_ok && $amount + 0.001 >= (float)$cert['fee'];
+            $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, certificate_id, verified_at)
+                           VALUES (?, ?, ?, ?, ?, ?, 'certificate', ?, IF(? = 'verified', NOW(), NULL))")
+                ->execute([$user['id'], $cert['course_id'], $amount, $ok ? 'verified' : 'pending',
+                           "Certificate fee – Paystack Ref: " . $reference . ($ok ? '' : " – paid $amount, fee {$cert['fee']}; needs review"),
+                           $reference, $cert['id'], $ok ? 'verified' : 'pending']);
+            if ($ok) unlock_certificate($pdo, (int)$cert['id'], $amount);
+            $pdo->commit();
+            header('Location: ' . ($ok ? 'certificate?code=' : 'certificate-pay?code=') . rawurlencode($cert['verification_code']));
         } elseif ($type === 'registration') {
             // 1. Record the payment
             $stmt = $pdo->prepare("INSERT INTO payments (student_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at) VALUES (?, ?, 'verified', ?, ?, 'registration', NOW())");
@@ -51,7 +91,7 @@ try {
             $stmt->execute([$user['id']]);
             
             $pdo->commit();
-            header("Location: student/index.php?msg=account_activated");
+            header("Location: student/?msg=account_activated");
         } elseif ($type === 'donation') {
             // Record the donation
             // If logged in, associate with student_id, otherwise use email in transaction_message
@@ -62,14 +102,14 @@ try {
             $stmt->execute([$uid, $amount, $msg, $reference, $reference]);
             
             $pdo->commit();
-            header("Location: thank-you.php?type=donation&ref=$reference");
+            header("Location: thank-you?type=donation&ref=$reference");
         }
         exit;
     } else {
-        $red = "index.php";
-        if($type === 'course') $red = "enroll.php?id=$item_id";
-        if($type === 'registration') $red = "register.php";
-        if($type === 'donation') $red = "donate.php";
+        $red = "./";
+        if($type === 'course') $red = "enroll?id=$item_id";
+        if($type === 'registration') $red = "register";
+        if($type === 'donation') $red = "donate";
         
         header("Location: $red&msg=payment_failed");
         exit;
@@ -77,7 +117,7 @@ try {
 } catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log($e->getMessage());
-    header("Location: index.php?msg=system_error");
+    header("Location: ./?msg=system_error");
     exit;
 }
 ?>

@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Networking Basics",
+  "short": "Networking",
+  "description": "A beginner course for school leavers who want to understand how computers connect and to set up and fix small networks in homes, offices and cyber cafés. You will learn the devices, addresses and services behind every network, plus practical Wi-Fi, cabling and troubleshooting skills.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 11,
+  "outcomes": [
+    "Explain LANs, WANs and the Internet and name the main network devices",
+    "Read IPv4 addresses and tell public from private addresses",
+    "Describe what DHCP and DNS do in plain language",
+    "Set up and secure a Wi-Fi router and choose the right cables",
+    "Troubleshoot common connection problems with ping and ipconfig",
+    "Plan a small office or cyber café network and your next career steps"
+  ]
+}

@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -94,7 +94,7 @@ if (isset($_GET['edit_id'])) {
                     <p style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Compose Institutional Notices</p>
                 </div>
                 <div style="padding: 32px;">
-                    <form method="POST" action="announcements.php" style="display: flex; flex-direction: column; gap: 24px;">
+                    <form method="POST" action="announcements" style="display: flex; flex-direction: column; gap: 24px;">
                         <input type="hidden" name="id" value="<?= $edit_data['id'] ?? '' ?>">
                         
                         <div>
@@ -128,7 +128,7 @@ if (isset($_GET['edit_id'])) {
                                 <?= $edit_data ? 'Update Broadcast' : 'Deploy Broadcast' ?>
                             </button>
                             <?php if($edit_data): ?>
-                                <a href="announcements.php" class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; text-decoration: none;">Cancel</a>
+                                <a href="announcements" class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; text-decoration: none;">Cancel</a>
                             <?php endif; ?>
                         </div>
                     </form>
@@ -215,7 +215,7 @@ if (isset($_GET['edit_id'])) {
 
     function confirmDelete(id) {
         SDA.confirmAction('Permanently deactivate and delete this institutional broadcast?', () => {
-            window.location.href = 'announcements.php?delete_id=' + id;
+            window.location.href = 'announcements?delete_id=' + id;
         });
     }
 

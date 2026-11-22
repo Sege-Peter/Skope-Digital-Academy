@@ -122,7 +122,7 @@ try {
         <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Instructional oversight and performance monitoring for <span style="color: var(--primary); font-weight: 700;"><?= explode(' ', $tutor['name'])[0] ?></span>.</p>
     </div>
     <div style="display: flex; gap: 16px; align-items: center;">
-        <a href="courses.php?action=new" class="btn-premium" style="padding: 16px 32px; border-radius: 18px; box-shadow: 0 15px 30px rgba(0, 191, 255, 0.25);">
+        <a href="courses?action=new" class="btn-premium" style="padding: 16px 32px; border-radius: 18px; box-shadow: 0 15px 30px rgba(0, 191, 255, 0.25);">
             <i class="fas fa-plus-circle"></i> LAUNCH NEW TRACK
         </a>
     </div>
@@ -181,10 +181,10 @@ try {
             <p style="margin: 0 0 24px; font-size: 1rem; line-height: 1.6; color: #cbd5e1;">I can architect complete lesson structures, generate high-fidelity quiz pools, and provide scholarly summaries for your tracks.</p>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-                <a href="lessons.php" class="btn-premium" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); box-shadow: none; text-decoration: none; justify-content: center;">
+                <a href="lessons" class="btn-premium" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); box-shadow: none; text-decoration: none; justify-content: center;">
                     <i class="fas fa-wand-magic-sparkles"></i> ARCHITECT LESSON
                 </a>
-                <a href="quizzes.php" class="btn-premium" style="background: var(--primary); justify-content: center; text-decoration: none;">
+                <a href="quizzes" class="btn-premium" style="background: var(--primary); justify-content: center; text-decoration: none;">
                     <i class="fas fa-brain"></i> POOL GENERATOR
                 </a>
             </div>
@@ -205,7 +205,7 @@ try {
                 </div>
             <?php else: ?>
                 <?php foreach($recent_submissions as $s): ?>
-                    <a href="assignments.php" style="display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 18px; transition: 0.2s; text-decoration: none; border: 1px solid transparent;" onmouseover="this.style.background='#F8FAFC'; this.style.borderColor='#E2E8F0'" onmouseout="this.style.background='transparent'; this.style.borderColor='transparent'">
+                    <a href="assignments" style="display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 18px; transition: 0.2s; text-decoration: none; border: 1px solid transparent;" onmouseover="this.style.background='#F8FAFC'; this.style.borderColor='#E2E8F0'" onmouseout="this.style.background='transparent'; this.style.borderColor='transparent'">
                         <div style="width: 44px; height: 44px; background: #E0F7FF; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.1rem;"><i class="fas fa-file-invoice"></i></div>
                         <div style="flex: 1;">
                             <div style="font-weight: 800; color: var(--text-main); font-size: 0.9rem; margin-bottom: 2px;"><?= htmlspecialchars($s['student_name']) ?></div>
@@ -215,7 +215,7 @@ try {
                     </a>
                 <?php endforeach; ?>
                 <div style="padding: 16px;">
-                    <a href="assignments.php" style="display: flex; align-items: center; justify-content: center; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; color: var(--text-dim); text-decoration: none; font-size: 0.8rem; font-weight: 800; gap: 8px;">VIEW ALL SUBMISSIONS <i class="fas fa-arrow-right"></i></a>
+                    <a href="assignments" style="display: flex; align-items: center; justify-content: center; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; color: var(--text-dim); text-decoration: none; font-size: 0.8rem; font-weight: 800; gap: 8px;">VIEW ALL SUBMISSIONS <i class="fas fa-arrow-right"></i></a>
                 </div>
             <?php endif; ?>
         </div>

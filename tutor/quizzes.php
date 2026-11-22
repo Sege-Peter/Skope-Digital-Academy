@@ -5,15 +5,15 @@ require_once 'includes/header.php';
 $tutor = currentUser();
 
 $course_id = (int)($_GET['course_id'] ?? 0);
-if (!$course_id) { header('Location: courses.php'); exit; }
+if (!$course_id) { header('Location: courses'); exit; }
 
 // Verify ownership & identity
 try {
     $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ? AND tutor_id = ?");
     $stmt->execute([$course_id, $tutor['id']]);
     $course = $stmt->fetch();
-    if (!$course) { header('Location: courses.php'); exit; }
-} catch (Exception $e) { header('Location: courses.php'); exit; }
+    if (!$course) { header('Location: courses'); exit; }
+} catch (Exception $e) { header('Location: courses'); exit; }
 
 // 🤖 2.5 Handle AI Auto-Bulk Questions (AJAX branch)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ai_bulk_questions'])) {
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_quiz'])) {
         $stmt = $pdo->prepare("INSERT INTO quizzes (course_id, title, time_limit_mins, pass_score, type, linked_week_num, linked_lesson_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$course_id, $title, $time, $pass, $type, $week, $lesson_link]);
         $message = "Assessment tier initialized successfully!";
-        header("Location: quizzes.php?course_id=$course_id&msg=success");
+        header("Location: quizzes?course_id=$course_id&msg=success");
         exit;
     } catch (Exception $e) { $error = "Setup Error: " . $e->getMessage(); }
 }
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_question'])) {
         $stmt = $pdo->prepare("INSERT INTO quiz_questions (quiz_id, question, type, options_json, correct_answer, points) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$qid, $question, $type, json_encode($options), $correct, $points]);
         $message = "Question synchronized within assessment pool.";
-        header("Location: quizzes.php?course_id=$course_id&quiz_id=$qid&msg=q_success");
+        header("Location: quizzes?course_id=$course_id&quiz_id=$qid&msg=q_success");
         exit;
     } catch (Exception $e) { $error = "Pool Error: " . $e->getMessage(); }
 }
@@ -201,7 +201,7 @@ require_once 'includes/sidebar.php';
 <header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
     <div class="greeting">
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-            <a href="courses.php" style="color: var(--primary); text-decoration: none; font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+            <a href="courses" style="color: var(--primary); text-decoration: none; font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 6px;">
                 <i class="fas fa-arrow-left"></i> CURRICULUM
             </a>
             <span style="color: #cbd5e1; font-weight: 900;">/</span>
@@ -489,7 +489,7 @@ async function generateAIPack() {
         formData.append('quiz_id', '<?= $active_quiz_id ?>');
         formData.append('topic_title', '<?= addslashes($active_title) ?>');
 
-        const resp = await fetch('quizzes.php?course_id=<?= $course_id ?>&quiz_id=<?= $active_quiz_id ?>', {
+        const resp = await fetch('quizzes?course_id=<?= $course_id ?>&quiz_id=<?= $active_quiz_id ?>', {
             method: 'POST',
             body: formData
         });

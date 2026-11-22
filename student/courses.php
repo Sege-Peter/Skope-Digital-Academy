@@ -27,7 +27,7 @@ require_once 'includes/layout-top.php';
         <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Track your growth across all certifications and high-performance modules.</p>
     </div>
     <div class="header-tools">
-        <a href="../courses.php" class="btn-premium" style="padding: 14px 28px; border-radius: 50px;"><i class="fas fa-compass"></i> Explore More</a>
+        <a href="../courses" class="btn-premium" style="padding: 14px 28px; border-radius: 50px;"><i class="fas fa-compass"></i> Explore More</a>
     </div>
 </header>
 
@@ -50,7 +50,7 @@ require_once 'includes/layout-top.php';
         <?php foreach($enrollments as $e): 
             $prog = round($e['progress_percent']);
         ?>
-        <div class="premium-card clickable-card" onclick="window.location.href='classroom.php?id=<?= $e['course_id'] ?>'" style="padding: 0; cursor: pointer; border-radius: 28px;">
+        <div class="premium-card clickable-card" onclick="window.location.href='classroom?id=<?= $e['course_id'] ?>'" style="padding: 0; cursor: pointer; border-radius: 28px;">
             <div style="position: relative; height: 200px; overflow: hidden;">
                 <img src="../<?= $e['thumbnail'] ? 'uploads/courses/'.$e['thumbnail'] : 'assets/images/course-placeholder.jpg' ?>" style="width: 100%; height: 100%; object-fit: cover; transition: 0.6s;">
                 <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(15, 23, 42, 0.85) 100%);"></div>
@@ -92,7 +92,7 @@ require_once 'includes/layout-top.php';
             </div>
             <h3 style="font-weight: 900; font-size: 1.5rem; margin-bottom: 12px;">No Active Paths</h3>
             <p style="color: var(--text-dim); max-width: 400px; margin: 0 auto 32px; line-height: 1.6;">You haven't enrolled in any courses yet. Start your journey by exploring our academy catalog.</p>
-            <a href="../courses.php" class="btn-premium" style="min-width: 200px;">Browse All Courses</a>
+            <a href="../courses" class="btn-premium" style="min-width: 200px;">Browse All Courses</a>
         </div>
     <?php endif; ?>
 </div>

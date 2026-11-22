@@ -71,7 +71,7 @@ try {
     $badges = $badge_stmt->fetchAll();
 
     // 8. Point ledger
-    $points_stmt = $pdo->prepare("SELECT pl.merit_points, pl.reason, pl.awarded_at, u.name as from_name
+    $points_stmt = $pdo->prepare("SELECT pl.points AS merit_points, pl.reason, pl.awarded_at, u.name as from_name
         FROM point_ledger pl LEFT JOIN users u ON pl.awarded_by=u.id
         WHERE pl.student_id=? ORDER BY pl.awarded_at DESC LIMIT 20");
     $points_stmt->execute([$sid]);
@@ -160,7 +160,7 @@ try {
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
             <button id="aiCommendBtn" onclick="generateAiCommendation()" class="btn btn-ghost" style="border-radius: 12px; font-weight: 800; border-color: var(--primary); color: var(--primary);"><i class="fas fa-magic" style="margin-right: 8px;"></i> AI Commendation</button>
             <button onclick="window.print()" class="btn btn-primary" style="border-radius: 12px; font-weight: 800;"><i class="fas fa-download" style="margin-right: 8px;"></i> Download PDF</button>
-            <a href="certificates.php" class="btn btn-ghost" style="border-radius: 12px; font-weight: 700;"><i class="fas fa-certificate" style="margin-right: 8px;"></i> Certificates</a>
+            <a href="certificates" class="btn btn-ghost" style="border-radius: 12px; font-weight: 700;"><i class="fas fa-certificate" style="margin-right: 8px;"></i> Certificates</a>
         </div>
     </div>
 
@@ -686,7 +686,7 @@ async function generateAiCommendation() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Synthesizing...';
 
     try {
-        const response = await fetch('ai-proxy.php', {
+        const response = await fetch('ai-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 

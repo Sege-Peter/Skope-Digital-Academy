@@ -5,7 +5,7 @@
 $pageTitle = 'Certificate Management';
 require_once '../includes/header.php';
 
-if ($user['role'] !== 'admin') { header('Location: /Skope Digital Academy/login.php'); exit; }
+if ($user['role'] !== 'admin') { header('Location: /Skope Digital Academy/login'); exit; }
 
 $msg = ''; $msgType = 'success';
 

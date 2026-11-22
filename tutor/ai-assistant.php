@@ -71,7 +71,7 @@ try {
             'quiz_title'  => $qTitle,
             'course_id'   => $course_id,
             'questions'   => $questions,
-            'quiz_url'    => "quizzes.php?course_id={$course_id}&quiz_id={$quiz_id}",
+            'quiz_url'    => "quizzes?course_id={$course_id}&quiz_id={$quiz_id}",
         ]);
 
     } elseif ($action === 'generate_lesson_plan') {
@@ -127,7 +127,7 @@ try {
         echo json_encode([
             'success' => true,
             'message' => "✅ 6-week syllabus successfully published to your course!",
-            'course_url' => "courses.php?edit_id={$course_id}"
+            'course_url' => "courses?edit_id={$course_id}"
         ]);
 
     } else {

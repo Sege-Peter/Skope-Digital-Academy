@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Introduction to Coding",
+  "short": "Coding Basics",
+  "description": "A gentle first step into programming for school leavers with no experience. In four weeks you will learn how computers follow instructions, write your first web page and Python script, and see which coding path can lead to paid work.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 8,
+  "outcomes": [
+    "Explain what programming is and how a computer follows instructions",
+    "Plan a solution step by step with algorithms and pseudocode",
+    "Use variables, conditions, loops and functions in simple programs",
+    "Find and fix mistakes in code with a calm debugging routine",
+    "Build a small web page and a first Python script",
+    "Choose a coding path (web, data or apps) and know how coders earn"
+  ]
+}

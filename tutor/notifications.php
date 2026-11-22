@@ -5,7 +5,7 @@ require_once 'includes/header.php';
 $tutor = currentUser();
 // Check if tutor
 if ($tutor['role'] !== 'tutor') {
-    header('Location: ../index.php');
+    header('Location: ../');
     exit;
 }
 
@@ -13,7 +13,7 @@ if ($tutor['role'] !== 'tutor') {
 if (isset($_POST['mark_all_read'])) {
     $stmt = $pdo->prepare("UPDATE notifications SET read_status = 1 WHERE target_user_id = ? OR user_role = 'tutor' OR user_role = 'all'");
     $stmt->execute([$tutor['id']]);
-    header('Location: notifications.php?msg=read');
+    header('Location: notifications?msg=read');
     exit;
 }
 

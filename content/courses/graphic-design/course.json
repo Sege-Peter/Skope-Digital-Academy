@@ -1,0 +1,16 @@
+{
+  "type": "course",
+  "title": "Graphic Design",
+  "short": "Graphic Design",
+  "description": "A hands-on beginner course for school leavers who want to design posters, social media posts and simple brand materials for businesses and events. You will learn the principles behind good design, work quickly in Canva, prepare files correctly, and build a portfolio you can use to start selling design services.",
+  "category": "Design",
+  "level": "beginner",
+  "order": 25,
+  "outcomes": [
+    "Apply contrast, alignment, hierarchy and whitespace to make designs clear",
+    "Choose colours and fonts that suit a brand and are easy to read",
+    "Design social media posts, flyers and simple logos in Canva",
+    "Export the right file format and size for print, web and social media",
+    "Build a small portfolio and price and sell your design services"
+  ]
+}

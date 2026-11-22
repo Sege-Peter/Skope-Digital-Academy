@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Introduction to Cybersecurity",
+  "short": "Cybersecurity",
+  "description": "A beginner course for school leavers who want to protect themselves, their families and small businesses online, and to explore a career in cybersecurity. You will learn to spot scams like phishing, smishing and SIM-swap fraud, lock down your accounts and phone, and respond calmly when something goes wrong.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 10,
+  "outcomes": [
+    "Recognise phishing, smishing, M-Pesa and SIM-swap scams before they cost you money",
+    "Create strong passwords, use a password manager and turn on two-factor authentication",
+    "Browse, use public Wi-Fi and social media more safely",
+    "Secure your phone and keep reliable backups",
+    "Respond to and report a hacked account or fraud incident",
+    "Plan your first steps towards a cybersecurity career"
+  ]
+}

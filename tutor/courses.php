@@ -12,10 +12,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_course'])) {
     $id = $_POST['id'] ?? null;
     $title = trim($_POST['title']);
     $desc = trim($_POST['description']);
-    $price = (float)$_POST['price'];
-    $level = $_POST['level'];
+    // Pricing and publishing belong to the admin (admin/course-pricing.php).
+    // Tutors may keep a course as a draft or submit it for review; a live course stays live.
+    $level = in_array($_POST['level'] ?? '', ['beginner', 'intermediate', 'advanced'], true) ? $_POST['level'] : 'beginner';
     $cat_id = (int)$_POST['category_id'];
-    $status = $_POST['status'] ?? 'draft';
+    $current_status = null;
+    if ($id) {
+        $cs = $pdo->prepare("SELECT status FROM courses WHERE id = ? AND tutor_id = ?");
+        $cs->execute([$id, $tutor['id']]);
+        $current_status = $cs->fetchColumn() ?: null;
+    }
+    $allowed = ['draft', 'pending'];
+    if ($current_status === 'published') $allowed[] = 'published';
+    $status = in_array($_POST['status'] ?? '', $allowed, true) ? $_POST['status'] : 'draft';
 
     // ── CSRF Verification (Security Protocol) ───────────────────
     if (!verifyCsrf()) {
@@ -29,12 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_course'])) {
 
     try {
         if ($id) {
-            $stmt = $pdo->prepare("UPDATE courses SET title=?, slug=?, description=?, price=?, level=?, category_id=?, status=? WHERE id=? AND tutor_id=?");
-            $stmt->execute([$title, $slug, $desc, $price, $level, $cat_id, $status, $id, $tutor['id']]);
+            $stmt = $pdo->prepare("UPDATE courses SET title=?, slug=?, description=?, level=?, category_id=?, status=? WHERE id=? AND tutor_id=?");
+            $stmt->execute([$title, $slug, $desc, $level, $cat_id, $status, $id, $tutor['id']]);
             $message = "Academic track synchronized successfully!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO courses (title, slug, description, price, level, category_id, tutor_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$title, $slug, $desc, $price, $level, $cat_id, $tutor['id'], $status]);
+            $stmt = $pdo->prepare("INSERT INTO courses (title, slug, description, price, level, category_id, tutor_id, status) VALUES (?, ?, ?, 0, ?, ?, ?, ?)");
+            $stmt->execute([$title, $slug, $desc, $level, $cat_id, $tutor['id'], $status]);
             $id = $pdo->lastInsertId();
             $message = "New scholarly track initialized!";
         }
@@ -51,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_course'])) {
                 }
             }
         }
-        header("Location: courses.php?msg=" . urlencode($message));
+        header("Location: courses?msg=" . urlencode($message));
         exit;
     } catch (Exception $e) { $error = "Track Error: " . $e->getMessage(); }
 }
@@ -60,7 +69,6 @@ end_processing:
 
 $pageTitle = 'Course Creation Center';
 require_once 'includes/header.php';
-?>
 
 // 2. Fetch Data
 try {
@@ -370,10 +378,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="?edit_id=<?= $c['id'] ?>#courseModalTrigger" class="dock-btn" title="Track Configuration">
                         <i class="fas fa-sliders-h"></i>
                     </a>
-                    <a href="lessons.php?course_id=<?= $c['id'] ?>" class="dock-btn primary">
+                    <a href="lessons?course_id=<?= $c['id'] ?>" class="dock-btn primary">
                         <span>CURRICULUM</span>
                     </a>
-                    <a href="quizzes.php?course_id=<?= $c['id'] ?>" class="dock-btn" title="Assessment Logic">
+                    <a href="quizzes?course_id=<?= $c['id'] ?>" class="dock-btn" title="Assessment Logic">
                         <i class="fas fa-lightbulb"></i>
                     </a>
                 </div>
@@ -403,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -1px;"><?= $edit_data ? 'Synchronize Track' : 'Initialize Track' ?></h3>
                 <p style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Define the core identity of this academic path.</p>
             </div>
-            <button type="button" onclick="location.href='courses.php'" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; transition: 0.3s; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'"><i class="fas fa-times-circle"></i></button>
+            <button type="button" onclick="location.href='courses'" style="background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; transition: 0.3s; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'"><i class="fas fa-times-circle"></i></button>
         </div>
         
         <form method="POST" enctype="multipart/form-data">
@@ -442,8 +450,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="form-group-elite">
-                    <label class="label-elite">Tuition (KES)</label>
-                    <input type="number" name="price" class="input-elite" value="<?= $edit_data['price'] ?? 1500 ?>">
+                    <label class="label-elite">Tuition</label>
+                    <div class="input-elite" style="display:flex;align-items:center;height:52px;background:#f8fafc;color:#475569;font-size:.85rem;">
+                        <?= isset($edit_data['id']) ? ((float)$edit_data['price'] > 0 ? 'KES ' . number_format($edit_data['price']) . ' · ' : 'Free · ') : '' ?>Set by the academy admin
+                    </div>
                 </div>
                 <div class="form-group-elite">
                     <label class="label-elite">Visibility Pillar</label>
@@ -463,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
 
             <div style="display: flex; gap: 16px; margin-top: 40px; padding-top: 32px; border-top: 1px solid #f1f5f9;">
-                <button type="button" onclick="location.href='courses.php'" class="btn btn-ghost" style="flex: 1; border-radius: 18px; height: 56px; font-weight: 700;">Dismiss</button>
+                <button type="button" onclick="location.href='courses'" class="btn btn-ghost" style="flex: 1; border-radius: 18px; height: 56px; font-weight: 700;">Dismiss</button>
                 <button type="submit" class="btn btn-primary" style="flex: 2; border-radius: 18px; height: 56px; font-weight: 800; font-size: 0.95rem;">
                     <i class="fas <?= $edit_data ? 'fa-sync-alt' : 'fa-rocket' ?>" style="margin-right: 10px;"></i>
                     <?= $edit_data ? 'SYNCHRONIZE TRACK' : 'LAUNCH TRACK' ?>

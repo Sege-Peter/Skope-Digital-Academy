@@ -32,6 +32,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_lesson'])) {
     $order = (int)$_POST['order_num'];
     $video_url = trim($_POST['video_url'] ?? '');
     $content = trim($_POST['content'] ?? '');
+    $code_lang = in_array($_POST['code_lang'] ?? '', ['html', 'css', 'javascript', 'python', 'php', 'sql', 'text'], true) ? $_POST['code_lang'] : null;
+    $code_example = $code_lang ? rtrim($_POST['code_example'] ?? '') : '';
+    if ($code_example === '') { $code_lang = null; $code_example = null; }
+    $is_preview = !empty($_POST['is_preview']) ? 1 : 0;
+    $release_date = !empty($_POST['release_date']) && strtotime($_POST['release_date']) ? date('Y-m-d H:i:s', strtotime($_POST['release_date'])) : null;
 
     // Handle PDF file upload
     $pdf_file_url = $video_url; // default: keep existing URL
@@ -69,15 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_lesson'])) {
         }
 
         if ($id) {
-            $stmt = $pdo->prepare("UPDATE lessons SET title=?, lesson_type=?, duration_mins=?, week_num=?, order_num=?, file_url=?, video_url=?, content=? WHERE id=? AND course_id=?");
-            $stmt->execute([$title, $type, $duration, $week, $order, $pdf_file_url, $video_url, $content, $id, $course_id]);
+            $stmt = $pdo->prepare("UPDATE lessons SET title=?, lesson_type=?, duration_mins=?, week_num=?, order_num=?, file_url=?, video_url=?, content=?, code_lang=?, code_example=?, is_preview=?, release_date=? WHERE id=? AND course_id=?");
+            $stmt->execute([$title, $type, $duration, $week, $order, $pdf_file_url, $video_url, $content, $code_lang, $code_example, $is_preview, $release_date, $id, $course_id]);
             $message = "Module synchronized!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO lessons (course_id, title, lesson_type, duration_mins, week_num, order_num, file_url, video_url, content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$course_id, $title, $type, $duration, $week, $order, $pdf_file_url, $video_url, $content]);
+            $stmt = $pdo->prepare("INSERT INTO lessons (course_id, title, lesson_type, duration_mins, week_num, order_num, file_url, video_url, content, code_lang, code_example, is_preview, release_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$course_id, $title, $type, $duration, $week, $order, $pdf_file_url, $video_url, $content, $code_lang, $code_example, $is_preview, $release_date]);
             $message = "Module added to curriculum!";
         }
-        header("Location: lessons.php?course_id=$course_id&msg=" . urlencode($message));
+        header("Location: lessons?course_id=$course_id&msg=" . urlencode($message));
         exit;
     } catch (Exception $e) { $error = $e->getMessage(); }
     skip_save:
@@ -85,8 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_lesson'])) {
 
 // 2. Handle Lesson Delete
 if (isset($_GET['delete_id'])) {
+    // Only the tutor who owns the course may delete its lessons.
+    $own = $pdo->prepare("SELECT 1 FROM courses WHERE id = ? AND tutor_id = ?");
+    $own->execute([$course_id, $tutor['id']]);
+    if (!$own->fetchColumn()) { header("Location: lessons"); exit; }
     $pdo->prepare("DELETE FROM lessons WHERE id=? AND course_id=?")->execute([$_GET['delete_id'], $course_id]);
-    header("Location: lessons.php?course_id=$course_id&msg=Module+Deleted");
+    header("Location: lessons?course_id=$course_id&msg=Module+Deleted");
     exit;
 }
 
@@ -100,6 +109,7 @@ if ($course_id) {
     $stmt = $pdo->prepare("SELECT * FROM courses WHERE id=? AND tutor_id=?");
     $stmt->execute([$course_id, $tutor['id']]);
     $course = $stmt->fetch();
+    if (!$course) { header('Location: lessons'); exit; }   // unknown course, or not this tutor's
 }
 
 $stmt = $pdo->prepare("SELECT * FROM courses WHERE tutor_id=? ORDER BY title ASC");
@@ -179,7 +189,7 @@ if (isset($_GET['msg'])) $message = $_GET['msg'];
     <?php else: ?>
         <div class="greeting">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                <a href="lessons.php" style="color: var(--primary); text-decoration: none; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;"><i class="fas fa-chevron-left"></i> SELECTION LOBBY</a>
+                <a href="lessons" style="color: var(--primary); text-decoration: none; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;"><i class="fas fa-chevron-left"></i> SELECTION LOBBY</a>
             </div>
             <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Manage Lessons<span style="color: var(--primary);">.</span></h1>
             <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Organizing the learning journey for <span style="color: var(--primary); font-weight: 700;"><?= htmlspecialchars($course['title']) ?></span></p>
@@ -211,7 +221,7 @@ if (isset($_GET['msg'])) $message = $_GET['msg'];
                     <div style="width: 100px; height: 100px; background: #f8fafc; border-radius: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 32px; font-size: 2.8rem; color: var(--primary);"><i class="fas fa-layer-group"></i></div>
                     <h3 style="margin: 0 0 12px; font-weight: 950; font-size: 1.5rem; letter-spacing: -0.5px;">No Tracks Synchronized</h3>
                     <p style="color: var(--text-dim); font-size: 1rem; margin: 0 0 32px; max-width: 440px; line-height: 1.6;">You haven't launched any academic tracks yet. Begin by architecting your first global program.</p>
-                    <a href="courses.php" class="btn-premium" style="min-width: 240px; text-decoration: none;">LAUNCH NOW</a>
+                    <a href="courses" class="btn-premium" style="min-width: 240px; text-decoration: none;">LAUNCH NOW</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -284,7 +294,7 @@ if (isset($_GET['msg'])) $message = $_GET['msg'];
                         <?= $edit_data ? 'Synchronize' : 'Initialize' ?> Module
                     </h3>
 
-                    <form method="POST" action="lessons.php?course_id=<?= $course_id ?>" enctype="multipart/form-data">
+                    <form method="POST" action="lessons?course_id=<?= $course_id ?>" enctype="multipart/form-data">
                         <input type="hidden" name="id" value="<?= $edit_data['id'] ?? '' ?>">
                         <input type="hidden" name="save_lesson" value="1">
 
@@ -357,8 +367,30 @@ if (isset($_GET['msg'])) $message = $_GET['msg'];
                         </div>
 
                         <div style="margin-bottom: 32px;">
-                            <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Description / Context</label>
-                            <textarea name="content" id="lessContent" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none; min-height: 120px; resize: none;" placeholder="What will the student learn in this module?"><?= htmlspecialchars($edit_data['content'] ?? '') ?></textarea>
+                            <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Lesson content</label>
+                            <textarea name="content" id="lessContent" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 500; outline: none; min-height: 220px; resize: vertical; font-family: inherit;" placeholder="Write the tutorial text learners will read."><?= htmlspecialchars($edit_data['content'] ?? '') ?></textarea>
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px;">Formatting: <code># Heading</code>, <code>## Sub-heading</code>, <code>- bullet</code>, <code>**bold**</code>, <code>`code`</code>, and <code>```</code> on its own line to start/end a code block.</div>
+                        </div>
+
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">"Try it yourself" example (optional)</label>
+                            <select name="code_lang" style="width: 100%; padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.9rem; font-weight: 600; margin-bottom: 10px;">
+                                <?php foreach (['' => 'No example', 'html' => 'HTML (runs in browser)', 'css' => 'CSS (runs in browser)', 'javascript' => 'JavaScript (runs in browser)', 'python' => 'Python (copy & run locally)', 'php' => 'PHP (copy & run locally)', 'sql' => 'SQL (copy & run locally)', 'text' => 'Other / plain text'] as $v => $lbl): ?>
+                                    <option value="<?= $v ?>" <?= ($edit_data['code_lang'] ?? '') === $v ? 'selected' : '' ?>><?= $lbl ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <textarea name="code_example" spellcheck="false" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font: 0.88rem/1.5 ui-monospace, Consolas, monospace; outline: none; min-height: 140px; resize: vertical; background: #0f172a; color: #e2e8f0;" placeholder="<h1>Hello world</h1>"><?= htmlspecialchars($edit_data['code_example'] ?? '') ?></textarea>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px;">
+                            <label style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 14px; cursor: pointer; font-size: 0.85rem;">
+                                <input type="checkbox" name="is_preview" value="1" <?= !empty($edit_data['is_preview']) ? 'checked' : '' ?> style="margin-top: 3px;">
+                                <span><strong>Free preview</strong><br><span style="color: var(--text-dim);">Anyone can read this lesson before enrolling.</span></span>
+                            </label>
+                            <div>
+                                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">Release date (optional)</label>
+                                <input type="datetime-local" name="release_date" value="<?= !empty($edit_data['release_date']) ? date('Y-m-d\TH:i', strtotime($edit_data['release_date'])) : '' ?>" style="width: 100%; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.9rem;">
+                            </div>
                         </div>
 
                         <div style="display: flex; gap: 16px;">
@@ -366,7 +398,7 @@ if (isset($_GET['msg'])) $message = $_GET['msg'];
                                 <?= $edit_data ? 'UPDATE MODULE' : 'ADD TO CURRICULUM' ?>
                             </button>
                             <?php if ($edit_data): ?>
-                                <a href="lessons.php?course_id=<?= $course_id ?>" class="btn-premium" style="flex: 1; background: #f8fafc; color: var(--text-dim); border: 1px solid #e2e8f0; box-shadow: none; text-decoration: none; display: flex; align-items: center; justify-content: center;">CANCEL</a>
+                                <a href="lessons?course_id=<?= $course_id ?>" class="btn-premium" style="flex: 1; background: #f8fafc; color: var(--text-dim); border: 1px solid #e2e8f0; box-shadow: none; text-decoration: none; display: flex; align-items: center; justify-content: center;">CANCEL</a>
                             <?php endif; ?>
                         </div>
                     </form>

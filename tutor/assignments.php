@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $pdo->prepare("INSERT INTO notifications (title, message, target_user_id) VALUES ('Assignment Graded', ?, ?)")
                 ->execute([$notifMsg, $student_id]);
 
-            header("Location: assignments.php?msg=" . urlencode("Scholarly evaluation synchronized!"));
+            header("Location: assignments?msg=" . urlencode("Scholarly evaluation synchronized!"));
             exit;
         } else {
             $error = "Unauthorized attempt to grade this submission.";
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_assignment'])) {
         if ($stmt->fetch()) {
             $stmt = $pdo->prepare("INSERT INTO assignments (course_id, title, description, max_score, deadline) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$course_id, $title, $desc, $max_score, $deadline]);
-            header("Location: assignments.php?msg=" . urlencode("New academic challenge deployed!"));
+            header("Location: assignments?msg=" . urlencode("New academic challenge deployed!"));
             exit;
         } else {
             $error = "Unauthorized attempt to launch assignment.";
@@ -199,7 +199,7 @@ if (isset($_GET['msg'])) $success_msg = $_GET['msg'];
         <h2 style="margin: 0 0 12px; font-size: 1.6rem; font-weight: 950; letter-spacing: -0.8px; color: var(--text-main);">Launch New Assignment</h2>
         <p style="color: var(--text-dim); margin-bottom: 40px; font-weight: 600;">Synchronize a new task across your academic program.</p>
 
-        <form method="POST" action="assignments.php">
+        <form method="POST" action="assignments">
             <input type="hidden" name="save_assignment" value="1">
             <div style="margin-bottom: 24px;">
                 <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Academic Track</label>
@@ -245,7 +245,7 @@ if (isset($_GET['msg'])) $success_msg = $_GET['msg'];
             <p id="subNotes" style="margin: 0; font-size: 0.9rem; color: var(--text-main); font-weight: 600; font-style: italic;">"Attached is my project core documentation."</p>
         </div>
 
-        <form method="POST" action="assignments.php">
+        <form method="POST" action="assignments">
             <input type="hidden" name="action" value="grade">
             <input type="hidden" name="submission_id" id="modalSubId">
             

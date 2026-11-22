@@ -21,7 +21,7 @@ function isLoggedIn(): bool {
 /**
  * Require login – redirect if not authenticated
  */
-function requireLogin(string $redirect = '/Skope Digital Academy/login.php'): void {
+function requireLogin(string $redirect = '/Skope Digital Academy/login'): void {
     if (!isLoggedIn()) {
         header('Location: ' . $redirect);
         exit;
@@ -31,7 +31,7 @@ function requireLogin(string $redirect = '/Skope Digital Academy/login.php'): vo
 /**
  * Require specific role
  */
-function requireRole(string|array $roles, string $redirect = '/Skope Digital Academy/login.php'): void {
+function requireRole(string|array $roles, string $redirect = '/Skope Digital Academy/login'): void {
     requireLogin($redirect);
     $userRole = $_SESSION['role'] ?? '';
     $roles = is_array($roles) ? $roles : [$roles];
@@ -83,11 +83,11 @@ function logoutUser(): void {
  */
 function redirectByRole(string $role): void {
     $map = [
-        'admin'   => '/Skope Digital Academy/admin/index.php',
-        'tutor'   => '/Skope Digital Academy/tutor/index.php',
-        'student' => '/Skope Digital Academy/student/index.php',
+        'admin'   => '/Skope Digital Academy/admin/',
+        'tutor'   => '/Skope Digital Academy/tutor/',
+        'student' => '/Skope Digital Academy/student/',
     ];
-    header('Location: ' . ($map[$role] ?? '/Skope Digital Academy/index.php'));
+    header('Location: ' . ($map[$role] ?? '/Skope Digital Academy/'));
     exit;
 }
 
@@ -105,8 +105,10 @@ function csrfToken(): string {
  * CSRF token validation
  */
 function verifyCsrf(): bool {
-    $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    return hash_equals($_SESSION['csrf_token'] ?? '', $token);
+    $token = (string)($_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    $expected = (string)($_SESSION['csrf_token'] ?? '');
+    // An empty session token must never match an empty submitted token.
+    return $expected !== '' && $token !== '' && hash_equals($expected, $token);
 }
 
 /**

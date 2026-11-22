@@ -6,7 +6,7 @@
     <div class="container" style="position: relative; z-index: 2;">
         <div class="grid-4" style="gap: 80px; margin-bottom: 100px;">
             <div style="grid-column: span 1.5;">
-                <a href="index.php" style="display: inline-block; margin-bottom: 32px; text-decoration: none;">
+                <a href="./" style="display: inline-block; margin-bottom: 32px; text-decoration: none;">
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <img src="assets/images/Skope Digital  logo.png" alt="Skope Digital" style="height: 54px; filter: brightness(0) invert(1);">
                         <div style="line-height: 1.1;">
@@ -27,11 +27,11 @@
             <div>
                 <h4 class="footer-heading">Quick Links</h4>
                 <ul class="footer-links">
-                    <li><a href="index.php">Home</a></li>
-                    <li><a href="about.php">About Academy</a></li>
-                    <li><a href="courses.php">Explore Courses</a></li>
-                    <li><a href="scholarships.php">Scholarships</a></li>
-                    <li><a href="contact.php">Support Center</a></li>
+                    <li><a href="./">Home</a></li>
+                    <li><a href="about">About Academy</a></li>
+                    <li><a href="courses">Explore Courses</a></li>
+                    <li><a href="scholarships">Scholarships</a></li>
+                    <li><a href="contact">Support Center</a></li>
                 </ul>
             </div>
 
@@ -80,8 +80,8 @@
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; flex-wrap: wrap; gap: 20px;">
             <p style="font-size: 0.88rem; color: #475569;">&copy; <?= date('Y') ?> Skope Digital Academy. All Rights Reserved.</p>
             <div style="display: flex; align-items: center; gap: 24px;">
-                <a href="privacy.php" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Privacy Policy</a>
-                <a href="terms.php" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Terms of Service</a>
+                <a href="privacy" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Privacy Policy</a>
+                <a href="terms" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Terms of Service</a>
             </div>
         </div>
     </div>

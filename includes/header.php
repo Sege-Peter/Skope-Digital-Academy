@@ -4,7 +4,7 @@ require_once 'auth.php';
 
 // Auth Check (Base)
 if (!isLoggedIn()) {
-    header('Location: /Skope Digital Academy/login.php');
+    header('Location: /Skope Digital Academy/login');
     exit;
 }
 
@@ -13,15 +13,15 @@ $user = currentUser();
 // Role Check Based on Directory
 $current_path = $_SERVER['REQUEST_URI'];
 if (strpos($current_path, '/admin/') !== false && $user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 if (strpos($current_path, '/tutor/') !== false && $user['role'] !== 'tutor') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 if (strpos($current_path, '/student/') !== false && $user['role'] !== 'student') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 

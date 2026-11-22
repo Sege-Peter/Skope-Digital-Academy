@@ -38,7 +38,7 @@ try {
     }
 
     if ($newly_awarded > 0) {
-        header("Location: badges.php?awarded=" . $newly_awarded);
+        header("Location: badges?awarded=" . $newly_awarded);
         exit;
     }
 

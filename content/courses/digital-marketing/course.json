@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Digital Marketing",
+  "short": "Digital Marketing",
+  "description": "A practical beginner course for school leavers who want to help businesses find customers online. You will learn how to plan, create and measure marketing on Facebook, Instagram, TikTok, WhatsApp, email and Google, and how to offer these skills as a paid service to local businesses.",
+  "category": "Business",
+  "level": "beginner",
+  "order": 2,
+  "outcomes": [
+    "Describe a business's target audience and write a clear marketing message for them",
+    "Set up and use Facebook, Instagram, TikTok and WhatsApp Business for a small business",
+    "Plan a month of content with a simple content calendar",
+    "Write short, persuasive copy for posts, adverts and emails",
+    "Apply basic SEO and read simple results such as reach, clicks and conversions",
+    "Package and price marketing services for local businesses"
+  ]
+}

@@ -97,7 +97,7 @@ $msg = $_GET['msg'] ?? '';
                     <?php endif; ?>
                 </div>
             <?php else: ?>
-                <form action="submit-assignment.php" method="POST" enctype="multipart/form-data" class="assignment-form">
+                <form action="submit-assignment" method="POST" enctype="multipart/form-data" class="assignment-form">
                     <input type="hidden" name="assignment_id" value="<?= $a['id'] ?>">
                     <div style="background: #f1f5f9; border-radius: 24px; padding: 32px; border: 2px dashed #cbd5e1;">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; align-items: flex-end;">
@@ -131,7 +131,7 @@ $msg = $_GET['msg'] ?? '';
             </div>
             <h3 style="font-weight: 950; font-size: 1.6rem; color: var(--text-main); margin-bottom: 12px; letter-spacing: -0.5px;">All Objectives Secured</h3>
             <p style="color: var(--text-dim); max-width: 400px; margin: 0 auto 32px; line-height: 1.6; font-weight: 500;">Your academic workspace is clean. No pending assignments require your immediate attention.</p>
-            <a href="index.php" class="btn-premium" style="min-width: 220px;">Return to Command Center</a>
+            <a href="./" class="btn-premium" style="min-width: 220px;">Return to Command Center</a>
         </div>
     <?php endif; ?>
 </div>

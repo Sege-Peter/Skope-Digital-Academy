@@ -3,14 +3,14 @@ $pageTitle = 'Institutional Referral Network';
 require_once '../includes/header.php';
 
 // Auth: Students only
-if ($user['role'] !== 'student') { header('Location: ../login.php'); exit; }
+if ($user['role'] !== 'student') { header('Location: ../login'); exit; }
 
 try {
     // 0. Fetch Full User Context (for referral_code, merit_coins, etc.)
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$user['id']]);
     $user_full = $stmt->fetch();
-    if (!$user_full) { header('Location: ../login.php'); exit; }
+    if (!$user_full) { header('Location: ../login'); exit; }
     // Override local $user with full DB record for consistency
     $user = $user_full;
 
@@ -87,7 +87,7 @@ try {
         <div style="background: white; border-radius: 28px; padding: 40px; text-align: center; min-width: 320px; box-shadow: 0 40px 80px rgba(0,0,0,0.25); position: relative; z-index: 2;">
             <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; font-weight: 800;">Your Referral Registry Link</div>
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 16px; font-family: monospace; font-size: 0.84rem; margin-bottom: 32px; color: #0f172a; word-break: break-all; min-height: 80px; display: flex; align-items: center; justify-content: center;" id="refURL">
-                http://localhost/Skope Digital Academy/register.php?ref=<?= $user['referral_code'] ?>
+                <?= htmlspecialchars((!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off" ? "https" : "http") . "://" . $_SERVER["HTTP_HOST"] . str_replace("\\", "/", dirname(dirname($_SERVER["SCRIPT_NAME"])))) ?>/register?ref=<?= htmlspecialchars($user["referral_code"]) ?>
             </div>
             <button class="btn btn-primary btn-block" onclick="copyRefURL()" style="height: 64px; font-weight: 800; letter-spacing: 1px; border-radius: 18px; box-shadow: 0 15px 30px rgba(0, 174, 239, 0.25);">
                 <i class="fas fa-link" style="margin-right: 12px;"></i> Copy Professional Link
@@ -157,7 +157,7 @@ try {
                 <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.1rem; font-weight: 800; margin-bottom: 20px;"><i class="fas fa-hand-holding-heart text-primary"></i> Scholarly Opportunities</h3>
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                     <?php foreach($available_scholarships as $as): ?>
-                    <a href="../scholarships.php" style="text-decoration: none; display: block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; transition: 0.3s;" onmouseover="this.style.borderColor='var(--primary)'; this.style.background='white';">
+                    <a href="../scholarships" style="text-decoration: none; display: block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; transition: 0.3s;" onmouseover="this.style.borderColor='var(--primary)'; this.style.background='white';">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                             <span style="font-size: 0.65rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">Grant Active</span>
                             <i class="fas fa-arrow-right-long" style="font-size: 0.8rem; color: #cbd5e1;"></i>

@@ -6,10 +6,10 @@ $pageTitle = 'Award Student';
 require_once 'includes/header.php';
 
 $tutor = currentUser();
-if ($tutor['role'] !== 'tutor') { header('Location: /Skope Digital Academy/login.php'); exit; }
+if ($tutor['role'] !== 'tutor') { header('Location: /Skope Digital Academy/login'); exit; }
 
 $student_id = (int)($_GET['id'] ?? 0);
-if (!$student_id) { header('Location: students.php'); exit; }
+if (!$student_id) { header('Location: students'); exit; }
 
 $msg = ''; $msgType = 'success';
 
@@ -103,7 +103,7 @@ try {
     $stmt = $pdo->prepare("SELECT name, email, avatar, merit_points as points, created_at, last_login FROM users WHERE id=? AND role='student'");
     $stmt->execute([$student_id]);
     $student_data = $stmt->fetch();
-    if (!$student_data) { header('Location: students.php'); exit; }
+    if (!$student_data) { header('Location: students'); exit; }
 
     // Tutor's courses the student is enrolled in
     $my_courses = $pdo->prepare("SELECT c.id, c.title, e.progress_percent FROM courses c 
@@ -145,14 +145,14 @@ try {
 
 <header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
     <div class="greeting">
-        <a href="students.php" style="color: var(--text-dim); font-size: 0.85rem; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
+        <a href="students" style="color: var(--text-dim); font-size: 0.85rem; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">
             <i class="fas fa-arrow-left"></i> Back to Scholar Roster
         </a>
         <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Award Scholastic Merit<span style="color: var(--primary);">.</span></h1>
         <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Directing <span style="color: var(--primary); font-weight: 700;">institutional recognition</span> and professional accreditation.</p>
     </div>
     <div style="display: flex; gap: 12px;">
-        <a href="student_profile.php?id=<?= $student_id ?>" class="btn-premium" style="background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none; font-size: 0.8rem; padding: 12px 24px;">
+        <a href="student_profile?id=<?= $student_id ?>" class="btn-premium" style="background: white; color: var(--text-dim); border: 1px solid #E2E8F0; box-shadow: none; font-size: 0.8rem; padding: 12px 24px;">
             <i class="fas fa-user-graduate"></i> VIEW SCHOLAR DOSSIER
         </a>
     </div>

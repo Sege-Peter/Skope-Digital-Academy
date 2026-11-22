@@ -45,7 +45,7 @@ $user = isLoggedIn() ? currentUser() : null;
             text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 24px;
         }
         h1 { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 3rem; margin-bottom: 16px; letter-spacing: -1px; }
-        .hero-sub { font-size: 1.1rem; opacity: 0.85; max-width: 600px; margin: 0 auto; line-height: 1.6; }
+        .hero-sub { font-size: 1.1rem; color: rgba(255,255,255,0.85); max-width: 600px; margin: 0 auto; line-height: 1.6; }
         
         .method-card { background: #f8fafc; border-radius: 24px; padding: 24px; margin-bottom: 20px; border: 1px solid #e2e8f0; transition: 0.3s; }
         .method-card:hover { border-color: var(--sky-blue); transform: translateY(-3px); }
@@ -218,7 +218,7 @@ $user = isLoggedIn() ? currentUser() : null;
                     ]
                 },
                 callback: function(response) {
-                    window.location.href = "verify-payment.php?reference=" + response.reference + "&type=donation&email=" + encodeURIComponent(email);
+                    window.location.href = "verify-payment?reference=" + response.reference + "&type=donation&email=" + encodeURIComponent(email);
                 },
                 onClose: function() {
                     donateBtn.disabled = false;

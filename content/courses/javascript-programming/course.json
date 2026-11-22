@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "JavaScript Programming",
+  "short": "JavaScript",
+  "description": "A free, project-based JavaScript course for school leavers who want to build interactive websites. Over four weeks you build small real apps in the browser – a counter, a tip calculator, a to-do list, a quiz and a product catalogue – and finish with a portfolio piece you can show clients.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 14,
+  "outcomes": [
+    "Write JavaScript with variables, conditions, loops and functions",
+    "Make web pages react to clicks and form input using the DOM",
+    "Store and display data with arrays and objects",
+    "Remember data between visits with localStorage",
+    "Build a working product catalogue with search and filters",
+    "Explain your projects to a client or employer"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "type": "course",
+  "title": "Learning How to Learn",
+  "short": "How to Learn",
+  "description": "For school leavers who want to learn new skills faster and remember them for longer, whether in college, online courses or on the job. You will learn simple, well-tested study methods and build your own learning plan.",
+  "category": "Career & Personal Skills",
+  "level": "beginner",
+  "order": 18,
+  "outcomes": [
+    "Explain in simple terms how memory works and why we forget",
+    "Use active recall and spaced repetition to remember more",
+    "Beat procrastination with the Pomodoro technique and small habits",
+    "Take useful notes and learn effectively from online courses",
+    "Stay motivated and build a personal learning plan for a new skill"
+  ]
+}

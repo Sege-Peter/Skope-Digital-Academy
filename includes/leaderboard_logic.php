@@ -19,24 +19,19 @@ if (!$course_id && !empty($courses)) {
     $course_id = $courses[0]['id'];
 }
 
-// 2. Fetch Leaderboard Data for selected course
+// 2. Leaderboard for the selected course, from the learning engine (XP earned in the course).
 $leaderboard = [];
 if ($course_id) {
     try {
-        $stmt = $pdo->prepare("SELECT u.id, u.name, u.avatar, 
-                                      e.progress_percent, e.enrolled_at,
-                                      (SELECT ROUND(AVG(score), 2) FROM quiz_attempts qa 
-                                       JOIN quizzes q ON qa.quiz_id = q.id 
-                                       WHERE qa.student_id = u.id AND q.course_id = ?) as avg_quiz_score,
-                                      (SELECT COUNT(*) FROM student_badges sb 
-                                       JOIN badges b ON sb.badge_id = b.id 
-                                       WHERE sb.student_id = u.id AND b.course_id = ?) as course_badges
-                              FROM enrollments e
-                              JOIN users u ON e.student_id = u.id
-                              WHERE e.course_id = ?
-                              ORDER BY avg_quiz_score DESC, progress_percent DESC, course_badges DESC
-                              LIMIT 50");
-        $stmt->execute([$course_id, $course_id, $course_id]);
-        $leaderboard = $stmt->fetchAll();
-    } catch (Exception $e) { $leaderboard = []; }
+        require_once __DIR__ . '/progress.php';
+        foreach (course_leaderboard($pdo, (int)$course_id, ($_GET['period'] ?? '') === 'week' ? 'week' : 'all', 50) as $row) {
+            $best = best_quiz_pct($pdo, (int)$row['id'], (int)$course_id);
+            $badges = $pdo->prepare("SELECT COUNT(*) FROM student_badges sb JOIN badges b ON b.id = sb.badge_id WHERE sb.student_id = ? AND b.course_id = ?");
+            $badges->execute([$row['id'], $course_id]);
+            $row['avg_quiz_score'] = $best ?? 0;
+            $row['course_badges'] = (int)$badges->fetchColumn();
+            if ($user['role'] === 'student') $row['name'] = $row['display_name'];
+            $leaderboard[] = $row;
+        }
+    } catch (Exception $e) { error_log($e->getMessage()); $leaderboard = []; }
 }

@@ -12,7 +12,7 @@
         <!-- Right Interaction Panel -->
         <aside class="right-panel">
             <div class="desktop-top-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; gap: 24px;">
-                <form action="search.php" method="GET" class="search-box" style="flex: 1; max-width: 540px; position: relative;">
+                <form action="search" method="GET" class="search-box" style="flex: 1; max-width: 540px; position: relative;">
                     <i class="fas fa-search" style="position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.9rem;"></i>
                     <input type="text" name="q" placeholder="Search for anything .." value="<?= htmlspecialchars($q ?? '') ?>" style="width: 100%; padding: 16px 20px 16px 54px; border: 1px solid var(--border); border-radius: 18px; outline: none; transition: 0.3s; font-size: 0.92rem; font-family: inherit; background: #f8fafc;">
                 </form>
@@ -63,7 +63,7 @@
                                 </div>
                             <?php endforeach; endif; ?>
                             </div>
-                            <a href="notifications.php" style="display: block; text-align: center; margin-top: 12px; font-size: 0.78rem; font-weight: 800; color: var(--primary); text-decoration: none; padding: 10px; background: #E0F7FF; border-radius: 10px;">View All</a>
+                            <a href="notifications" style="display: block; text-align: center; margin-top: 12px; font-size: 0.78rem; font-weight: 800; color: var(--primary); text-decoration: none; padding: 10px; background: #E0F7FF; border-radius: 10px;">View All</a>
                         </div>
                     </div>
 
@@ -84,9 +84,9 @@
                         </div>
 
                         <div id="profileDropdown" style="display: none; flex-direction: column; position: absolute; top: 60px; right: 0; background: white; border: 1px solid var(--border); border-radius: 16px; padding: 8px; width: 220px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); z-index: 100;">
-                            <a href="profile.php" style="display: flex; align-items: center; gap: 12px; padding: 12px; color: var(--text-main); text-decoration: none; font-size: 0.88rem; border-radius: 10px; font-weight: 750; transition: 0.2s;"><i class="fas fa-user-circle" style="color: var(--primary); width: 18px;"></i> Profile Base</a>
+                            <a href="profile" style="display: flex; align-items: center; gap: 12px; padding: 12px; color: var(--text-main); text-decoration: none; font-size: 0.88rem; border-radius: 10px; font-weight: 750; transition: 0.2s;"><i class="fas fa-user-circle" style="color: var(--primary); width: 18px;"></i> Profile Base</a>
                             <div style="height: 1px; background: #f1f5f9; margin: 8px 0;"></div>
-                            <a href="../logout.php" style="display: flex; align-items: center; gap: 12px; padding: 12px; color: #ef4444; text-decoration: none; font-size: 0.88rem; border-radius: 10px; font-weight: 750; transition: 0.2s;"><i class="fas fa-power-off" style="width: 18px;"></i> Logout</a>
+                            <a href="../logout" style="display: flex; align-items: center; gap: 12px; padding: 12px; color: #ef4444; text-decoration: none; font-size: 0.88rem; border-radius: 10px; font-weight: 750; transition: 0.2s;"><i class="fas fa-power-off" style="width: 18px;"></i> Logout</a>
                         </div>
                     </div>
                 </div>

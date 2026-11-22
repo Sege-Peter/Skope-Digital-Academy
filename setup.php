@@ -375,7 +375,7 @@ try {
             Tutor: tutor@skopedigital.ac.ke / Tutor@2026<br>
             Student: student@skopedigital.ac.ke / Student@2026
         </div>
-        <a href="index.php">Go to Homepage →</a>
+        <a href="./">Go to Homepage →</a>
     </div></body></html>';
 
     // Seed Default Categories

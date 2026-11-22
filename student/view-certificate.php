@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 // Must be logged in
 if (!isLoggedIn()) {
-    header('Location: /Skope Digital Academy/login.php');
+    header('Location: /Skope Digital Academy/login');
     exit;
 }
 
@@ -17,7 +17,7 @@ $currentUser = currentUser();
 // Fix operator precedence bug — was: (int)$_GET['id'] ?? 0
 $cid = (int)($_GET['id'] ?? 0);
 if (!$cid) {
-    header('Location: certificates.php');
+    header('Location: certificates');
     exit;
 }
 
@@ -45,11 +45,11 @@ try {
 
     // 404 guard + ownership check (admin/tutor can view any; students only their own)
     if (!$cert) {
-        header('Location: certificates.php');
+        header('Location: certificates');
         exit;
     }
     if ($currentUser['role'] === 'student' && $cert['student_id'] != $currentUser['id']) {
-        header('Location: certificates.php');
+        header('Location: certificates');
         exit;
     }
 
@@ -62,15 +62,15 @@ try {
 
 } catch (Exception $e) {
     error_log($e->getMessage());
-    header('Location: certificates.php');
+    header('Location: certificates');
     exit;
 }
 
 // Back-link differs by role
 $backLink = match($currentUser['role']) {
-    'admin'  => '/Skope Digital Academy/admin/certificates.php',
-    'tutor'  => '/Skope Digital Academy/tutor/students.php',
-    default  => '/Skope Digital Academy/student/certificates.php',
+    'admin'  => '/Skope Digital Academy/admin/certificates',
+    'tutor'  => '/Skope Digital Academy/tutor/students',
+    default  => '/Skope Digital Academy/student/certificates',
 };
 ?>
 <!DOCTYPE html>
@@ -602,7 +602,7 @@ body::after {
         <?= $currentUser['role'] === 'student' ? 'All Certificates' : 'Back' ?>
     </a>
     <?php if ($currentUser['role'] === 'student'): ?>
-    <a href="transcript.php" class="btn btn-ghost">
+    <a href="transcript" class="btn btn-ghost">
         <i class="fas fa-scroll"></i> View Transcript
     </a>
     <?php endif; ?>

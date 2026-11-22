@@ -85,7 +85,7 @@ require_once 'includes/layout-top.php';
 
             <!-- Input Area -->
             <div style="padding: 24px 32px; border-top: 1px solid #f1f5f9; background: #fff;">
-                <form action="send-message.php" method="POST" style="display: flex; gap: 12px; align-items: center;">
+                <form action="send-message" method="POST" style="display: flex; gap: 12px; align-items: center;">
                     <input type="hidden" name="to_id" value="<?= $receiver['id'] ?>">
                     <button type="button" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem;"><i class="far fa-smile"></i></button>
                     <input type="text" name="message" placeholder="Type your inquiry for the faculty lead..." style="flex: 1; padding: 14px 20px; border: 1px solid #e2e8f0; border-radius: 14px; outline: none; font-size: 0.88rem; font-weight: 600; background: #f8fafc;">

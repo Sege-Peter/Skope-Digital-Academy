@@ -1,0 +1,8 @@
+{
+  "title": "SQL Tutorial",
+  "short": "SQL",
+  "description": "Learn SQL, the language for asking questions of databases, by querying a real sample shop database right in your browser. Start with SELECT and finish able to join tables, summarise data and build your own tables.",
+  "category": "Technology",
+  "level": "beginner",
+  "order": 5
+}

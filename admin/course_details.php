@@ -5,7 +5,7 @@ require_once 'includes/header.php';
 $id = (int)($_GET['id'] ?? 0);
 
 if (!$id) {
-    header('Location: courses.php');
+    header('Location: courses');
     exit;
 }
 
@@ -20,7 +20,7 @@ try {
     $course = $stmt->fetch();
 
     if (!$course) {
-        header('Location: courses.php');
+        header('Location: courses');
         exit;
     }
 
@@ -65,7 +65,7 @@ try {
 
 } catch (Exception $e) {
     error_log($e->getMessage());
-    header('Location: courses.php');
+    header('Location: courses');
     exit;
 }
 ?>
@@ -97,7 +97,7 @@ try {
             </div>
         </div>
         <div>
-            <a href="courses.php" class="btn btn-ghost btn-sm"><i class="fas fa-arrow-left"></i> Back to Catalog</a>
+            <a href="courses" class="btn btn-ghost btn-sm"><i class="fas fa-arrow-left"></i> Back to Catalog</a>
         </div>
     </header>
 

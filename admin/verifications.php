@@ -4,7 +4,7 @@ require_once 'includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -19,23 +19,27 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $pdo->beginTransaction();
             
             // 1. Update Payment Status
-            $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_by = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_by = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'");
             $stmt->execute([$user['id'], $payment_id]);
+            $newly_verified = $stmt->rowCount() > 0;
 
             // 2. Fetch Payment Details for Enrollment
-            $stmt = $pdo->prepare("SELECT student_id, course_id FROM payments WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT student_id, course_id, amount, learning_mode, cohort_id, payment_type, certificate_id FROM payments WHERE id = ?");
             $stmt->execute([$payment_id]);
-            $pay = $stmt->fetch();
+            $pay = $newly_verified ? $stmt->fetch() : null;
 
-            if ($pay) {
-                // 3. Create/Update Enrollment
-                $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') 
-                                       ON DUPLICATE KEY UPDATE status = 'active'");
-                $stmt->execute([$pay['student_id'], $pay['course_id']]);
-                
-                // 4. Update Course Enrolled Count
-                $stmt = $pdo->prepare("UPDATE courses SET enrolled_count = enrolled_count + 1 WHERE id = ?");
-                $stmt->execute([$pay['course_id']]);
+            if ($pay && $pay['payment_type'] === 'certificate' && $pay['certificate_id']) {
+                // Certificate fee: unlock the learner's certificate (no enrollment change).
+                require_once __DIR__ . '/../includes/progress.php';
+                unlock_certificate($pdo, (int)$pay['certificate_id'], (float)$pay['amount']);
+            } elseif ($pay && $pay['course_id']) {
+                // 3-4. Activate on the track the learner paid for (credits amount, counts the seat once)
+                require_once __DIR__ . '/../includes/learning.php';
+                $cstmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+                $cstmt->execute([$pay['course_id']]);
+                $pcourse = $cstmt->fetch();
+                $pmode = in_array($pay['learning_mode'], SDA_MODES, true) ? $pay['learning_mode'] : course_modes($pcourse)[0];
+                enroll_student($pdo, (int)$pay['student_id'], $pcourse, $pmode, $pay['cohort_id'] ? (int)$pay['cohort_id'] : null, (float)$pay['amount']);
             }
 
             $pdo->commit();
@@ -159,7 +163,7 @@ try {
                                     <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;"><?= htmlspecialchars($p['student_email']) ?></div>
                                 </td>
                                 <td>
-                                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);"><?= htmlspecialchars($p['course_title']) ?></div>
+                                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);"><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></div>
                                     <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">TxID: #<?= $p['id'] ?></div>
                                 </td>
                                 <td style="font-weight: 900; color: var(--primary);">KES <?= number_format($p['amount']) ?></td>
@@ -170,10 +174,10 @@ try {
                                 </td>
                                 <td style="text-align: right;">
                                     <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                        <a href="verifications.php?action=verify&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--success-glow); color: var(--success); border: none; cursor: pointer;" title="Authorize Access">
+                                        <a href="verifications?action=verify&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--success-glow); color: var(--success); border: none; cursor: pointer;" title="Authorize Access">
                                             <i class="fas fa-check" style="font-size: 0.8rem;"></i>
                                         </a>
-                                        <a href="verifications.php?action=reject&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--danger-glow); color: var(--danger); border: none; cursor: pointer;" title="Invalidate Transaction">
+                                        <a href="verifications?action=reject&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--danger-glow); color: var(--danger); border: none; cursor: pointer;" title="Invalidate Transaction">
                                             <i class="fas fa-times" style="font-size: 0.8rem;"></i>
                                         </a>
                                     </div>
@@ -219,7 +223,7 @@ try {
                         <tr>
                             <td><span style="font-weight: 900; color: var(--text-muted); font-size: 0.7rem;">#<?= $h['id'] ?></span></td>
                             <td style="font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($h['student_name']) ?></td>
-                            <td style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);"><?= htmlspecialchars($h['course_title']) ?></td>
+                            <td style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);"><?= htmlspecialchars($h['course_title']) ?><?= ($h['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
                             <td style="font-weight: 900; color: var(--success);">KES <?= number_format($h['amount']) ?></td>
                             <td>
                                 <div class="badge-premium" style="background: var(--bg-main); color: var(--primary); border: 1.5px solid var(--border-light); font-size: 0.65rem;">

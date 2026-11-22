@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/learning.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
@@ -34,11 +35,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
 
                     // Store token
+                    // Only a hash of the token is stored; the plain token exists only in the email link.
                     $stmt = $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
-                    $stmt->execute([$email, $token, $expires_at]);
+                    $stmt->execute([$email, hash('sha256', $token), $expires_at]);
 
                     // Send Email
-                    $reset_link = "http://" . $_SERVER['HTTP_HOST'] . "/Skope Digital Academy/reset-password.php?token=" . $token;
+                    // Build the link from the configured site URL, never from the request's Host header.
+                    $site = rtrim(setting('site_url'), '/');
+                    if ($site === '') {
+                        $site = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://localhost' . rtrim(sda_base_href(), '/');
+                    }
+                    $reset_link = $site . '/reset-password?token=' . $token;
                     
                     $subject = "Skope Digital Academy - Password Reset";
                     $message = "
@@ -83,210 +90,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password – Skope Digital Academy</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/auth.css?v=3">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
-    <style>
-        :root {
-            --base: #f1f3f6;
-            --shadow-dark: #d1d9e6;
-            --shadow-light: #ffffff;
-            --primary-btn: #67b7d1;
-            --primary-btn-hover: #5aa9c3;
-            --text-main: #31456a;
-            --text-dim: #64748b;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--base);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: var(--text-main);
-        }
-
-        .neu-card {
-            width: 100%;
-            max-width: 420px;
-            background: var(--base);
-            border-radius: 50px;
-            padding: 50px 40px;
-            box-shadow: 20px 20px 60px var(--shadow-dark), 
-                       -20px -20px 60px var(--shadow-light);
-            text-align: center;
-        }
-
-        .logo-wrapper {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 30px;
-            background: var(--base);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 8px 8px 16px var(--shadow-dark), 
-                       -8px -8px 16px var(--shadow-light);
-            padding: 5px;
-            border: 4px solid var(--base);
-        }
-        
-        .logo-wrapper i {
-            font-size: 2rem;
-            color: var(--primary-btn);
-        }
-
-        h1 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 800;
-            margin-bottom: 20px;
-        }
-
-        p.desc {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            margin-bottom: 30px;
-            line-height: 1.5;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 25px;
-        }
-        .input-neu {
-            width: 100%;
-            height: 60px;
-            background: var(--base);
-            border: none;
-            outline: none;
-            border-radius: 30px;
-            padding: 0 50px 0 60px;
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            box-shadow: inset 6px 6px 12px var(--shadow-dark), 
-                       inset -6px -6px 12px var(--shadow-light);
-            transition: 0.3s;
-        }
-        .input-neu:focus {
-            box-shadow: inset 2px 2px 5px var(--shadow-dark), 
-                       inset -2px -2px 5px var(--shadow-light);
-        }
-        .input-group i {
-            position: absolute;
-            left: 25px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-dim);
-            font-size: 1.1rem;
-        }
-
-        .btn-neu {
-            width: 100%;
-            height: 60px;
-            background: var(--primary-btn);
-            color: #fff;
-            border: none;
-            border-radius: 30px;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 1.1rem;
-            margin-top: 5px;
-            cursor: pointer;
-            box-shadow: 6px 6px 12px var(--shadow-dark), 
-                       -6px -6px 12px var(--shadow-light);
-            transition: 0.3s;
-        }
-        .btn-neu:hover {
-            background: var(--primary-btn-hover);
-            transform: translateY(-2px);
-            box-shadow: 8px 8px 16px var(--shadow-dark), 
-                       -8px -8px 16px var(--shadow-light);
-        }
-        .btn-neu:active {
-            transform: translateY(0);
-            box-shadow: inset 4px 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .back-home {
-            margin-top: 30px;
-            font-size: 0.85rem;
-            font-weight: 800;
-        }
-        .back-home a {
-            color: var(--text-dim);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            transition: 0.3s;
-        }
-        .back-home a:hover { color: var(--primary-btn); }
-
-        #error-overlay { margin-bottom: 20px; font-size: 0.85rem; color: #ef4444; font-weight: 700; }
-        #success-overlay { margin-bottom: 20px; font-size: 0.85rem; color: #10b981; font-weight: 700; background: #dcfce7; padding: 12px; border-radius: 12px; border: 1px solid #bbf7d0; }
-
-        @media (max-width: 480px) {
-            .neu-card { padding: 40px 25px; border-radius: 40px; }
-        }
-    </style>
 </head>
 <body>
-
-    <div class="neu-card">
-        <div class="logo-wrapper">
-            <i class="fas fa-key"></i>
+<div class="auth">
+    <aside class="auth-brand">
+        <a class="auth-logo" href="./">
+            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
+        </a>
+        <div class="auth-pitch">
+            <h1>Locked out?<br><span>It happens.</span></h1>
+            <p>Enter your email and we'll send you a secure link to choose a new password. Your courses and progress stay exactly where they are.</p>
+            <ul class="auth-points">
+                <li><i class="fas fa-envelope-open-text"></i><div><strong>Check your inbox</strong><span>The link arrives within a few minutes. Look in spam too.</span></div></li>
+                <li><i class="fas fa-hourglass-half"></i><div><strong>Valid for 1 hour</strong><span>Each link works once and expires after an hour.</span></div></li>
+                <li><i class="fas fa-headset"></i><div><strong>Still stuck?</strong><span>Our team can help from the contact page.</span></div></li>
+            </ul>
         </div>
-        
-        <h1>Forgot Password</h1>
-        <p class="desc">Enter your registered email address below and we'll send you a secure link to reset your password.</p>
+    </aside>
 
-        <?php if ($error): ?>
-            <div id="error-overlay">
-                <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
-            </div>
-        <?php endif; ?>
-
+    <main class="auth-main">
+        <div class="auth-card">
         <?php if ($success): ?>
-            <div id="success-overlay">
-                <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?>
+            <div class="done">
+                <div class="auth-icon"><i class="fas fa-paper-plane"></i></div>
+                <h2>Check your email</h2>
+                <p><?= htmlspecialchars($success) ?> The link expires in 1 hour. Didn't get it? Check your spam folder, or try again in a few minutes.</p>
+                <a class="submit" href="login"><i class="fas fa-arrow-left"></i> Back to sign in</a>
+                <div class="auth-foot"><a href="forgot-password">Use a different email</a> · <a href="contact?topic=Technical%20Support">Contact support</a></div>
             </div>
         <?php else: ?>
-            <form action="forgot-password.php" method="POST" id="resetForm">
+            <div class="auth-icon"><i class="fas fa-key"></i></div>
+            <h2>Forgot your password?</h2>
+            <p>Enter the email address on your account and we'll email you a reset link.</p>
+
+            <?php if ($error): ?>
+                <div class="alert err" role="alert"><i class="fas fa-circle-exclamation"></i><span><?= htmlspecialchars($error) ?></span></div>
+            <?php endif; ?>
+
+            <form action="forgot-password" method="POST" id="fpForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">
-
-                <div class="input-group">
-                    <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" class="input-neu" placeholder="Email Address" required>
+                <div class="field">
+                    <div class="field-top"><label for="email">Email address</label></div>
+                    <div class="control">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required autofocus>
+                    </div>
                 </div>
-
-                <button type="submit" class="btn-neu" id="submitBtn">Send Reset Link</button>
+                <button type="submit" class="submit" id="fpBtn"><i class="fas fa-paper-plane"></i> Send reset link</button>
             </form>
+
+            <div class="auth-switch">Remembered it? <a href="login">Sign in</a></div>
+            <div class="auth-foot"><a href="./"><i class="fas fa-arrow-left"></i> Back to homepage</a></div>
         <?php endif; ?>
-
-        <div class="back-home">
-            <a href="login.php">
-                <i class="fas fa-arrow-left"></i> Back to Login
-            </a>
         </div>
-    </div>
-
-    <script>
-        const form = document.getElementById('resetForm');
-        if (form) {
-            form.addEventListener('submit', function() {
-                const btn = document.getElementById('submitBtn');
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                btn.style.opacity = '0.8';
-            });
-        }
-    </script>
+    </main>
+</div>
+<script>
+(() => {
+    const form = document.getElementById('fpForm');
+    if (!form) return;
+    form.addEventListener('submit', (ev) => {
+        if (!form.checkValidity()) { ev.preventDefault(); form.reportValidity(); return; }
+        const btn = document.getElementById('fpBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending…';
+    });
+})();
+</script>
 </body>
 </html>

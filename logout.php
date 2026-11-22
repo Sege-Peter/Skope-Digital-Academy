@@ -6,5 +6,5 @@ session_start();
 session_destroy();
 
 // Redirect to login with logout message
-header('Location: login.php?msg=logout_success');
+header('Location: login?msg=logout_success');
 exit;

@@ -50,7 +50,7 @@ $user = $student; // Shared variable for sidebar compatibility
 <?php if(isset($_SESSION['admin_impersonator_id'])): ?>
     <div style="background: #ef4444; color: white; text-align: center; padding: 12px; font-weight: 800; font-size: 0.85rem; z-index: 10000; position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); backdrop-filter: blur(8px);">
         <span><i class="fas fa-user-secret"></i> DIAGNOSTIC MODE: VIEWING AS <?= htmlspecialchars($student['name']) ?></span>
-        <a href="../impersonate.php?action=stop" style="background: white; color: #ef4444; padding: 4px 14px; border-radius: 8px; text-decoration: none; font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 700;">STOP IMPERSONATION</a>
+        <a href="../impersonate?action=stop" style="background: white; color: #ef4444; padding: 4px 14px; border-radius: 8px; text-decoration: none; font-size: 0.75rem; letter-spacing: 0.5px; font-weight: 700;">STOP IMPERSONATION</a>
     </div>
     <div style="height: 48px;"></div>
 <?php endif; ?>

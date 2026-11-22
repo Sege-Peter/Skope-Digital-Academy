@@ -4,7 +4,7 @@ require_once '../includes/header.php';
 
 // Auth check
 if ($user['role'] !== 'admin') {
-    header('Location: ../login.php');
+    header('Location: ../login');
     exit;
 }
 
@@ -121,7 +121,7 @@ try {
         </div>
         
         <div style="display: flex; gap: 16px;">
-            <form action="courses.php" method="GET" class="header-search" style="display: flex; gap: 10px;">
+            <form action="courses" method="GET" class="header-search" style="display: flex; gap: 10px;">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($status_filter) ?>">
                 <input type="text" name="search" placeholder="Filter Curriculum..." value="<?= htmlspecialchars($search) ?>" style="padding-right: 48px;">
                 <i class="fas fa-search"></i>
@@ -170,10 +170,10 @@ try {
         <div class="premium-card glass-effect" style="padding: 16px 24px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-right: 12px;">Lifecycle Status:</span>
-                <a href="courses.php" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= !$status_filter ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= !$status_filter ? 'white' : '#64748b' ?>;">ALL</a>
-                <a href="courses.php?status=published" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'published' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'published' ? 'white' : '#64748b' ?>;">LIVE</a>
-                <a href="courses.php?status=pending" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'pending' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'pending' ? 'white' : '#64748b' ?>;">PENDING</a>
-                <a href="courses.php?status=draft" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'draft' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'draft' ? 'white' : '#64748b' ?>;">DRAFTS</a>
+                <a href="courses" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= !$status_filter ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= !$status_filter ? 'white' : '#64748b' ?>;">ALL</a>
+                <a href="courses?status=published" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'published' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'published' ? 'white' : '#64748b' ?>;">LIVE</a>
+                <a href="courses?status=pending" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'pending' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'pending' ? 'white' : '#64748b' ?>;">PENDING</a>
+                <a href="courses?status=draft" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $status_filter == 'draft' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $status_filter == 'draft' ? 'white' : '#64748b' ?>;">DRAFTS</a>
             </div>
             <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">
                 Showing <span style="color: var(--text-main);"><?= count($courses) ?></span> Curriculum Tracks
@@ -255,7 +255,10 @@ try {
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
-                    <a href="course_details.php?id=<?= $c['id'] ?>" class="avatar-sm" style="width: 38px; height: 38px; background: var(--primary-glow); color: var(--primary); border: none; text-decoration: none;" title="Performance Intelligence">
+                    <a href="course-pricing?id=<?= $c['id'] ?>" class="avatar-sm" style="width: 38px; height: 38px; background: #fff4e5; color: #b45309; border: none; text-decoration: none;" title="Pricing, tracks &amp; cohorts">
+                        <i class="fas fa-money-bill-wave" style="font-size: 0.8rem;"></i>
+                    </a>
+                    <a href="course_details?id=<?= $c['id'] ?>" class="avatar-sm" style="width: 38px; height: 38px; background: var(--primary-glow); color: var(--primary); border: none; text-decoration: none;" title="Performance Intelligence">
                         <i class="fas fa-chart-bar" style="font-size: 0.8rem;"></i>
                     </a>
                 </div>

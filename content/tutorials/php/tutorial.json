@@ -1,0 +1,8 @@
+{
+  "title": "PHP Tutorial",
+  "short": "PHP",
+  "description": "Learn PHP 8 from your first script to forms, sessions, MySQL with PDO and object-oriented code, with clear examples and their output.",
+  "category": "Technology",
+  "level": "intermediate",
+  "order": 6
+}

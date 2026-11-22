@@ -1,12 +1,15 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/learning.php';
 
 // ── Filter inputs ─────────────────────────────────────────────
 $cat_id = $_GET['category'] ?? 'all';
 $level  = $_GET['level']    ?? 'all';
 $search = trim($_GET['search'] ?? '');
 $sort   = $_GET['sort']     ?? 'newest';
+$price_f = in_array($_GET['price'] ?? '', ['free', 'paid'], true) ? $_GET['price'] : 'all';
+$mode_f  = in_array($_GET['mode'] ?? '', ['self_paced', 'structured', 'tutorial'], true) ? $_GET['mode'] : 'all';
 
 // ── Build Query ───────────────────────────────────────────────
 $params = [];
@@ -19,6 +22,8 @@ $query  = "SELECT c.*, u.name AS tutor_name, cat.name AS category_name
 if ($cat_id !== 'all') { $query .= " AND c.category_id = ?"; $params[] = $cat_id; }
 if ($level  !== 'all') { $query .= " AND c.level = ?";       $params[] = $level; }
 if ($search !== '')    { $query .= " AND (c.title LIKE ? OR c.description LIKE ?)"; $params[] = "%$search%"; $params[] = "%$search%"; }
+if ($mode_f === 'tutorial') { $query .= " AND c.is_open_tutorial = 1"; }
+elseif ($mode_f !== 'all')  { $query .= " AND c.learning_modes IN (?, 'both')"; $params[] = $mode_f; }
 
 $query .= match($sort) {
     'price_asc'  => " ORDER BY c.price ASC",
@@ -31,7 +36,16 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $courses = $stmt->fetchAll();
-
+    // Price filter/sort use the live price (sale, cheapest track), which SQL can't see.
+    if ($price_f !== 'all') {
+        $courses = array_values(array_filter($courses, fn($c) => ($price_f === 'free') === (course_from_price($c) <= 0)));
+    }
+    if ($sort === 'price_asc' || $sort === 'price_desc') {
+        usort($courses, fn($a, $b) => ($sort === 'price_asc' ? 1 : -1) * (course_from_price($a) <=> course_from_price($b)));
+    }
+    if ($sort === 'newest') {
+        usort($courses, fn($a, $b) => [$b['is_featured'], $b['created_at']] <=> [$a['is_featured'], $a['created_at']]);
+    }
     $categories = $pdo->query("SELECT * FROM categories ORDER BY name ASC")->fetchAll();
 
     // Count per category
@@ -307,7 +321,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
 }
 
 @media (max-width: 768px) {
-  .page-hero { padding: 56px 0 40px; text-align: center; }
+  .page-hero { padding: 84px 0 40px; text-align: center; }
   .page-hero p { margin: 0 auto 24px; font-size: 0.95rem; }
   .search-field { height: 50px; font-size: 0.9rem; padding-left: 48px; }
   .search-wrap .search-icon { left: 18px; }
@@ -320,6 +334,12 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
   .btn-enroll { width: 100%; justify-content: center; }
   .stat-pod-elite .value { font-size: 1.3rem !important; }
 }
+  .c-tracks { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 2px; }
+  .c-track { font-size:.68rem; font-weight:800; padding:3px 9px; border-radius:99px; text-decoration:none; }
+  .c-track.self { background:#e6f3ff; color:#08427a; }
+  .c-track.struct { background:#fff4e5; color:#7a4300; }
+  .c-track.free { background:#e7f7f0; color:#075e40; }
+  .c-track.cert { background:#fef3c7; color:#92400e; }
 </style>
 </head>
 <body>
@@ -336,7 +356,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
     <p>Explore <?= number_format($total_published + 118) ?>+ professional courses across Technology, Business, Design, and more — built for real-world careers.</p>
 
     <!-- Search Bar -->
-    <form action="courses.php" method="GET" class="search-wrap" id="heroSearch">
+    <form action="courses" method="GET" class="search-wrap" id="heroSearch">
       <i class="fas fa-search search-icon"></i>
       <input type="text" name="search" class="search-field"
              placeholder="Search courses, topics, or skills…"
@@ -355,16 +375,16 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
       <?php if($search): ?>
         <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:5px 12px;font-size:0.78rem;font-weight:600;color:#475569;">
           <i class="fas fa-search" style="color:#00BFFF;"></i> "<?= htmlspecialchars($search) ?>"
-          <a href="courses.php?category=<?= $cat_id ?>&level=<?= $level ?>" style="color:#ef4444;margin-left:4px;"><i class="fas fa-times"></i></a>
+          <a href="courses?category=<?= $cat_id ?>&level=<?= $level ?>" style="color:#ef4444;margin-left:4px;"><i class="fas fa-times"></i></a>
         </span>
       <?php endif; ?>
       <?php if($level !== 'all'): ?>
         <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:5px 12px;font-size:0.78rem;font-weight:600;color:#475569;">
           <i class="fas fa-signal" style="color:#FF8C00;"></i> <?= ucfirst($level) ?>
-          <a href="courses.php?category=<?= $cat_id ?>&search=<?= urlencode($search) ?>" style="color:#ef4444;margin-left:4px;"><i class="fas fa-times"></i></a>
+          <a href="courses?category=<?= $cat_id ?>&search=<?= urlencode($search) ?>" style="color:#ef4444;margin-left:4px;"><i class="fas fa-times"></i></a>
         </span>
       <?php endif; ?>
-      <a href="courses.php" style="display:inline-flex;align-items:center;gap:6px;color:#64748B;text-decoration:none;font-size:0.78rem;font-weight:600;padding:5px 12px;">
+      <a href="courses" style="display:inline-flex;align-items:center;gap:6px;color:#64748B;text-decoration:none;font-size:0.78rem;font-weight:600;padding:5px 12px;">
         Clear all <i class="fas fa-times-circle"></i>
       </a>
     </div>
@@ -379,8 +399,35 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
     <!-- ── SIDEBAR (Desktop) ── -->
     <aside>
       <div class="filter-panel">
-        <form id="filterForm" action="courses.php" method="GET">
+        <form id="filterForm" action="courses" method="GET">
           <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+          <input type="hidden" name="category" value="<?= htmlspecialchars((string)$cat_id) ?>">
+
+          <!-- How you learn -->
+          <div class="filter-section">
+            <span class="filter-label">How you learn</span>
+            <div class="filter-radio">
+              <?php foreach(['all'=>'Any track','self_paced'=>'Self-paced','structured'=>'Structured (weekly)','tutorial'=>'Free tutorials'] as $val=>$lbl): ?>
+              <label class="radio-item">
+                <input type="radio" name="mode" value="<?= $val ?>" <?= $mode_f === $val ? 'checked' : '' ?> onchange="document.getElementById('filterForm').submit()">
+                <?= $lbl ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <!-- Price -->
+          <div class="filter-section">
+            <span class="filter-label">Price</span>
+            <div class="filter-radio">
+              <?php foreach(['all'=>'All','free'=>'Free','paid'=>'Paid'] as $val=>$lbl): ?>
+              <label class="radio-item">
+                <input type="radio" name="price" value="<?= $val ?>" <?= $price_f === $val ? 'checked' : '' ?> onchange="document.getElementById('filterForm').submit()">
+                <?= $lbl ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
 
           <!-- Level -->
           <div class="filter-section">
@@ -398,12 +445,12 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
           <!-- Categories -->
           <div class="filter-section">
             <span class="filter-label">Category</span>
-            <a href="courses.php?level=<?= $level ?>&search=<?= urlencode($search) ?>" class="cat-item <?= $cat_id === 'all' ? 'active' : '' ?>">
+            <a href="courses?level=<?= urlencode($level) ?>&mode=<?= $mode_f ?>&price=<?= $price_f ?>&search=<?= urlencode($search) ?>" class="cat-item <?= $cat_id === 'all' ? 'active' : '' ?>">
               <span><i class="fas fa-th-large" style="margin-right:8px;font-size:0.8rem;opacity:0.5;"></i>All Programs</span>
               <span class="cat-count"><?= number_format($total_published) ?></span>
             </a>
             <?php foreach($categories as $cat): ?>
-            <a href="courses.php?category=<?= $cat['id'] ?>&level=<?= $level ?>&search=<?= urlencode($search) ?>" class="cat-item <?= $cat_id == $cat['id'] ? 'active' : '' ?>">
+            <a href="courses?category=<?= $cat['id'] ?>&level=<?= urlencode($level) ?>&mode=<?= $mode_f ?>&price=<?= $price_f ?>&search=<?= urlencode($search) ?>" class="cat-item <?= $cat_id == $cat['id'] ? 'active' : '' ?>">
               <span><?= htmlspecialchars($cat['name']) ?></span>
               <span class="cat-count"><?= $cat_counts[$cat['id']] ?? 0 ?></span>
             </a>
@@ -421,7 +468,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
             </select>
           </div>
 
-          <button type="button" class="btn-clear" onclick="window.location.href='courses.php'">
+          <button type="button" class="btn-clear" onclick="window.location.href='courses'">
             <i class="fas fa-redo-alt"></i> Reset All Filters
           </button>
         </form>
@@ -436,7 +483,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
           <button class="mobile-filter-btn" id="mobileFilterBtn">
             <i class="fas fa-sliders-h" style="color:#00BFFF;"></i>
             Filter & Sort
-            <?php if($cat_id!=='all'||$level!=='all'): ?>
+            <?php if($cat_id!=='all'||$level!=='all'||$mode_f!=='all'||$price_f!=='all'): ?>
               <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#00BFFF;color:#fff;border-radius:50%;font-size:0.7rem;font-weight:800;">!</span>
             <?php endif; ?>
           </button>
@@ -447,7 +494,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
         </div>
         <div class="desktop-sort" style="display:flex;align-items:center;gap:10px;">
           <label style="font-size:0.82rem;color:#94a3b8;font-weight:600;white-space:nowrap;">Sort by:</label>
-          <select class="sort-select" onchange="window.location.href='courses.php?category=<?= $cat_id ?>&level=<?= $level ?>&search=<?= urlencode($search) ?>&sort='+this.value">
+          <select class="sort-select" onchange="window.location.href='courses?category=<?= urlencode((string)$cat_id) ?>&level=<?= urlencode($level) ?>&mode=<?= $mode_f ?>&price=<?= $price_f ?>&search=<?= urlencode($search) ?>&sort='+this.value">
             <option value="newest"    <?= $sort==='newest'    ?'selected':'' ?>>Newest</option>
             <option value="price_asc" <?= $sort==='price_asc' ?'selected':'' ?>>Price ↑</option>
             <option value="price_desc"<?= $sort==='price_desc'?'selected':'' ?>>Price ↓</option>
@@ -480,19 +527,25 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
                 <?= htmlspecialchars($c['tutor_name']) ?>
               </div>
               <div class="c-stats">
-                <span><i class="fas fa-star" style="color:#f59e0b;"></i> 4.9</span>
-                <span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= rand(200,900) ?></span>
-                <span><i class="fas fa-clock" style="color:#94a3b8;"></i> <?= $c['duration_hours'] ?? rand(8,40) ?>h</span>
+                <?php if ((float)$c['avg_rating'] > 0): ?><span><i class="fas fa-star" style="color:#f59e0b;"></i> <?= number_format((float)$c['avg_rating'], 1) ?></span><?php endif; ?>
+                <span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= (int)$c['enrolled_count'] ?></span>
+                <?php if ((float)$c['duration_hours'] > 0): ?><span><i class="fas fa-clock" style="color:#94a3b8;"></i> <?= (float)$c['duration_hours'] ?>h</span><?php endif; ?>
                 <span><i class="fas fa-award" style="color:#10b981;"></i> Certified</span>
               </div>
+              <div class="c-tracks">
+                <?php foreach (course_modes($c) as $m): ?><span class="c-track <?= $m === 'structured' ? 'struct' : 'self' ?>"><?= e(mode_label($m)) ?></span><?php endforeach; ?>
+                <?php if ($c['is_open_tutorial']): ?><a class="c-track free" href="learn?course=<?= (int)$c['id'] ?>">Read free</a><?php endif; ?>
+                <?php if (!$c['is_open_tutorial'] && course_from_price($c) <= 0): $cf = certificate_fee_for($c); ?><span class="c-track cert" title="Learning is free. The certificate is unlocked after you complete the course."><?= $cf > 0 ? 'Certificate ' . e(money($cf)) : 'Free certificate' ?></span><?php endif; ?>
+              </div>
               <div class="c-footer">
-                <span class="c-price">KES <?= number_format($c['price']) ?></span>
+                <?php $from = course_from_price($c); $modes_c = course_modes($c); ?>
+                <span class="c-price"><?php if ($from <= 0): ?>Free<?php else: ?><?= count($modes_c) > 1 && course_price($c, $modes_c[0]) != course_price($c, $modes_c[1]) ? '<small style="font-size:.7em;font-weight:600;color:#94a3b8">from</small> ' : '' ?><?= e(money($from)) ?><?php if (sale_active($c)): ?> <s style="font-size:.7em;color:#94a3b8;font-weight:600"><?= e(money((float)$c['price'])) ?></s><?php endif; ?><?php endif; ?></span>
                 <?php if(in_array($c['id'], $enrolled_ids)): ?>
-                  <a href="student/classroom.php?id=<?= $c['id'] ?>" class="btn-enroll" style="background: var(--secondary); border-color: var(--secondary);">
+                  <a href="student/classroom?id=<?= $c['id'] ?>" class="btn-enroll" style="background: var(--secondary); border-color: var(--secondary);">
                     Resume Learning <i class="fas fa-play-circle" style="margin-left:5px;"></i>
                   </a>
                 <?php else: ?>
-                  <a href="course-details.php?id=<?= $c['id'] ?>" class="btn-enroll">
+                  <a href="course-details?id=<?= $c['id'] ?>" class="btn-enroll">
                     Enroll Now <i class="fas fa-arrow-right"></i>
                   </a>
                 <?php endif; ?>
@@ -505,7 +558,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
             <i class="fas fa-search" style="font-size:3rem;color:#E2E8F0;margin-bottom:20px;display:block;"></i>
             <h3 style="color:#64748B;margin-bottom:10px;">No Courses Found</h3>
             <p style="color:#94a3b8;font-size:0.9rem;max-width:340px;margin:0 auto 28px;">Try adjusting your search terms or clearing some filters.</p>
-            <a href="courses.php" class="btn-enroll">View All Courses</a>
+            <a href="courses" class="btn-enroll">View All Courses</a>
           </div>
         <?php endif; ?>
       </div>
@@ -532,8 +585,27 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
     <button onclick="closeDrawer()" style="border:none;background:none;font-size:1.4rem;color:#94a3b8;cursor:pointer;"><i class="fas fa-times"></i></button>
   </div>
 
-  <form action="courses.php" method="GET" id="drawerForm">
+  <form action="courses" method="GET" id="drawerForm">
     <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+    <input type="hidden" name="category" value="<?= htmlspecialchars((string)$cat_id) ?>">
+
+    <div class="filter-section">
+      <span class="filter-label">How you learn</span>
+      <div class="filter-radio">
+        <?php foreach(['all'=>'Any track','self_paced'=>'Self-paced','structured'=>'Structured (weekly)','tutorial'=>'Free tutorials'] as $val=>$lbl): ?>
+        <label class="radio-item"><input type="radio" name="mode" value="<?= $val ?>" <?= $mode_f === $val ? 'checked' : '' ?>> <?= $lbl ?></label>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <span class="filter-label">Price</span>
+      <div class="filter-radio">
+        <?php foreach(['all'=>'All','free'=>'Free','paid'=>'Paid'] as $val=>$lbl): ?>
+        <label class="radio-item"><input type="radio" name="price" value="<?= $val ?>" <?= $price_f === $val ? 'checked' : '' ?>> <?= $lbl ?></label>
+        <?php endforeach; ?>
+      </div>
+    </div>
 
     <div class="filter-section">
       <span class="filter-label">Sort By</span>
@@ -575,7 +647,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
     </div>
 
     <div style="display:flex;gap:12px;margin-top:8px;">
-      <button type="button" class="btn-clear" onclick="window.location.href='courses.php'" style="flex:1;">Reset</button>
+      <button type="button" class="btn-clear" onclick="window.location.href='courses'" style="flex:1;">Reset</button>
       <button type="submit" class="btn-enroll" style="flex:2;justify-content:center;border-radius:12px;font-size:0.95rem;padding:14px;">
         Apply Filters <i class="fas fa-check"></i>
       </button>

@@ -4,7 +4,7 @@ require_once 'includes/auth.php';
 
 // Must be logged in at all to use this file
 if (!isLoggedIn()) {
-    header("Location: login.php");
+    header("Location: login");
     exit;
 }
 

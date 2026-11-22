@@ -4,6 +4,7 @@
  */
 require_once 'includes/db.php';
 require_once 'includes/paystack.php';
+require_once 'includes/learning.php';
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') exit;
@@ -43,17 +44,28 @@ if ($event->event === 'charge.success') {
         $pdo->beginTransaction();
         
         if ($type === 'course' && $item_id) {
-            // Record the payment
-            $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at) VALUES (?, ?, ?, 'verified', ?, ?, 'course', NOW())");
-            $stmt->execute([$user_id, $item_id, $amount, "Paystack Webhook Ref: " . $reference, $reference]);
-            
-            // Enroll the student
-            $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active') ON DUPLICATE KEY UPDATE status = 'active'");
-            $stmt->execute([$user_id, $item_id]);
-            
-            // Update course enrollment count
-            $stmt = $pdo->prepare("UPDATE courses SET enrolled_count = enrolled_count + 1 WHERE id = ?");
-            $stmt->execute([$item_id]);
+            $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+            $stmt->execute([(int)$item_id]);
+            $course = $stmt->fetch();
+            if ($course) {
+                [$mode, $cohort_id] = resolve_mode_choice($pdo, $course, $metadata->learning_mode ?? null, $metadata->cohort_id ?? null);
+                $due = amount_due($course, $mode, get_enrollment($pdo, (int)$user_id, (int)$item_id));
+                $ok = $amount + 0.001 >= $due;
+                $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at, learning_mode, cohort_id) VALUES (?, ?, ?, ?, ?, ?, 'course', IF(? = 'verified', NOW(), NULL), ?, ?)");
+                $status = $ok ? 'verified' : 'pending';
+                $stmt->execute([$user_id, $item_id, $amount, $status, "Paystack Webhook Ref: " . $reference . ($ok ? '' : " – paid $amount, due $due; needs review"), $reference, $status, $mode, $cohort_id]);
+                if ($ok) enroll_student($pdo, (int)$user_id, $course, $mode, $cohort_id, $amount);
+            }
+        } elseif ($type === 'certificate' && $item_id) {
+            require_once 'includes/progress.php';
+            $cs = $pdo->prepare("SELECT * FROM certificates WHERE id = ? AND student_id = ?");
+            $cs->execute([(int)$item_id, $user_id]);
+            if ($cert = $cs->fetch()) {
+                $ok = $amount + 0.001 >= (float)$cert['fee'];
+                $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, certificate_id, verified_at) VALUES (?, ?, ?, ?, ?, ?, 'certificate', ?, IF(? = 'verified', NOW(), NULL))")
+                    ->execute([$user_id, $cert['course_id'], $amount, $ok ? 'verified' : 'pending', "Certificate fee – Paystack Webhook Ref: " . $reference, $reference, $cert['id'], $ok ? 'verified' : 'pending']);
+                if ($ok) unlock_certificate($pdo, (int)$cert['id'], $amount);
+            }
         } elseif ($type === 'registration') {
             // Record the payment
             $stmt = $pdo->prepare("INSERT INTO payments (student_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at) VALUES (?, ?, 'verified', ?, ?, 'registration', NOW())");

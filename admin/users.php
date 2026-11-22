@@ -109,7 +109,7 @@ try {
         </div>
         
         <div style="display: flex; gap: 16px;">
-            <form action="users.php" method="GET" class="header-search" style="display: flex; gap: 10px;">
+            <form action="users" method="GET" class="header-search" style="display: flex; gap: 10px;">
                 <input type="hidden" name="role" value="<?= htmlspecialchars($role_filter) ?>">
                 <input type="hidden" name="status" value="<?= htmlspecialchars($status_filter) ?>">
                 <input type="text" name="search" placeholder="Search Identity..." value="<?= htmlspecialchars($search) ?>" style="padding-right: 48px;">
@@ -147,14 +147,14 @@ try {
         <div class="premium-card glass-effect" style="padding: 20px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-right: 12px;">Governance Tier:</span>
-                <a href="users.php?role=all&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'all' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'all' ? 'white' : '#64748b' ?>;">ALL</a>
-                <a href="users.php?role=student&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'student' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'student' ? 'white' : '#64748b' ?>;">SCHOLARS</a>
-                <a href="users.php?role=tutor&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'tutor' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'tutor' ? 'white' : '#64748b' ?>;">FACULTY</a>
+                <a href="users?role=all&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'all' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'all' ? 'white' : '#64748b' ?>;">ALL</a>
+                <a href="users?role=student&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'student' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'student' ? 'white' : '#64748b' ?>;">SCHOLARS</a>
+                <a href="users?role=tutor&status=<?= $status_filter ?>&search=<?= urlencode($search) ?>" style="text-decoration:none; padding: 8px 16px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; background: <?= $role_filter == 'tutor' ? 'var(--grad-primary)' : '#f1f5f9' ?>; color: <?= $role_filter == 'tutor' ? 'white' : '#64748b' ?>;">FACULTY</a>
             </div>
             
             <div style="display: flex; gap: 16px; align-items: center;">
                 <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Security Status:</span>
-                <select onchange="location.href='users.php?role=<?= $role_filter ?>&search=<?= urlencode($search) ?>&status=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
+                <select onchange="location.href='users?role=<?= $role_filter ?>&search=<?= urlencode($search) ?>&status=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
                     <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Statuses</option>
                     <option value="active" <?= $status_filter == 'active' ? 'selected' : '' ?>>Active Access</option>
                     <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending Review</option>
@@ -212,17 +212,17 @@ try {
                             <td>
                                 <div style="display: flex; gap: 8px; justify-content: flex-end;">
                                     <?php if($u['status'] == 'pending'): ?>
-                                        <a href="users.php?action=approve&uid=<?= $u['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.1); color: var(--success); border: none; text-decoration: none;" title="Approve"><i class="fas fa-check" style="font-size: 0.8rem;"></i></a>
+                                        <a href="users?action=approve&uid=<?= $u['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.1); color: var(--success); border: none; text-decoration: none;" title="Approve"><i class="fas fa-check" style="font-size: 0.8rem;"></i></a>
                                     <?php endif; ?>
                                     
                                     <?php if($u['role'] == 'student'): ?>
-                                        <button onclick="SDA.confirmAction('Upgrade this scholar to Faculty status?', () => window.location.href='users.php?action=make_tutor&uid=<?= $u['id'] ?>')" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(0, 174, 239, 0.1); color: var(--primary); border: none; cursor: pointer;" title="Promote"><i class="fas fa-chalkboard-teacher" style="font-size: 0.8rem;"></i></button>
+                                        <button onclick="SDA.confirmAction('Upgrade this scholar to Faculty status?', () => window.location.href='users?action=make_tutor&uid=<?= $u['id'] ?>')" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(0, 174, 239, 0.1); color: var(--primary); border: none; cursor: pointer;" title="Promote"><i class="fas fa-chalkboard-teacher" style="font-size: 0.8rem;"></i></button>
                                     <?php endif; ?>
                                     
-                                    <a href="user-profile.php?id=<?= $u['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--text-dim); text-decoration: none;" title="View"><i class="fas fa-user-shield" style="font-size: 0.8rem;"></i></a>
+                                    <a href="user-profile?id=<?= $u['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--text-dim); text-decoration: none;" title="View"><i class="fas fa-user-shield" style="font-size: 0.8rem;"></i></a>
                                     
                                     <?php if($u['role'] != 'admin'): ?>
-                                        <button onclick="SDA.confirmAction('Permanently purge this record?', () => window.location.href='users.php?action=delete&uid=<?= $u['id'] ?>')" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: none; cursor: pointer;" title="Purge"><i class="fas fa-trash-alt" style="font-size: 0.8rem;"></i></button>
+                                        <button onclick="SDA.confirmAction('Permanently purge this record?', () => window.location.href='users?action=delete&uid=<?= $u['id'] ?>')" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: none; cursor: pointer;" title="Purge"><i class="fas fa-trash-alt" style="font-size: 0.8rem;"></i></button>
                                     <?php endif; ?>
                                 </div>
                             </td>

@@ -1,0 +1,17 @@
+{
+  "type": "course",
+  "title": "Virtual Assistant Skills",
+  "short": "Virtual Assistant",
+  "description": "For school leavers who are organised and want to support busy business owners online. You will learn the everyday work of a virtual assistant – email, calendars, Google Workspace, data entry, research and simple tools like Trello and Canva – and how to find your first clients.",
+  "category": "Business",
+  "level": "beginner",
+  "order": 6,
+  "outcomes": [
+    "Explain what virtual assistants do and which services you can offer",
+    "Organise an inbox and manage a calendar using Gmail and Google Calendar",
+    "Schedule meetings correctly across time zones",
+    "Do accurate data entry and online research in Google Sheets and Docs",
+    "Use Trello and Canva for simple tasks clients often need",
+    "Communicate professionally and find your first VA clients"
+  ]
+}

@@ -2,7 +2,7 @@
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-if (!isLoggedIn()) { header('Location: index.php'); exit; }
+if (!isLoggedIn()) { header('Location: ./'); exit; }
 
 $student = currentUser();
 
@@ -15,12 +15,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assignment_id'])) {
     $allowed = ['pdf', 'doc', 'docx', 'zip', 'rar', 'jpg', 'png'];
     
     if ($file['error'] !== 0) {
-        header('Location: assignments.php?msg=upload_error');
+        header('Location: assignments?msg=upload_error');
         exit;
     }
 
     if (!in_array($ext, $allowed)) {
-        header('Location: assignments.php?msg=invalid_file_type');
+        header('Location: assignments?msg=invalid_file_type');
         exit;
     }
 
@@ -44,12 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assignment_id'])) {
                 $stmt->execute(["New Assignment Submission", "A student has submitted work for one of your assignments.", $tutor_id]);
             }
             
-            header('Location: assignments.php?msg=success');
-        } catch (Exception $e) { error_log($e->getMessage()); header('Location: assignments.php?msg=db_error'); }
+            header('Location: assignments?msg=success');
+        } catch (Exception $e) { error_log($e->getMessage()); header('Location: assignments?msg=db_error'); }
     } else {
-        header('Location: assignments.php?msg=upload_failed');
+        header('Location: assignments?msg=upload_failed');
     }
 } else {
-    header('Location: assignments.php');
+    header('Location: assignments');
 }
 ?>

@@ -97,7 +97,7 @@ a{display:inline-block;margin-top:24px;background:#00AEEF;color:#fff;padding:12p
         <li><?= $item ?></li>
         <?php endforeach; ?>
     </ul>
-    <a href="/Skope Digital Academy/admin/certificates.php">Admin Certificates →</a>
-    <a href="/Skope Digital Academy/tutor/students.php" class="a2">Tutor Students →</a>
+    <a href="/Skope Digital Academy/admin/certificates">Admin Certificates →</a>
+    <a href="/Skope Digital Academy/tutor/students" class="a2">Tutor Students →</a>
 </div>
 </body></html>

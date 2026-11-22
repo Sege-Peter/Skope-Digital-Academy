@@ -4,7 +4,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="dashSidebar">
     <div class="sidebar-header" style="position: relative;">
-        <a href="../index.php" class="navbar-logo">
+        <a href="../" class="navbar-logo">
             <img src="../assets/images/Skope Digital  logo.png" alt="Logo" class="logo-img" style="height: 40px;">
         </a>
         <!-- Integrated Focused-Mode Logic (Desktop + Mobile) -->
@@ -64,53 +64,65 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <nav class="sidebar-menu" style="flex: 1; padding: 12px;">
         <div class="menu-label">Main Console</div>
-        <a href="index.php" class="menu-item <?= $current_page == 'index.php' ? 'active' : '' ?>">
+        <a href="./" class="menu-item <?= $current_page == 'index.php' ? 'active' : '' ?>">
             <i class="fas fa-home"></i>
             <span>Overview</span>
         </a>
-        <a href="courses.php" class="menu-item <?= $current_page == 'courses.php' ? 'active' : '' ?>">
+        <a href="courses" class="menu-item <?= $current_page == 'courses.php' ? 'active' : '' ?>">
             <i class="fas fa-graduation-cap"></i>
             <span>Learning Path</span>
         </a>
+        <a href="../courses" class="menu-item">
+            <i class="fas fa-compass"></i>
+            <span>Explore Courses</span>
+        </a>
+        <a href="../learn" class="menu-item">
+            <i class="fas fa-book-open"></i>
+            <span>Free Tutorials</span>
+        </a>
         
         <div class="menu-label">Evaluation</div>
-        <a href="quizzes.php" class="menu-item <?= in_array($current_page, ['quizzes.php', 'take-quiz.php']) ? 'active' : '' ?>">
+        <a href="quizzes" class="menu-item <?= in_array($current_page, ['quizzes.php', 'take-quiz.php']) ? 'active' : '' ?>">
             <i class="fas fa-brain"></i>
             <span>Challenges</span>
         </a>
-        <a href="assignments.php" class="menu-item <?= $current_page == 'assignments.php' ? 'active' : '' ?>">
+        <a href="assignments" class="menu-item <?= $current_page == 'assignments.php' ? 'active' : '' ?>">
             <i class="fas fa-clipboard-check"></i>
             <span>Assignments</span>
         </a>
 
         <div class="menu-label">Network Hub</div>
-        <a href="leaderboard.php" class="menu-item <?= $current_page == 'leaderboard.php' ? 'active' : '' ?>">
+        <a href="achievements" class="menu-item <?= $current_page == 'achievements.php' ? 'active' : '' ?>">
+            <i class="fas fa-trophy"></i>
+            <span>Achievements</span>
+        </a>
+        <a href="leaderboard" class="menu-item <?= $current_page == 'leaderboard.php' ? 'active' : '' ?>">
             <i class="fas fa-star"></i>
             <span>Leaderboard</span>
         </a>
-        <a href="referral.php" class="menu-item <?= $current_page == 'referral.php' ? 'active' : '' ?>">
+        <a href="referral" class="menu-item <?= $current_page == 'referral.php' ? 'active' : '' ?>">
             <i class="fas fa-network-wired"></i>
             <span>Network Growth</span>
         </a>
-        <a href="mentor.php" class="menu-item <?= $current_page == 'mentor.php' ? 'active' : '' ?>">
+        <a href="mentor" class="menu-item <?= $current_page == 'mentor.php' ? 'active' : '' ?>">
             <i class="fas fa-microchip"></i>
             <span>AI Mentor</span>
         </a>
-        <a href="community.php" class="menu-item <?= $current_page == 'community.php' ? 'active' : '' ?>">
+        <a href="community" class="menu-item <?= $current_page == 'community.php' ? 'active' : '' ?>">
             <i class="fas fa-users-viewfinder"></i>
             <span>Community</span>
         </a>
 
         <div class="menu-label">Personalization</div>
-        <a href="transcript.php" class="menu-item <?= $current_page == 'transcript.php' ? 'active' : '' ?>">
+        <a href="transcript" class="menu-item <?= $current_page == 'transcript.php' ? 'active' : '' ?>">
             <i class="fas fa-file-contract"></i>
             <span>Academic Record</span>
         </a>
-        <a href="profile.php" class="menu-item <?= $current_page == 'profile.php' ? 'active' : '' ?>">
+        <a href="profile" class="menu-item <?= $current_page == 'profile.php' ? 'active' : '' ?>">
             <i class="fas fa-user-circle"></i>
             <span>Account Setting</span>
         </a>
-        <a href="../logout.php" class="menu-item" style="color: #ef4444; margin-top: 12px; border: 1px solid transparent;">
+        <a href="../logout" class="menu-item" style="color: #ef4444; margin-top: 12px; border: 1px solid transparent;">
             <i class="fas fa-power-off"></i>
             <span>Secure Logout</span>
         </a>

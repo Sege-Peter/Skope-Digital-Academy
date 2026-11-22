@@ -32,7 +32,7 @@ try {
         }
         
         // Prevent re-submission
-        header("Location: index.php");
+        header("Location: ./");
         exit;
     }
 
@@ -67,7 +67,7 @@ try {
     $new_assignments = $stmt->fetchAll();
 
     // 4. Notifications (Live Pulse)
-    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE target_user_id = ? ORDER BY created_at DESC LIMIT 5");
     $stmt->execute([$student['id']]);
     $live_notifications = $stmt->fetchAll();
 
@@ -77,7 +77,7 @@ try {
     // Dynamic Referral URL Base
     $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http");
     $baseUrl = $protocol . "://" . $_SERVER['HTTP_HOST'] . str_replace('index.php', '', $_SERVER['PHP_SELF']);
-    $referralLink = str_replace('student/', '', $baseUrl) . "register.php?ref=" . $student['referral_code'];
+    $referralLink = str_replace('student/', '', $baseUrl) . "register?ref=" . $student['referral_code'];
 
 } catch (Exception $e) { 
     error_log($e->getMessage());
@@ -124,7 +124,7 @@ require_once 'includes/layout-top.php';
             <h3 style="margin: 0; font-weight: 950; font-size: 1.8rem; letter-spacing: -1px; color: var(--text-main);">My Active Paths<span style="color: var(--primary);">.</span></h3>
             <p style="margin: 8px 0 0; color: var(--text-dim); font-size: 0.9rem; font-weight: 500;">Your high-performance curriculum dashboard.</p>
         </div>
-        <a href="courses.php" class="btn-action" style="color: var(--primary); background: rgba(0, 174, 239, 0.08); font-weight: 800; border-radius: 50px; padding: 12px 24px; text-decoration: none;">View Roadmap</a>
+        <a href="courses" class="btn-action" style="color: var(--primary); background: rgba(0, 174, 239, 0.08); font-weight: 800; border-radius: 50px; padding: 12px 24px; text-decoration: none;">View Roadmap</a>
     </div>
 
     <?php if(empty($my_courses)): ?>
@@ -132,7 +132,7 @@ require_once 'includes/layout-top.php';
         <div style="width: 100px; height: 100px; background: #f8fafc; border-radius: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 32px; font-size: 2.8rem; color: var(--primary); box-shadow: inset 0 4px 10px rgba(0,0,0,0.03);"><i class="fas fa-graduation-cap"></i></div>
         <h4 style="margin: 0 0 12px; font-weight: 950; font-size: 1.5rem; letter-spacing: -0.5px;">No Active Enrollment</h4>
         <p style="color: var(--text-dim); font-size: 1rem; margin: 0 0 32px; max-width: 440px; line-height: 1.6;">Your journey to digital excellence starts here. Explore our elite courses and pick your path today.</p>
-        <a href="../courses.php" class="btn-premium" style="min-width: 240px;">EXPLORE CATALOGUE</a>
+        <a href="../courses" class="btn-premium" style="min-width: 240px;">EXPLORE CATALOGUE</a>
     </div>
     <?php else: ?>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 32px;">
@@ -140,7 +140,7 @@ require_once 'includes/layout-top.php';
                 $progress = isset($c['progress_percent']) ? round($c['progress_percent']) : 0;
                 $isFallback = isset($c['is_fallback']);
             ?>
-            <div class="course-card-premium" onclick="window.location.href='classroom.php?id=<?= $c['course_id'] ?>'" style="cursor: pointer;">
+            <div class="course-card-premium" onclick="window.location.href='classroom?id=<?= $c['course_id'] ?>'" style="cursor: pointer;">
                 <div style="height: 200px; position: relative; overflow: hidden;">
                     <img src="../uploads/courses/<?= htmlspecialchars($c['thumbnail'] ?: 'course-default.jpg') ?>" style="width: 100%; height: 100%; object-fit: cover;">
                     <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(15, 23, 42, 0.9) 100%);"></div>
@@ -258,7 +258,7 @@ require_once 'includes/layout-top.php';
                     <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($t['title']) ?></h5>
                     <p style="margin: 2px 0 0; font-size: 0.75rem; color: var(--text-dim); font-weight: 500;"><?= htmlspecialchars($t['course_name']) ?></p>
                 </div>
-                <a href="take-quiz.php?id=<?= $t['id'] ?>" class="btn-premium" style="padding: 10px 20px; font-size: 0.75rem; border-radius: 12px; box-shadow: none;">Attempt</a>
+                <a href="take-quiz?id=<?= $t['id'] ?>" class="btn-premium" style="padding: 10px 20px; font-size: 0.75rem; border-radius: 12px; box-shadow: none;">Attempt</a>
             </div>
         <?php endforeach; endif; ?>
     </div>
@@ -287,7 +287,7 @@ require_once 'includes/layout-top.php';
                         </span>
                     </div>
                 </div>
-                <a href="assignments.php" class="btn-action" style="color: <?= $overdue ? '#EF4444' : 'var(--primary)' ?>; background: white; border: 1px solid <?= $overdue ? '#FEE2E2' : 'var(--border)' ?>; font-weight: 800;">Submit</a>
+                <a href="assignments" class="btn-action" style="color: <?= $overdue ? '#EF4444' : 'var(--primary)' ?>; background: white; border: 1px solid <?= $overdue ? '#FEE2E2' : 'var(--border)' ?>; font-weight: 800;">Submit</a>
             </div>
         <?php endforeach; endif; ?>
     </div>
@@ -312,7 +312,7 @@ require_once 'includes/layout-top.php';
                         <span style="margin-left: 8px; color: var(--primary); font-weight: 700;"><?= round($course['progress_percent'] ?? 0) ?>% Path Complete</span>
                     </p>
                 </div>
-                <a href="classroom.php?id=<?= $course['course_id'] ?>" class="btn-action" style="background: var(--primary); color: white;">Open Path</a>
+                <a href="classroom?id=<?= $course['course_id'] ?>" class="btn-action" style="background: var(--primary); color: white;">Open Path</a>
             </div>
         <?php endforeach; endif; ?>
     </div>
@@ -323,7 +323,7 @@ require_once 'includes/layout-top.php';
 <div style="margin-top: 48px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <h3 style="margin: 0; font-weight: 950; font-size: 1.5rem; letter-spacing: -0.5px;">Live Pulse <span style="color: var(--secondary);">.</span></h3>
-        <a href="notifications.php" style="font-size: 0.8rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 6px;">View Full History <i class="fas fa-arrow-right"></i></a>
+        <a href="notifications" style="font-size: 0.8rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 6px;">View Full History <i class="fas fa-arrow-right"></i></a>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">

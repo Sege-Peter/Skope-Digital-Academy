@@ -2,7 +2,7 @@
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
-if (!isLoggedIn()) { header('Location: login.php'); exit; }
+if (!isLoggedIn()) { header('Location: login'); exit; }
 
 $user = currentUser();
 
@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['scholarship_id'])) {
     $stmt = $pdo->prepare("SELECT id FROM scholarship_applications WHERE user_id = ? AND scholarship_id = ?");
     $stmt->execute([$user['id'], $sid]);
     if ($stmt->fetch()) {
-        header('Location: scholarships.php?msg=already_applied');
+        header('Location: scholarships?msg=already_applied');
         exit;
     }
 
@@ -36,15 +36,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['scholarship_id'])) {
     try {
         $stmt = $pdo->prepare("INSERT INTO scholarship_applications (scholarship_id, user_id, sop, academic_background, document_file) VALUES (?, ?, ?, ?, ?)");
         if ($stmt->execute([$sid, $user['id'], $sop, $background, $filename])) {
-            header('Location: scholarships.php?msg=success');
+            header('Location: scholarships?msg=success');
         } else {
-            header('Location: scholarships.php?msg=error');
+            header('Location: scholarships?msg=error');
         }
     } catch (Exception $e) {
         error_log($e->getMessage());
-        header('Location: scholarships.php?msg=error');
+        header('Location: scholarships?msg=error');
     }
 } else {
-    header('Location: scholarships.php');
+    header('Location: scholarships');
 }
 ?>

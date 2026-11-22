@@ -53,7 +53,7 @@ require_once 'includes/layout-top.php';
                     <i class="far fa-calendar-alt"></i> Issued: <?= date('M d, Y', strtotime($c['issued_at'])) ?>
                 </p>
                 <div style="margin-top: auto; display: flex; gap: 12px;">
-                    <a href="view-certificate.php?id=<?= $c['id'] ?>" class="btn-premium" style="flex: 1; justify-content: center; font-size: 0.75rem;">View Online</a>
+                    <a href="view-certificate?id=<?= $c['id'] ?>" class="btn-premium" style="flex: 1; justify-content: center; font-size: 0.75rem;">View Online</a>
                     <a href="#" class="btn-premium" style="background: #F8FAFC; color: var(--text-dim); border: 1px solid var(--border); box-shadow: none; width: 44px; display: flex; justify-content: center;" onclick="alert('Download started...')"><i class="fas fa-download"></i></a>
                 </div>
             </div>
@@ -65,7 +65,7 @@ require_once 'includes/layout-top.php';
             <i class="fas fa-award" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 20px; display: block;"></i>
             <h3 style="font-weight: 800;">No Certificates Earned Yet</h3>
             <p style="color: var(--text-dim); margin-bottom: 20px;">Complete your curriculum milestones to unlock your official diploma.</p>
-            <a href="courses.php" class="btn-premium">Continue Learning</a>
+            <a href="courses" class="btn-premium">Continue Learning</a>
         </div>
     <?php endif; ?>
 </div>

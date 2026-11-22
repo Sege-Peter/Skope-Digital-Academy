@@ -19,7 +19,7 @@ if (empty($token)) {
     try {
         // Find valid token
         $stmt = $pdo->prepare("SELECT email FROM password_resets WHERE token = ? AND expires_at > NOW() LIMIT 1");
-        $stmt->execute([$token]);
+        $stmt->execute([hash('sha256', $token)]);
         $reset_record = $stmt->fetch();
 
         if ($reset_record) {
@@ -29,7 +29,7 @@ if (empty($token)) {
             $error = "This password reset token is invalid or has expired. Please request a new one.";
         }
     } catch (Exception $e) {
-        $error = "Database error verifying token.";
+        $error = "We couldn't check that link. Please try again.";
         error_log($e->getMessage());
     }
 }
@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
                 // Delete token
                 $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
 
-                header("Location: login.php?msg=pw_updated");
+                header("Location: login?msg=pw_updated");
                 exit;
             } catch (Exception $e) {
                 $error = 'Something went wrong updating your password.';
@@ -72,198 +72,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Set New Password – Skope Digital Academy</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="referrer" content="no-referrer">
+    <title>Choose a New Password – Skope Digital Academy</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/auth.css?v=3">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
-    <style>
-        :root {
-            --base: #f8fafc;
-            --primary-btn: #0f172a;
-            --primary-btn-hover: #1e293b;
-            --text-main: #0f172a;
-            --text-dim: #64748b;
-        }
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--base);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: var(--text-main);
-        }
-
-        .auth-card {
-            width: 100%;
-            max-width: 440px;
-            background: white;
-            border-radius: 24px;
-            padding: 40px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
-            text-align: center;
-        }
-
-        .icon-shield {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 24px;
-            background: #f1f5f9;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: #10b981;
-        }
-
-        h1 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.6rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
-        }
-
-        p.subtitle {
-            font-size: 0.9rem;
-            color: var(--text-dim);
-            margin-bottom: 30px;
-            line-height: 1.5;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .input-group label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: #475569;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-        }
-
-        .input-neu {
-            width: 100%;
-            height: 54px;
-            background: #f8fafc;
-            border: 1.5px solid #e2e8f0;
-            outline: none;
-            border-radius: 14px;
-            padding: 0 45px 0 20px;
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            transition: 0.3s;
-        }
-
-        .input-neu:focus {
-            background: white;
-            border-color: #0ea5e9;
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
-        }
-
-        .input-group i.fa-lock {
-            position: absolute;
-            right: 18px;
-            top: 42px;
-            color: #94a3b8;
-        }
-
-        .btn-update {
-            width: 100%;
-            height: 56px;
-            background: var(--primary-btn);
-            color: white;
-            border: none;
-            border-radius: 14px;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 800;
-            font-size: 1rem;
-            margin-top: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .btn-update:hover {
-            background: var(--primary-btn-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
-        }
-
-        #error-msg {
-            background: #fee2e2;
-            color: #b91c1c;
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-            border: 1px solid #fecaca;
-        }
-
-        .back-home { margin-top: 25px; font-size: 0.85rem; font-weight: 800; }
-        .back-home a { color: var(--text-dim); text-decoration: none; transition: 0.3s; }
-        .back-home a:hover { color: #0284c7; }
-    </style>
 </head>
 <body>
-
-    <div class="auth-card">
-        <div class="icon-shield">
-            <i class="fas fa-unlock-alt"></i>
+<div class="auth">
+    <aside class="auth-brand">
+        <a class="auth-logo" href="./">
+            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
+        </a>
+        <div class="auth-pitch">
+            <h1>Almost there.<br><span>Choose a new password.</span></h1>
+            <p>Pick something you haven't used here before. You'll sign in with it straight after.</p>
+            <ul class="auth-points">
+                <li><i class="fas fa-ruler-horizontal"></i><div><strong>At least 8 characters</strong><span>Longer is stronger. A short sentence works well.</span></div></li>
+                <li><i class="fas fa-shuffle"></i><div><strong>Mix it up</strong><span>Combine upper and lower case letters, numbers and symbols.</span></div></li>
+                <li><i class="fas fa-user-shield"></i><div><strong>Keep it to yourself</strong><span>Skope staff will never ask for your password.</span></div></li>
+            </ul>
         </div>
-        
-        <h1>Set New Password</h1>
-        
-        <?php if ($error): ?>
-            <div id="error-msg"><i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error) ?></div>
-            <?php if (!$valid_token): ?>
-                <div class="back-home">
-                    <a href="forgot-password.php">Request new link <i class="fas fa-arrow-right"></i></a>
-                </div>
+    </aside>
+
+    <main class="auth-main">
+        <div class="auth-card">
+        <?php if (!$valid_token): ?>
+            <div class="done">
+                <div class="auth-icon" style="color:#b45309;background:#fffbeb"><i class="fas fa-link-slash"></i></div>
+                <h2>This link has expired</h2>
+                <p><?= htmlspecialchars($error ?: 'This password reset link is no longer valid.') ?> Reset links work once and expire after 1 hour.</p>
+                <a class="submit" href="forgot-password"><i class="fas fa-paper-plane"></i> Send a new link</a>
+                <div class="auth-foot"><a href="login"><i class="fas fa-arrow-left"></i> Back to sign in</a></div>
+            </div>
+        <?php else: ?>
+            <div class="auth-icon"><i class="fas fa-lock-open"></i></div>
+            <h2>Set a new password</h2>
+            <p>For <strong><?= htmlspecialchars($email) ?></strong></p>
+
+            <?php if ($error): ?>
+                <div class="alert err" role="alert"><i class="fas fa-circle-exclamation"></i><span><?= htmlspecialchars($error) ?></span></div>
             <?php endif; ?>
-        <?php endif; ?>
 
-        <?php if ($valid_token): ?>
-            <p class="subtitle">Securely enter the new password you want to use for your account.</p>
-            <form action="reset-password.php?token=<?= htmlspecialchars($token) ?>" method="POST" id="resetForm">
+            <form action="reset-password?token=<?= htmlspecialchars(urlencode($token)) ?>" method="POST" id="rpForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">
-
-                <div class="input-group">
-                    <label>New Private Password</label>
-                    <input type="password" name="new_password" class="input-neu" placeholder="Enter at least 8 characters" required>
-                    <i class="fas fa-lock"></i>
+                <div class="field">
+                    <div class="field-top"><label for="new_password">New password</label></div>
+                    <div class="control">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="new_password" name="new_password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required autofocus>
+                        <button type="button" class="peek" data-for="new_password" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="meter" id="meter" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                    <div class="hint" id="pwHint">Use 8+ characters with a mix of letters, numbers and symbols.</div>
                 </div>
-
-                <div class="input-group">
-                    <label>Confirm New Password</label>
-                    <input type="password" name="confirm_password" class="input-neu" placeholder="Re-enter password" required>
-                    <i class="fas fa-lock"></i>
+                <div class="field">
+                    <div class="field-top"><label for="confirm_password">Confirm new password</label></div>
+                    <div class="control">
+                        <i class="fas fa-shield-halved"></i>
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Type it again" autocomplete="new-password" required>
+                        <button type="button" class="peek" data-for="confirm_password" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div class="hint" id="matchHint" aria-live="polite"></div>
                 </div>
-
-                <button type="submit" class="btn-update" id="submitBtn">Save New Password</button>
+                <button type="submit" class="submit" id="rpBtn"><i class="fas fa-check"></i> Save new password</button>
             </form>
+            <div class="auth-foot"><a href="login"><i class="fas fa-arrow-left"></i> Back to sign in</a></div>
         <?php endif; ?>
-    </div>
-
-    <script>
-        const form = document.getElementById('resetForm');
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                const btn = document.getElementById('submitBtn');
-                btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...';
-                btn.style.opacity = '0.8';
-            });
-        }
-    </script>
+        </div>
+    </main>
+</div>
+<script>
+(() => {
+    const form = document.getElementById('rpForm');
+    if (!form) return;
+    const pw = document.getElementById('new_password');
+    const cf = document.getElementById('confirm_password');
+    const meter = document.getElementById('meter');
+    const pwHint = document.getElementById('pwHint');
+    const matchHint = document.getElementById('matchHint');
+    document.querySelectorAll('.peek').forEach((b) => b.addEventListener('click', () => {
+        const input = document.getElementById(b.dataset.for);
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        b.innerHTML = '<i class="fas ' + (show ? 'fa-eye-slash' : 'fa-eye') + '"></i>';
+    }));
+    const strength = (v) => {
+        if (!v) return 0;
+        let s = v.length >= 8 ? 1 : 0;
+        if (v.length >= 12) s++;
+        if (/[a-z]/.test(v) && /[A-Z]/.test(v)) s++;
+        if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) s++;
+        return Math.max(1, Math.min(4, s));
+    };
+    const labels = ['', 'Too weak', 'Okay', 'Good', 'Strong'];
+    const check = () => {
+        const s = strength(pw.value);
+        meter.dataset.s = s;
+        if (!pw.value) { pwHint.className = 'hint'; pwHint.textContent = 'Use 8+ characters with a mix of letters, numbers and symbols.'; }
+        else if (pw.value.length < 8) { pwHint.className = 'hint bad'; pwHint.textContent = `${8 - pw.value.length} more character${8 - pw.value.length === 1 ? '' : 's'} needed`; }
+        else { pwHint.className = 'hint ' + (s >= 3 ? 'good' : 'warn'); pwHint.textContent = 'Strength: ' + labels[s]; }
+        if (!cf.value) { matchHint.textContent = ''; cf.classList.remove('bad'); }
+        else if (cf.value === pw.value) { matchHint.className = 'hint good'; matchHint.textContent = '✓ Passwords match'; cf.classList.remove('bad'); }
+        else { matchHint.className = 'hint bad'; matchHint.textContent = 'Passwords don\'t match yet'; cf.classList.add('bad'); }
+    };
+    pw.addEventListener('input', check);
+    cf.addEventListener('input', check);
+    form.addEventListener('submit', (ev) => {
+        cf.setCustomValidity(cf.value && cf.value !== pw.value ? 'Passwords do not match' : '');
+        if (!form.checkValidity()) { ev.preventDefault(); form.reportValidity(); return; }
+        const btn = document.getElementById('rpBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+    });
+})();
+</script>
 </body>
 </html>

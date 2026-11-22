@@ -275,8 +275,8 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
     <h1>Building Kenya's <span>Digital Future</span>,<br>One Learner at a Time.</h1>
     <p>Skope Digital Academy was founded on a single belief: world-class education should be accessible to every ambitious mind in Africa — regardless of background or location.</p>
     <div class="hero-cta-row">
-      <a href="courses.php" class="btn-hero-primary"><i class="fas fa-rocket"></i> Explore Courses</a>
-      <a href="scholarships.php" class="btn-hero-outline"><i class="fas fa-graduation-cap"></i> Get a Scholarship</a>
+      <a href="courses" class="btn-hero-primary"><i class="fas fa-rocket"></i> Explore Courses</a>
+      <a href="scholarships" class="btn-hero-outline"><i class="fas fa-graduation-cap"></i> Get a Scholarship</a>
     </div>
   </div>
 </section>
@@ -411,8 +411,8 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
       <h2>Ready to <span>Transform</span> Your Career?</h2>
       <p>Join <?= number_format($total_students) ?>+ learners already mastering the future of technology with Africa's most innovative learning platform.</p>
       <div class="about-cta-btns">
-        <a href="courses.php" class="btn-cta-w"><i class="fas fa-rocket"></i> Start Learning Free</a>
-        <a href="scholarships.php" class="btn-cta-ow"><i class="fas fa-graduation-cap"></i> Apply for Scholarship</a>
+        <a href="courses" class="btn-cta-w"><i class="fas fa-rocket"></i> Start Learning Free</a>
+        <a href="scholarships" class="btn-cta-ow"><i class="fas fa-graduation-cap"></i> Apply for Scholarship</a>
       </div>
     </div>
   </div>
