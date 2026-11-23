@@ -135,7 +135,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
 .mission-list li i { color: #00BFFF; margin-top: 3px; flex-shrink: 0; }
 
 .image-stack { position: relative; }
-.img-main { width: 100%; border-radius: 28px; box-shadow: 0 24px 52px rgba(0,0,0,0.1); display: block; }
+.img-main { width: 100%; height: auto; aspect-ratio: 1200 / 894; object-fit: cover; border-radius: 28px; box-shadow: 0 24px 52px rgba(0,0,0,0.1); display: block; }
 .img-float {
   position: absolute; bottom: -28px; left: -28px;
   background: #fff; padding: 22px 26px;
@@ -324,12 +324,15 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
       </div>
       <!-- Right: Image -->
       <div class="image-stack" data-aos="fade-left">
-        <img src="assets/images/elearning login bg (1).jpeg" class="img-main" alt="Skope Digital Academy students learning" onerror="this.style.display='none'">
+        <picture>
+          <source srcset="assets/images/about-learner.webp" type="image/webp">
+          <img src="assets/images/about-learner.jpg" class="img-main" width="1200" height="894" loading="lazy" alt="A happy Kenyan learner celebrating at her laptop in a Skope Digital Academy shirt, with the academy logo and the motto Learn Smart. Achieve More.">
+        </picture>
         <div class="img-float">
           <div class="img-float-icon"><i class="fas fa-medal"></i></div>
           <div>
-            <div class="img-float-label">Globally Certified</div>
-            <div class="img-float-sub">Accepted by 200+ employers</div>
+            <div class="img-float-label">Verifiable certificates</div>
+            <div class="img-float-sub">Anyone can check them online</div>
           </div>
         </div>
       </div>
