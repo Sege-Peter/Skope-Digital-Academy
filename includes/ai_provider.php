@@ -116,3 +116,56 @@ function sda_gemini_complete(string $prompt, string $system = '', array $o = [])
     $text = (string)($d['candidates'][0]['content']['parts'][0]['text'] ?? '');
     return ['ok' => trim($text) !== '', 'text' => $text, 'error' => trim($text) === '' ? 'Empty reply.' : ''];
 }
+
+/**
+ * Multi-turn chat. $messages: [['role' => 'user'|'assistant', 'content' => '...'], ...] (oldest first, ends with the user).
+ * Returns the same shape as sda_ai_complete().
+ */
+function sda_ai_chat(array $messages, string $system = '', array $o = []): array
+{
+    $clean = [];
+    foreach ($messages as $m) {
+        $role = ($m['role'] ?? '') === 'assistant' ? 'assistant' : 'user';
+        $text = trim((string)($m['content'] ?? ''));
+        if ($text === '') continue;
+        if ($clean && end($clean)['role'] === $role) { $clean[count($clean) - 1]['content'] .= "\n\n" . $text; continue; }   // keep turns alternating
+        $clean[] = ['role' => $role, 'content' => $text];
+    }
+    while ($clean && $clean[0]['role'] !== 'user') array_shift($clean);
+    if (!$clean || end($clean)['role'] !== 'user') return ['ok' => false, 'text' => '', 'error' => 'Nothing to answer.'];
+
+    if (sda_ai_provider() === 'anthropic') {
+        $key = sda_anthropic_key();
+        if ($key === '') return ['ok' => false, 'text' => '', 'error' => 'No Anthropic API key is set (Admin > Settings > AI).'];
+        $body = ['model' => sda_claude_model(), 'max_tokens' => (int)($o['max_tokens'] ?? 2048), 'messages' => $clean];
+        if ($system !== '') $body['system'] = $system;
+        $ch = curl_init('https://api.anthropic.com/v1/messages');
+        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => (int)($o['timeout'] ?? 90), CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['content-type: application/json', 'x-api-key: ' . $key, 'anthropic-version: ' . SDA_ANTHROPIC_VERSION],
+            CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE)]);
+        $raw = curl_exec($ch); $err = curl_error($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        if ($raw === false || $err !== '') return ['ok' => false, 'text' => '', 'error' => 'Could not reach Anthropic: ' . $err];
+        $d = json_decode((string)$raw, true);
+        if ($code !== 200) { error_log('[claude chat] HTTP ' . $code . ': ' . ($d['error']['message'] ?? '')); return ['ok' => false, 'text' => '', 'error' => $d['error']['message'] ?? ('HTTP ' . $code)]; }
+        if (($d['stop_reason'] ?? '') === 'refusal') return ['ok' => false, 'text' => '', 'error' => 'The request was declined by the model.'];
+        $text = '';
+        foreach ((array)($d['content'] ?? []) as $b) if (($b['type'] ?? '') === 'text') $text .= $b['text'];
+        if (($d['stop_reason'] ?? '') === 'max_tokens') $text .= "\n\n_(Reply cut short – ask me to continue.)_";
+        return ['ok' => trim($text) !== '', 'text' => $text, 'error' => trim($text) === '' ? 'Empty reply.' : ''];
+    }
+
+    if (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') return ['ok' => false, 'text' => '', 'error' => 'No Gemini API key is set (Admin > Settings > AI).'];
+    $payload = ['contents' => array_map(fn($m) => ['role' => $m['role'] === 'assistant' ? 'model' : 'user', 'parts' => [['text' => $m['content']]]], $clean),
+                'generationConfig' => ['maxOutputTokens' => (int)($o['max_tokens'] ?? 2048)]];
+    if ($system !== '') $payload['systemInstruction'] = ['parts' => [['text' => $system]]];
+    $url = str_contains(GEMINI_API_URL, 'key=') ? GEMINI_API_URL : GEMINI_API_URL . '?key=' . GEMINI_API_KEY;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => (int)($o['timeout'] ?? 90),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode($payload)]);
+    $raw = curl_exec($ch); $err = curl_error($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($raw === false || $err !== '') return ['ok' => false, 'text' => '', 'error' => 'Could not reach Gemini: ' . $err];
+    $d = json_decode((string)$raw, true);
+    if ($code !== 200) return ['ok' => false, 'text' => '', 'error' => $d['error']['message'] ?? ('HTTP ' . $code)];
+    $text = (string)($d['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    return ['ok' => trim($text) !== '', 'text' => $text, 'error' => trim($text) === '' ? 'Empty reply.' : ''];
+}

@@ -1,0 +1,45 @@
+/* Admin dropdowns (assets/js/ax-select.js): styled button + option list, follows the admin light/dark theme. */
+.axs { position: relative; width: 100%; }
+.axs-native { position: absolute !important; inset: 0; width: 100% !important; height: 100% !important; opacity: 0 !important; pointer-events: none !important; }
+.axs-btn {
+    width: 100%; min-height: 46px; display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    border: 1.5px solid var(--border, #e2e8f0); border-radius: 12px; background: var(--input-bg, var(--surface, #fff));
+    color: var(--text-main, #0f172a); font: 600 .92rem 'Inter', system-ui, sans-serif; text-align: left; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.axs-btn:hover:not(:disabled) { border-color: var(--text-muted, #94a3b8); }
+.axs-btn:focus-visible, .axs.is-open .axs-btn { outline: none; border-color: var(--primary, #00BFFF); box-shadow: 0 0 0 4px rgba(0, 191, 255, .16); }
+.axs.is-invalid .axs-btn { border-color: var(--danger, #ef4444); box-shadow: 0 0 0 4px rgba(239, 68, 68, .14); }
+.axs-btn:disabled { opacity: .55; cursor: not-allowed; }
+.axs-val { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axs-car { flex: none; font-size: .78rem; color: var(--primary, #00BFFF); transition: transform .2s; }
+.axs.is-open .axs-car { transform: rotate(180deg); }
+
+.axs-list {
+    position: fixed; z-index: 100000; margin: 0; padding: 6px; list-style: none; overflow-y: auto;
+    background: var(--surface, #fff); color: var(--text-main, #0f172a);
+    border: 1px solid var(--border, #e2e8f0); border-radius: 14px;
+    box-shadow: 0 24px 48px -18px rgba(2, 6, 23, .45), 0 2px 6px rgba(2, 6, 23, .08);
+    animation: axsIn .14s ease-out; font-family: 'Inter', system-ui, sans-serif;
+}
+.axs-list.is-up { animation-name: axsUp; }
+@keyframes axsIn { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes axsUp { from { opacity: 0; transform: translateY(4px); } }
+.axs-list[hidden] { display: none; }
+.axs-list li {
+    position: relative; display: grid; gap: 2px; padding: 10px 36px 10px 12px; border-radius: 10px; cursor: pointer;
+    scroll-margin: 6px; transition: background .1s;
+}
+.axs-list li + li { margin-top: 2px; }
+.axs-t { font-weight: 700; font-size: .9rem; line-height: 1.3; }
+.axs-d { font-size: .78rem; color: var(--text-muted, #64748b); line-height: 1.35; }
+.axs-list li.is-active { background: var(--surface-2, #f1f5f9); }
+.axs-list li[aria-selected="true"] { background: rgba(0, 191, 255, .12); }
+.axs-list li[aria-selected="true"] .axs-t { color: var(--primary, #0284c7); }
+.axs-list li[aria-selected="true"].is-active { background: rgba(0, 191, 255, .18); }
+.axs-tick { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: .8rem; color: var(--primary, #00BFFF); opacity: 0; }
+.axs-list li[aria-selected="true"] .axs-tick { opacity: 1; }
+.axs-list li[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.axs-list::-webkit-scrollbar { width: 8px; } .axs-list::-webkit-scrollbar-thumb { background: var(--border, #cbd5e1); border-radius: 8px; }
+/* Small selects inside toolbars/tables keep a compact height */
+.ax-toolbar .axs-btn, .ax-table .axs-btn, .axs-sm .axs-btn { min-height: 36px; padding: 6px 12px; font-size: .84rem; border-radius: 10px; }

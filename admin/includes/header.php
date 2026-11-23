@@ -61,6 +61,8 @@ if (time() - (int)setting('cron_last_run') > 900 && is_file(__DIR__ . '/../../in
     <link rel="stylesheet" href="../assets/css/main.css?v=<?= time() ?>">
     <link rel="stylesheet" href="../assets/css/admin.css?v=<?= time() ?>">
     <link rel="stylesheet" href="../assets/css/admin-ui.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="../assets/css/ax-select.css?v=1">
+    <script src="../assets/js/ax-select.js?v=1" defer></script>
     
     <link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="../assets/pwa/favicon-32.png">
     
