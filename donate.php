@@ -34,6 +34,12 @@ $user = isLoggedIn() ? currentUser() : null;
             background: radial-gradient(circle at 70% 30%, rgba(0,191,255,0.15) 0%, transparent 60%);
             pointer-events: none;
         }
+        .donate-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: center; text-align: left; position: relative; z-index: 2; }
+        .donate-hero-text .hero-sub { margin: 0; }
+        .donate-kicker { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: rgba(255,255,255,.1); color: #fff; font-size: .8rem; font-weight: 700; margin-bottom: 18px; }
+        .donate-kicker i { color: var(--premium-orange); }
+        .donate-hero-art img { display: block; width: 100%; height: auto; aspect-ratio: 1100 / 733; border-radius: 26px; border: 6px solid rgba(255,255,255,.12); box-shadow: 0 30px 60px -26px rgba(0,0,0,.65); }
+        @media (max-width: 900px) { .donate-hero-grid { grid-template-columns: 1fr; gap: 28px; text-align: center; } .donate-hero-text .hero-sub { margin: 0 auto; } .donate-hero-art { max-width: 560px; margin: 0 auto; } }
         .donate-container { max-width: 1000px; margin: -60px auto 100px; padding: 0 20px; position: relative; z-index: 10; }
         .donate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
         .premium-card {
@@ -99,9 +105,15 @@ $user = isLoggedIn() ? currentUser() : null;
     <?php require_once 'includes/nav.php'; ?>
 
     <section class="donate-hero">
-        <div class="container">
-            <h1>Support Our <span style="color: var(--sky-blue);">Learners.</span></h1>
-            <p class="hero-sub">Your contribution directly funds tuition, certificates and learning tools for talented students across Africa.</p>
+        <div class="container donate-hero-grid">
+            <div class="donate-hero-text">
+                <span class="donate-kicker"><i class="fas fa-hand-holding-heart"></i> Together, we create lasting impact</span>
+                <h1>Support Our <span style="color: var(--sky-blue);">Learners.</span></h1>
+                <p class="hero-sub">Your contribution directly funds tuition, certificates and learning tools for talented students across Africa.</p>
+            </div>
+            <div class="donate-hero-art">
+                <picture><source type="image/webp" srcset="assets/images/promo/donate.webp"><img src="assets/images/promo/donate.jpg" width="1100" height="733" alt="A smiling Skope Digital Academy team member in the academy shirt holding a donation box that reads Donate: Together, we create lasting impact." fetchpriority="high"></picture>
+            </div>
         </div>
     </section>
 
