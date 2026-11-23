@@ -60,6 +60,16 @@ TXT . "\n" . axai_snapshot($pdo);
 }
 
 /* ── Chat API ──────────────────────────────────────────────────────────── */
+// The floating widget loads the shared conversation from here
+if (($_GET['history'] ?? '') === '1') {
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['ok' => true, 'chat' => array_values($_SESSION['axai_chat'] ?? []), 'label' => sda_ai_label(),
+                      'ready' => sda_anthropic_key() !== '' || (defined('GEMINI_API_KEY') && GEMINI_API_KEY !== '')]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     while (ob_get_level()) ob_end_clean();
     header('Content-Type: application/json');

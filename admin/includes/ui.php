@@ -176,4 +176,9 @@ document.querySelectorAll('[data-filter-table]').forEach(function(inp){var t=doc
 document.querySelectorAll('[data-open]').forEach(function(b){b.addEventListener('click',function(){var d=document.getElementById(b.dataset.open);if(d&&d.showModal)d.showModal();});});
 document.querySelectorAll('dialog.ax-modal [data-close]').forEach(function(b){b.addEventListener('click',function(){b.closest('dialog').close();});});
 </script>
+<?php if (($_SESSION['role'] ?? '') === 'admin' && basename($_SERVER['PHP_SELF']) !== 'ai-assistant.php'): /* floating AI assistant, bottom-right */ ?>
+<div id="axAi" data-csrf="<?= e(csrfToken()) ?>" data-name="<?= e(strtok((string)($_SESSION['user_name'] ?? ''), ' ')) ?>" hidden></div>
+<link rel="stylesheet" href="../assets/css/ax-ai-widget.css?v=1">
+<script src="../assets/js/ax-ai-widget.js?v=1" defer></script>
+<?php endif; ?>
 <?php }
