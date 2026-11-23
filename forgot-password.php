@@ -16,9 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid security token. Please refresh and try again.';
     } else {
         $email = trim($_POST['email'] ?? '');
+        require_once __DIR__ . '/includes/security.php';
 
         if (empty($email)) {
             $error = 'Please enter your email address.';
+        } elseif (!sda_rate_ok('reset_ip', 10, 60) || !sda_rate_ok('reset_email', 3, 60, $email)) {
+            // Stops reset-email flooding; the generic message keeps account existence private.
+            $error = 'Too many reset requests. Please wait an hour and try again, or check your inbox and spam folder for an earlier link.';
         } else {
             try {
                 // Check if user exists
@@ -78,13 +82,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="assets/css/auth.css?v=9">
-    <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 </head>
 <body>
 <div class="auth">
     <aside class="auth-brand">
         <a class="auth-logo" href="./">
-            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <img src="assets/images/skope-logo-512.png" alt="">
             <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
         </a>
         <div class="auth-pitch">

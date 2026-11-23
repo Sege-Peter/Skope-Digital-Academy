@@ -35,7 +35,7 @@ $tpNav = [
 <div class="tp-overlay" id="tpOverlay"></div>
 <aside class="tp-side" id="tpSide" aria-label="Tutor portal navigation">
     <div class="tp-side-brand">
-        <img src="../assets/images/Skope Digital  logo.png" alt="">
+        <img src="../assets/images/skope-logo-512.png" alt="">
         <div><b>Skope Digital</b><small>Tutor portal</small></div>
         <button type="button" class="tp-side-close" data-tp-close-menu aria-label="Close menu"><i class="fas fa-xmark"></i></button>
     </div>

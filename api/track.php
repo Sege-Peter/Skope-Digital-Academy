@@ -67,6 +67,8 @@ try {
             track_time($pdo, $uid, $lessonRow, (int)($in['seconds'] ?? 0));
             break;
         case 'complete':
+            // Readable any time, but completing needs the previous lesson done and this lesson's tests passed.
+            if (($block = lesson_completion_block($pdo, $uid, $all, $lessonId)) !== null) out(['ok' => false, 'error' => 'tests', 'reason' => $block], 409);
             $pdo->prepare("INSERT INTO lesson_progress (student_id, lesson_id, course_id, status, completed_at) VALUES (?, ?, ?, 'completed', NOW())
                            ON DUPLICATE KEY UPDATE status = 'completed', completed_at = COALESCE(completed_at, NOW())")
                 ->execute([$uid, $lessonRow['id'], $course['id']]);
@@ -92,6 +94,12 @@ $xp = $pdo->prepare("SELECT xp FROM users WHERE id = ?");
 $xp->execute([$uid]);
 $total = (int)$xp->fetchColumn();
 $res['ok'] = true;
+if (in_array($action, ['exercise', 'quiz'], true)) {
+    // Fresh test state so the page can unlock "Mark complete" once everything in the lesson is passed.
+    foreach (load_course_lessons($pdo, $course['id'], $uid) as $l) {
+        if ((int)$l['id'] === $lessonId) { $res['tests'] = lesson_tests_status($pdo, $uid, $l); break; }
+    }
+}
 $res['total_xp'] = $total;
 $res['level'] = xp_level($total);
 if ($res['certificate']) $res['certificate']['url'] = 'certificate?code=' . rawurlencode($res['certificate']['code']);

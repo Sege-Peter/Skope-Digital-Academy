@@ -2,6 +2,7 @@
 /** Admin: platform settings – general details, payments, email, AI and a security check-up. */
 $pageTitle = 'Platform Settings';
 require_once 'includes/header.php';
+require_once __DIR__ . '/../includes/mail_account.php';   // sda_site_base() for the sign-in return address
 
 /* key => [label, type, hint, section]; type: text|email|url|number|select:a,b|bool|secret */
 $fields = [
@@ -89,7 +90,7 @@ $fileConst = function (string $file, string $name): string {
 $liveKeys = [
     'paystack_public_key' => $fileConst('paystack.php', 'PAYSTACK_PUBLIC_KEY'),
     'paystack_secret_key' => $fileConst('paystack.php', 'PAYSTACK_SECRET_KEY'),
-    'gemini_api_key'      => $fileConst('ai_config.php', 'GEMINI_API_KEY'),
+    'gemini_api_key'      => defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '',
 ];
 $liveModel = preg_match('~models/([\w.-]+):~', $fileConst('ai_config.php', 'GEMINI_API_URL'), $mm) ? $mm[1] : '';
 $payMode = str_starts_with($liveKeys['paystack_secret_key'], 'sk_live_') ? 'Live' : ($liveKeys['paystack_secret_key'] ? 'Test' : 'Not set');
@@ -162,11 +163,11 @@ require_once 'includes/sidebar.php';
                     <form method="post" class="ax-panel-b ax-form" autocomplete="off">
                         <?= ax_csrf() ?><input type="hidden" name="section" value="<?= $sk ?>">
                         <?php if ($sk === 'payments' || $sk === 'ai'): ?>
-                        <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $sk === 'payments' ? 'Checkout currently reads its keys' : 'The AI helpers currently read their key' ?> from <span class="ax-code"><?= $sk === 'payments' ? 'includes/paystack.php' : 'includes/ai_config.php' ?></span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
+                        <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $sk === 'payments' ? 'Checkout currently reads its keys' : 'The AI helpers currently read their key' ?> from <span class="ax-code"><?= $sk === 'payments' ? 'includes/paystack.php' : 'this setting, or includes/private/config.php' ?></span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
                         <?php elseif ($sk === 'email'): ?>
                         <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $val('smtp_host') !== '' && $val('smtp_username') !== '' && $val('smtp_password') !== '' ? 'Emails are sent through <b>' . e($val('smtp_host')) . '</b> as ' . e($val('smtp_username')) . '.' : 'SMTP is not complete, so emails fall back to the server’s built-in mail (often lands in spam or fails). For Gmail use smtp.gmail.com, port 587, TLS.' ?></div></div>
                         <?php elseif ($sk === 'signin'): ?>
-                        <div class="st-note"><i class="fas fa-circle-info"></i><div>In the OAuth client, add these under <b>Authorized JavaScript origins</b>: <span class="ax-code"><?= e(setting('site_url') !== '' ? preg_replace('~^(https?://[^/]+).*$~', '$1', setting('site_url')) : 'https://your-domain') ?></span>, <span class="ax-code">http://localhost</span> and <span class="ax-code">http://localhost:80</span>. New Google sign-ups become learner accounts and go to the activation checkout like normal sign-ups.</div></div>
+                        <div class="st-note"><i class="fas fa-circle-info"></i><div>"Continue with Google" opens Google's own page and comes back to <span class="ax-code"><?= e(rtrim(sda_site_base(), '/') . '/' . (trim(setting('google_login_redirect')) ?: 'admin/mail-connect')) ?></span>, which must be listed under <b>Authorized redirect URIs</b> in the OAuth client. It needs the Client secret saved under Webmail (Gmail). New Google sign-ups become learner accounts and go to the activation checkout like normal sign-ups. In Google Cloud, set the app's publishing status to <b>In production</b> so any learner can use it.</div></div>
                         <?php endif; ?>
                         <div class="ax-row">
                         <?php foreach ($fields as $key => [$label, $type, $hint, $s]): if ($s !== $sk) continue; $id = 'f-' . $key; $cur = $val($key); ?>

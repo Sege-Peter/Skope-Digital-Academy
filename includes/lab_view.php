@@ -38,16 +38,17 @@ $labTitle = $labMode === 'home' ? 'Learning Lab' : ($pageTitle ?? 'Learning Lab'
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
-<link rel="stylesheet" href="assets/css/learn.css?v=6">
+<link rel="stylesheet" href="assets/css/learn.css?v=8">
 <link rel="stylesheet" href="assets/css/lab.css?v=<?= @filemtime(__DIR__ . '/../assets/css/lab.css') ?>">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
+<?php require_once __DIR__ . '/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="lab-body lab-mode-<?= e($labMode) ?>">
 
 <header class="lab-top">
   <?php if ($labMode === 'course'): ?><button class="lab-icon-btn lab-only-mobile" id="lrMenu" type="button" aria-label="Show lessons" aria-controls="lrSide"><i class="fas fa-bars"></i></button><?php endif; ?>
   <a class="lab-brand" href="lab">
-    <span class="lab-brand-logo"><img src="assets/images/Skope Digital  logo.png" alt=""></span>
+    <span class="lab-brand-logo"><img src="assets/images/skope-logo-512.png" alt=""></span>
     <span class="lab-brand-text"><strong>Learning Lab</strong><small>Skope Digital Academy</small></span>
   </a>
   <?php if ($labMode === 'course'): ?>
@@ -352,9 +353,12 @@ $canWrite = $student_id && $active && $active['can_read'] && ($enrolled || !empt
                 <span class="lab-chip green big"><i class="fas fa-check"></i> Lesson completed</span>
                 <?php if ($next && $next['can_read']): ?><a class="lab-btn" href="<?= e(learn_url($course, $next)) ?>">Next lesson <i class="fas fa-arrow-right"></i></a><?php endif; ?>
               <?php else: ?>
-                <form method="post" action="<?= e($here) ?>"><input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+                <?php if (!empty($blockReason)): ?>
+                  <div class="lr-gate" id="lrGate" role="status"><i class="fas fa-lock"></i><span><?= e($blockReason) ?></span></div>
+                <?php endif; ?>
+                <form method="post" action="<?= e($here) ?>" id="lrCompleteForm"<?= !empty($blockReason) ? ' hidden' : '' ?>><input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
                   <button class="lab-btn lg" name="complete" value="1"><i class="fas fa-check"></i> Mark complete<?= $next ? ' &amp; continue' : '' ?></button></form>
-                <span class="lab-muted lab-small"><?= $next ? 'The next lesson opens when you finish this one.' : 'This is the last lesson.' ?></span>
+                <span class="lab-muted lab-small"><?= $next ? 'You can read ahead any time; finish this lesson\'s tests to move on.' : 'This is the last lesson.' ?></span>
               <?php endif; ?>
               <?php if (!empty($active['attached_quiz_id'])): ?>
                 <a class="lab-btn ghost" href="student/take-quiz?id=<?= (int)$active['attached_quiz_id'] ?>"><i class="fas fa-circle-question"></i> Lesson quiz</a>
@@ -431,7 +435,7 @@ $canWrite = $student_id && $active && $active['can_read'] && ($enrolled || !empt
 <div class="lr-xp-toast" id="xpToast" role="status" aria-live="polite"></div>
 <script>window.SDA_TRACK = <?= json_encode($track, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_FLASH = <?= json_encode($flash, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_LEVEL = <?= json_encode($meLevel) ?>;
 window.LAB = <?= json_encode($canWrite && $view === 'lesson' && !$wantWorkbook ? ['endpoint' => 'api/lab', 'csrf' => csrfToken(), 'lesson' => (int)$active['id'], 'taskDone' => !empty($wb[(int)$active['id']]['task_done'])] : null, JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
-<script src="assets/js/learn.js?v=6"></script>
+<script src="assets/js/learn.js?v=8"></script>
 <script src="assets/js/lab.js?v=<?= @filemtime(__DIR__ . '/../assets/js/lab.js') ?>"></script>
 </body>
 </html>

@@ -442,7 +442,7 @@ require_once 'includes/layout-top.php';
             <h2>Academic transcript</h2>
             <div>Kisumu, Kenya &middot; Support: 0742380183</div>
         </div>
-        <div><img src="../assets/images/Skope Digital  logo.png" class="ts-logo" alt=""></div>
+        <div><img src="../assets/images/skope-logo-512.png" class="ts-logo" alt=""></div>
         <div class="ts-student">
             <div><label>Name</label> <strong><?= $h($me_name) ?></strong></div>
             <div><label>Email</label> <?= $h($me_email) ?></div>

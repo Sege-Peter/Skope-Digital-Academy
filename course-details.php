@@ -380,10 +380,15 @@ if ($course['status'] !== 'published' && !$is_admin && !$is_tutor && !$is_enroll
                     <?php else: ?>
                         <?php $isFreeCourse = course_from_price($course) <= 0; ?>
                         <?php if (!$user && $isFreeCourse): ?>
-                            <a href="register" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;">Register free &amp; start learning <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                            <a href="enroll-me?id=<?= $id ?>" rel="nofollow" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;">Sign up &amp; enroll <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
                             <p style="text-align:center;margin:10px 0 0;font-size:.85rem;color:var(--text-dim);">Already have an account? <a href="login">Sign in</a> to enroll.</p>
                         <?php else: ?>
-                            <a href="enroll?id=<?= $id ?>" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;"><?= $isFreeCourse ? 'Start learning free' : 'Choose your track' ?> <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                            <?php if ($isFreeCourse && in_array('self_paced', course_modes($course), true)): ?>
+                                <?= str_replace('<button ', '<button style="width:100%;height:72px;font-size:1.1rem;border-radius:20px;justify-content:center" ', sda_enroll_button($course, false, 'btn btn-primary btn-block btn-lg')) ?>
+                                <p style="text-align:center;margin:10px 0 0;font-size:.85rem;color:var(--text-dim);">One tap: the course opens straight away.</p>
+                            <?php else: ?>
+                                <a href="enroll?id=<?= $id ?>" class="btn btn-primary btn-block btn-lg" style="height: 72px; font-size: 1.1rem; border-radius: 20px;"><?= $isFreeCourse ? 'Start learning free' : 'Enroll me' ?> <i class="fas fa-arrow-right" style="margin-left: 12px; font-size: 0.9rem;"></i></a>
+                            <?php endif; ?>
                         <?php endif; ?>
                     <?php endif; ?>
                     <?php $readable = $course['is_open_tutorial'] || array_filter($lessons, fn($l) => $l['is_preview']); ?>

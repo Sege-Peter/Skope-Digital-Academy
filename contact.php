@@ -33,7 +33,7 @@ $preselect = $_GET['topic'] ?? '';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="assets/css/main.css">
-    <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
     <style>
         .ct {
             --ct-cyan: #00BFFF;

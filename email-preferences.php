@@ -50,7 +50,7 @@ $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     <title>Email preferences – Skope Digital Academy</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
     <style>
         :root { --ink:#0f172a; --dim:#64748b; --line:#e2e8f0; --cyan:#00BFFF; --bg:#f1f5f9; --card:#fff; }
         @media (prefers-color-scheme: dark) { :root { --ink:#e2e8f0; --dim:#94a3b8; --line:#1e293b; --bg:#0b1220; --card:#111a2e; } }
@@ -71,6 +71,7 @@ $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
         .ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; }
         a { color: var(--cyan); }
     </style>
+<?php require_once __DIR__ . '/includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body>
 <div class="wrap">

@@ -12,8 +12,11 @@ $success = '';
 if (!empty($_SESSION['google_error'])) { $error = (string)$_SESSION['google_error']; unset($_SESSION['google_error']); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/includes/security.php';
     if (!verifyCsrf()) {
         $error = 'Invalid security token.';
+    } elseif (!sda_rate_ok('register_ip', 8, 60)) {
+        $error = 'Too many sign-ups from this connection. Please try again in an hour.';
     } else {
         $name           = trim($_POST['full_name'] ?? '');
         $email          = trim($_POST['email'] ?? '');
@@ -111,14 +114,14 @@ $ref = $_POST['ref_code'] ?? $_GET['ref'] ?? '';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=9">
-    <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+    <link rel="stylesheet" href="assets/css/auth.css?v=10">
+    <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 </head>
 <body class="auth-compact">
 <div class="auth">
     <aside class="auth-brand">
         <a class="auth-logo" href="./">
-            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <img src="assets/images/skope-logo-512.png" alt="">
             <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
         </a>
         <div class="auth-pitch">
@@ -155,6 +158,8 @@ $ref = $_POST['ref_code'] ?? $_GET['ref'] ?? '';
                 <div class="alert err" role="alert"><i class="fas fa-circle-exclamation"></i><span><?= htmlspecialchars($error) ?><?= $error === 'This email is already registered.' ? ' <a href="login">Sign in instead</a> or <a href="forgot-password">reset your password</a>.' : '' ?></span></div>
             <?php elseif ($ref !== ''): ?>
                 <div class="alert info" role="status"><i class="fas fa-gift"></i><span>You were invited by a Skope learner. Welcome!</span></div>
+            <?php elseif (($_GET['msg'] ?? '') === 'signup_to_enroll'): ?>
+                <div class="alert info" role="status"><i class="fas fa-user-plus"></i><span>Create your account to enroll. As soon as your registration is complete, the course opens. Already a learner? <a href="login">Sign in</a>.</span></div>
             <?php endif; ?>
 
             <?php require_once __DIR__ . '/includes/google_auth.php'; sda_google_block('register', $ref); ?>

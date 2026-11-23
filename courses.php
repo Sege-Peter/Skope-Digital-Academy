@@ -73,7 +73,7 @@ $enrolled_ids = $user ? $pdo->query("SELECT course_id FROM enrollments WHERE stu
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/css/main.css">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <style>
 /* ═══ PAGE BASE ═══ */
 *, *::before, *::after { box-sizing: border-box; }
@@ -290,6 +290,9 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
   border: none; cursor: pointer; font-family: 'Inter',sans-serif;
 }
 .btn-enroll:hover { background: #009ACD; transform: translateY(-2px); color: #fff; }
+.c-footer .btn-enroll { background: linear-gradient(135deg,#FF8C00,#FF6A00); box-shadow: 0 8px 18px -10px rgba(255,120,0,.8); white-space: nowrap; }
+.c-footer .btn-enroll:hover { background: linear-gradient(135deg,#ff7a00,#f05a00); }
+.c-footer .btn-enroll.is-enrolled { background: #10b981; box-shadow: none; }
 
 /* ═══ EMPTY STATE ═══ */
 .empty-state {
@@ -351,7 +354,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
 <section class="page-hero">
   <div class="container" style="text-align:center; position:relative; z-index:1;">
     <h1>Find Your Next <span>Skill</span></h1>
-    <p>Explore <?= number_format($total_published + 118) ?>+ professional courses across Technology, Business, Design, and more — built for real-world careers.</p>
+    <p>Explore <?= number_format($total_published) ?> courses across Technology, Business, Design, and more — built for real-world careers.</p>
 
     <!-- Search Bar -->
     <form action="courses" method="GET" class="search-wrap" id="heroSearch">
@@ -526,7 +529,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
               </div>
               <div class="c-stats">
                 <?php if ((float)$c['avg_rating'] > 0): ?><span><i class="fas fa-star" style="color:#f59e0b;"></i> <?= number_format((float)$c['avg_rating'], 1) ?></span><?php endif; ?>
-                <span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= (int)$c['enrolled_count'] ?></span>
+                <?php if ((int)$c['enrolled_count'] > 0): ?><span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= (int)$c['enrolled_count'] ?> enrolled</span><?php endif; ?>
                 <?php if ((float)$c['duration_hours'] > 0): ?><span><i class="fas fa-clock" style="color:#94a3b8;"></i> <?= (float)$c['duration_hours'] ?>h</span><?php endif; ?>
                 <span><i class="fas fa-award" style="color:#10b981;"></i> Certified</span>
               </div>
@@ -538,15 +541,7 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
               <div class="c-footer">
                 <?php $from = course_from_price($c); $modes_c = course_modes($c); ?>
                 <span class="c-price"><?php if ($from <= 0): ?>Free<?php else: ?><?= count($modes_c) > 1 && course_price($c, $modes_c[0]) != course_price($c, $modes_c[1]) ? '<small style="font-size:.7em;font-weight:600;color:#94a3b8">from</small> ' : '' ?><?= e(money($from)) ?><?php if (sale_active($c)): ?> <s style="font-size:.7em;color:#94a3b8;font-weight:600"><?= e(money((float)$c['price'])) ?></s><?php endif; ?><?php endif; ?></span>
-                <?php if(in_array($c['id'], $enrolled_ids)): ?>
-                  <a href="student/classroom?id=<?= $c['id'] ?>" class="btn-enroll" style="background: var(--secondary); border-color: var(--secondary);">
-                    Resume Learning <i class="fas fa-play-circle" style="margin-left:5px;"></i>
-                  </a>
-                <?php else: ?>
-                  <a href="course-details?id=<?= $c['id'] ?>" class="btn-enroll">
-                    Enroll Now <i class="fas fa-arrow-right"></i>
-                  </a>
-                <?php endif; ?>
+                <?= sda_enroll_button($c, in_array($c['id'], $enrolled_ids)) ?>
               </div>
             </div>
           </article>

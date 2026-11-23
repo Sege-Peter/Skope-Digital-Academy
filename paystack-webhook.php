@@ -16,7 +16,7 @@ $input = @file_get_contents("php://input");
 $event = json_decode($input);
 
 // Validate the signature
-if (!isset($_SERVER['HTTP_X_PAYSTACK_SIGNATURE']) || ($_SERVER['HTTP_X_PAYSTACK_SIGNATURE'] !== hash_hmac('sha512', $input, PAYSTACK_SECRET_KEY))) {
+if (!PAYSTACK_SECRET_KEY || !isset($_SERVER['HTTP_X_PAYSTACK_SIGNATURE']) || !hash_equals(hash_hmac('sha512', $input, PAYSTACK_SECRET_KEY), (string)$_SERVER['HTTP_X_PAYSTACK_SIGNATURE'])) {   // constant-time check
     exit;
 }
 

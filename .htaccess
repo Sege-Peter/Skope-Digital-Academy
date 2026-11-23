@@ -46,11 +46,36 @@ Options -Indexes
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
+    Header set X-XSS-Protection "0"
+    # Only send the site name to other sites, never full addresses (which can carry tokens)
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # No camera / microphone / location for this site or anything embedded in it
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), usb=(), magnetometer=(), gyroscope=(), payment=(self \"https://checkout.paystack.com\")"
+    Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on'"
+    Header always set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+    # Content Security Policy: HTTPS sources only, no plugins, no <base> hijack, no framing by other sites,
+    # forms post only to this site or HTTPS (payment and Google). Kept broad so the code editor, video,
+    # Paystack and Google sign-in keep working.
+    Header always set Content-Security-Policy "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; frame-src 'self' https: blob: data:; worker-src 'self' blob:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self' https:"
+    Header always unset X-Powered-By
 </IfModule>
+
+# Docs, scripts, dumps and logs are never served
+<FilesMatch "(?i)\.(md|sh|sql|log|bak|dist|lock|ini)$">
+    Require all denied
+</FilesMatch>
 
 # Prevent access to dot files
 <FilesMatch "^\.">
     Order allow,deny
     Deny from all
 </FilesMatch>
+
+# App (PWA): correct types, and always re-check the service worker and manifest so updates reach phones quickly
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+    <FilesMatch "^(sw\.js|manifest\.webmanifest|offline\.html)$">
+        Header set Cache-Control "no-cache, max-age=0"
+        Header set Service-Worker-Allowed "/"
+    </FilesMatch>
+</IfModule>

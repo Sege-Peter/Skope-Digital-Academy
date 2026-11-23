@@ -1,8 +1,8 @@
 /* Skope Digital Academy – tutorial reader: lesson menu, exercises, quizzes. */
 (() => {
-  // Mobile lesson menu
+  // Mobile lesson menu (tutorial pages handle it in includes/learn-top.php together with the site menu)
   const side = document.getElementById('lrSide');
-  document.getElementById('lrMenu')?.addEventListener('click', () => {
+  if (!document.getElementById('lrSiteBtn')) document.getElementById('lrMenu')?.addEventListener('click', () => {
     const open = side.classList.toggle('open');
     document.body.classList.toggle('lr-menu-open', open);
   });
@@ -188,10 +188,10 @@
       new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { reachedEnd = true; maybeComplete(); } }, { threshold: 0.4 }).observe(end);
     }
     async function maybeComplete() {
-      if (completed || !reachedEnd || active < T.minSecs) return;
+      if (completed || T.blocked || !reachedEnd || active < T.minSecs) return;
       completed = true;
       const res = await send('complete');
-      if (!res || !res.ok) { completed = false; return; }
+      if (!res || !res.ok) { completed = false; if (res && res.error === 'tests') { T.blocked = true; gate(res.reason); } return; }
       handle(res);
       const row = document.querySelector('.lr-done-row');
       if (row) row.querySelector('form')?.replaceWith(Object.assign(document.createElement('span'), { className: 'lr-pill free', innerHTML: '<i class="fas fa-check"></i> Completed automatically' }));
@@ -200,9 +200,28 @@
     }
 
     // 4. Exercises and quizzes
-    document.addEventListener('sda:exercise', (e) => send('exercise', { n: e.detail.n }).then(handle));
+    // Tests gate: completing stays locked until every exercise and quiz in the lesson is passed.
+    function gate(text) {
+      const g = document.getElementById('lrGate');
+      if (g && text) g.querySelector('span').textContent = text;
+    }
+    function testsUpdate(res) {
+      const t = res && res.tests;
+      if (!t) return;
+      if (t.ok && T.prevDone) {
+        T.blocked = false;
+        document.getElementById('lrGate')?.remove();
+        const f = document.getElementById('lrCompleteForm');
+        if (f) f.hidden = false;
+        maybeComplete();
+      } else if (!t.ok) {
+        gate('Finish the tests in this lesson to continue (' + t.done + ' of ' + t.total + ' done). Still to do: ' + t.missing.join(', ') + '.');
+      }
+    }
+    document.addEventListener('sda:exercise', (e) => send('exercise', { n: e.detail.n }).then((res) => { handle(res); testsUpdate(res); }));
     document.addEventListener('sda:quiz', (e) => send('quiz', e.detail).then((res) => {
       handle(res);
+      testsUpdate(res);
       if (res && res.ok && res.completed) setTimeout(() => location.reload(), 4000);
     }));
   }

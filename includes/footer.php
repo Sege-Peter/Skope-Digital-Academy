@@ -18,7 +18,7 @@ $ftH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
             <!-- Brand -->
             <div class="sf-brand">
                 <a href="./" class="sf-logo" aria-label="Skope Digital Academy home">
-                    <img src="assets/images/Skope Digital  logo.png" alt="" width="52" height="52">
+                    <img src="assets/images/skope-logo-512.png" alt="" width="52" height="52">
                     <span><b>SKOPE <em>DIGITAL</em></b><small>Academy</small></span>
                 </a>
                 <p class="sf-about">Practical coding and digital skills for Kenya and East Africa: free tutorials, self-paced or weekly classes, and certificates you can verify.</p>
@@ -150,7 +150,13 @@ $ftH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     .sf-about { margin-bottom: 20px; }
     .sf-contact { grid-column: 1 / -1; }
     .sf-contact .sf-cards { grid-template-columns: 1fr; }
-    .sf-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
+    /* Phone bottom bar: centred stack - legal links, copyright, credit */
+    .sf-bottom { flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 22px 0 28px; }
+    .sf-legal { order: 1; justify-content: center; gap: 0; }
+    .sf-legal a { padding: 4px 12px; font-size: .86rem; }
+    .sf-legal a + a { border-left: 1px solid var(--sf-line); }
+    .sf-bottom > p:first-child { order: 2; font-size: .78rem; line-height: 1.5; }
+    .sf-credit { order: 3; font-size: .78rem; padding: 7px 14px; border: 1px solid var(--sf-line); border-radius: 999px; background: rgba(255,255,255,.03); }
 }
 @media (max-width: 360px) {
     .sf-grid { grid-template-columns: 1fr; }

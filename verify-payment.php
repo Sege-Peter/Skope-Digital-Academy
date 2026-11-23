@@ -110,7 +110,7 @@ try {
             sda_notify_activated((int)$user['id'], $amount, (string)$reference);
             
             $pdo->commit();
-            header("Location: student/?msg=account_activated");
+            header('Location: ' . sda_after_activation('student/?msg=account_activated'));
         } elseif ($type === 'donation') {
             // Record the donation
             // If logged in, associate with student_id, otherwise use email in transaction_message

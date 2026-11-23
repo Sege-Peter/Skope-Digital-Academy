@@ -1,4 +1,5 @@
 <?php
+ob_start(); // pages may still redirect after including this header
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/ui.php';
@@ -46,7 +47,7 @@ if (time() - (int)setting('cron_last_run') > 900 && is_file(__DIR__ . '/../../in
     <link rel="stylesheet" href="../assets/css/admin.css?v=<?= time() ?>">
     <link rel="stylesheet" href="../assets/css/admin-ui.css?v=<?= time() ?>">
     
-    <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="../assets/pwa/favicon-32.png">
     
     <style>
         /* ── Stealth Report Protocol ── */
@@ -62,6 +63,7 @@ if (time() - (int)setting('cron_last_run') > 900 && is_file(__DIR__ . '/../../in
             * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; }
         }
     </style>
+<?php require_once __DIR__ . '/../../includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="dashboard-body">
 

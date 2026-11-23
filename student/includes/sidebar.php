@@ -59,7 +59,7 @@ $sp_menu = [
 <aside class="sidebar" id="dashSidebar" aria-label="Student menu">
     <div class="sidebar-header">
         <a href="../" class="sp-brand" title="Skope Digital Academy home">
-            <span class="sp-brand-logo"><img src="../assets/images/Skope Digital  logo.png" alt=""></span>
+            <span class="sp-brand-logo"><img src="../assets/images/skope-logo-512.png" alt=""></span>
             <span class="sp-brand-text"><strong>Skope Digital</strong><span>Student portal</span></span>
         </a>
         <button type="button" class="sp-side-btn sp-hide-mobile" onclick="toggleDesktopFocus()" title="Shrink or expand the menu" aria-label="Shrink or expand the menu">

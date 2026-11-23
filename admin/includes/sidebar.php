@@ -60,7 +60,7 @@ $axActive = $axAlias[$current_page] ?? $current_page;
 <aside class="sidebar" id="dashSidebar" aria-label="Admin menu">
     <div class="sidebar-header">
         <a href="../" class="brand" title="View website">
-            <img src="../assets/images/Skope Digital  logo.png" alt="" >
+            <img src="../assets/images/skope-logo-512.png" alt="" >
             <span><b>SKOPE <span>DIGITAL</span></b><small>Admin Panel</small></span>
         </a>
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close menu"><i class="fas fa-times"></i></button>

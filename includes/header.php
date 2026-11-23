@@ -4,7 +4,7 @@ require_once 'auth.php';
 
 // Auth Check (Base)
 if (!isLoggedIn()) {
-    header('Location: /Skope Digital Academy/login');
+    header('Location: ' . sda_path('login'));
     exit;
 }
 
@@ -90,5 +90,6 @@ try {
     }
     .print-only { display: none; }
 </style>
+<?php require_once __DIR__ . '/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body>

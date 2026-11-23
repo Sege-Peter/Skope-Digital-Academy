@@ -30,7 +30,7 @@ if ($lock && !flock($lock, LOCK_EX | LOCK_NB)) exit("busy\n");
 $log = [];
 if ($mode !== 'queue') {
     save_setting($pdo, 'cron_last_run', (string)time());
-    foreach (['sda_job_lessons_opening', 'sda_job_cohort_starting', 'sda_job_assignments_due', 'sda_job_access_expiring', 'sda_job_weekly_digest', 'sda_job_inactive_nudge'] as $job) {
+    foreach (['sda_job_lessons_opening', 'sda_job_cohort_starting', 'sda_job_assignments_due', 'sda_job_access_expiring', 'sda_job_weekly_digest', 'sda_job_inactive_nudge', 'sda_job_server_health'] as $job) {
         try { $log[] = $job . ': ' . $job($pdo); } catch (Throwable $e) { $log[] = "$job FAILED: " . $e->getMessage(); error_log("[cron] $job " . $e->getMessage()); }
     }
     if (file_exists(__DIR__ . '/includes/mailbox.php')) {
@@ -158,4 +158,20 @@ function sda_job_inactive_nudge(PDO $pdo): string
             ['dedupe' => 'nudge:' . $r['student_id'] . ':' . $week, 'inapp' => false])) $n++;
     }
     return "$n sent";
+}
+
+/** Server health: alert the admins (at most once a day) when disk space runs low or a backup is overdue. */
+function sda_job_server_health(PDO $pdo): string
+{
+    $issues = [];
+    $free = @disk_free_space(__DIR__); $total = @disk_total_space(__DIR__);
+    if ($free && $total && $free / $total < 0.10) $issues[] = 'Disk space is low: ' . round($free / 1073741824, 1) . ' GB free of ' . round($total / 1073741824, 1) . ' GB.';
+    $last = (int)setting('backup_last_ok');
+    if (PHP_OS_FAMILY === 'Linux' && $last > 0 && time() - $last > 36 * 3600) $issues[] = 'The daily database backup has not succeeded since ' . date('j M Y, H:i', $last) . '.';
+    if (!$issues) return 'ok';
+    if (setting('health_alert_day') === date('Y-m-d')) return 'issues (already alerted today)';
+    require_once __DIR__ . '/includes/security.php';
+    sda_security_alert('Server needs attention', implode('<br>', array_map('htmlspecialchars', $issues)));
+    save_setting($pdo, 'health_alert_day', date('Y-m-d'));
+    return 'alerted: ' . implode(' ', $issues);
 }

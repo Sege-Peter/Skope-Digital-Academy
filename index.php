@@ -1,12 +1,10 @@
 <?php
 require_once 'includes/db.php';
 require_once 'includes/auth.php';
+require_once 'includes/learning.php';
 
-// ── Real COUNT queries + community base ─────────────────────────
-$BASE_STUDENTS = 2400;
-$BASE_COURSES  = 118;
-$BASE_TUTORS   = 80;
-$BASE_HOURS    = 15000;
+// ── Live numbers straight from the database (no padding) ───────
+$total_lessons = $total_tutorials = $total_paths = 0;
 
 try {
     // 0. Fetch latest active scholarship (Isolated priority)
@@ -17,10 +15,12 @@ try {
     $db_courses   = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status = 'published'")->fetchColumn();
     $db_tutors    = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'tutor' AND status = 'active'")->fetchColumn();
 
-    $total_students = $db_students + $BASE_STUDENTS;
-    $total_courses  = $db_courses  + $BASE_COURSES;
-    $total_tutors   = $db_tutors   + $BASE_TUTORS;
-    $total_hours    = $BASE_HOURS  + ($db_students * 5);
+    $total_students = $db_students;
+    $total_courses  = $db_courses;
+    $total_tutors   = $db_tutors;
+    $total_lessons  = (int)$pdo->query("SELECT COUNT(*) FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published'")->fetchColumn();
+    $total_tutorials = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status = 'published' AND is_open_tutorial = 1")->fetchColumn();
+    try { $total_paths = (int)$pdo->query("SELECT COUNT(*) FROM learning_paths")->fetchColumn(); } catch (Throwable $e) { $total_paths = 0; }
 
     // Fetch courses with real enrolment counts
     $stmt = $pdo->query("SELECT c.*, u.name AS tutor_name, cat.name AS category_name,
@@ -36,15 +36,13 @@ try {
     $recent_courses = $stmt->fetchAll();
 
 } catch (Exception $e) {
-    $total_students = $BASE_STUDENTS;
-    $total_courses  = $BASE_COURSES;
-    $total_tutors   = $BASE_TUTORS;
-    $total_hours    = $BASE_HOURS;
+    $total_students = $total_courses = $total_tutors = 0;
     $recent_courses = [];
     $featured_scholarship = $featured_scholarship ?? null; // Keep if already fetched
 }
 
 $user = isLoggedIn() ? currentUser() : null;
+$enrolled_ids = ($user && $user['role'] === 'student') ? array_map('intval', $pdo->query("SELECT course_id FROM enrollments WHERE student_id = " . (int)$user['id'] . " AND status IN ('active','completed')")->fetchAll(PDO::FETCH_COLUMN)) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -57,7 +55,7 @@ $user = isLoggedIn() ? currentUser() : null;
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/css/main.css">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <style>
 /* ═══════════════════ BASE ═══════════════════ */
 *, *::before, *::after { box-sizing: border-box; }
@@ -97,6 +95,27 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
   gap: 60px; align-items: center;
   position: relative; z-index: 2;
 }
+
+/* ── Hero photo (branded) ── */
+.hv { position: relative; max-width: 500px; margin: 0 auto; width: 100%; animation: fadeUp .7s .15s ease both; }
+.hv-blob { position: absolute; inset: 8% 4% 0 4%; border-radius: 42% 58% 46% 54% / 52% 44% 56% 48%; background: linear-gradient(140deg, #00BFFF 0%, #0080FF 45%, #FF8C00 100%); opacity: .95; box-shadow: 0 30px 70px -30px rgba(0,128,255,.6); }
+.hv-ring { position: absolute; inset: 2% -2% -4% -2%; border-radius: 50%; border: 2px dashed rgba(0,128,255,.25); animation: hvSpin 40s linear infinite; }
+.hv-photo { position: relative; display: block; width: 100%; height: auto; border-radius: 34px; box-shadow: 0 24px 60px -24px rgba(15,23,42,.45); border: 6px solid #fff; }
+.hv-card { position: absolute; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 14px; background: rgba(255,255,255,.96); box-shadow: 0 14px 34px -14px rgba(15,23,42,.35); font-family: 'Inter', sans-serif; white-space: nowrap; animation: hvFloat 5s ease-in-out infinite; }
+.hv-card b { display: block; font-size: .82rem; color: #0f172a; }
+.hv-card small { display: block; font-size: .7rem; color: #64748b; }
+.hv-card img { border-radius: 9px; }
+.hv-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: .95rem; flex: none; }
+.hv-c1 { top: 12%; left: -6%; }
+.hv-c2 { bottom: 20%; right: -6%; animation-delay: -1.6s; }
+.hv-c3 { bottom: -4%; left: 8%; animation-delay: -3.2s; }
+@keyframes hvFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+@keyframes hvSpin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .hv-card, .hv-ring { animation: none; } }
+@media (max-width: 1024px) { .hv { max-width: 420px; margin-top: 10px; } .hv-c1 { left: -2%; } .hv-c2 { right: -2%; } }
+@media (max-width: 480px) { .hv { max-width: 330px; } .hv-card { padding: 8px 10px 8px 8px; } .hv-card b { font-size: .74rem; } .hv-card small { display: none; } .hv-ic, .hv-card img { width: 28px !important; height: 28px !important; } .hv-c1 { top: 6%; left: -4%; } .hv-c2 { right: -4%; bottom: 24%; } .hv-c3 { left: 4%; } }
+.schol-wrap { max-width: 900px; margin-top: 40px; margin-bottom: 10px; }
+.schol-wrap .schol-card { margin: 0; }
 
 /* ── Badge pill ── */
 .badge-pill {
@@ -418,6 +437,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
   .schol-tag { font-size: 0.65rem; }
   .navbar-logo img { height: 32px !important; }
 }
+.c-enroll{padding:10px 18px!important;border-radius:10px!important;font-size:.82rem!important;border:0;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;text-decoration:none}.c-enroll.is-enrolled{background:#10b981!important}
 </style>
 </head>
 <body>
@@ -440,7 +460,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         </h1>
 
         <p class="hero-sub">
-          Join thousands of Kenyan professionals mastering in-demand technology skills through AI‑personalized paths and globally verified certifications.
+          Learn in-demand coding and digital skills online: free interactive tutorials, self-paced or weekly classes, and certificates anyone can verify.
         </p>
 
         <!-- Trust badges -->
@@ -462,75 +482,35 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <!-- LIVE STATS -->
         <div class="stats-bar">
           <div class="stat-chip">
-            <span class="stat-num" data-count="<?= $total_students ?>">0<sup>+</sup></span>
-            <div class="stat-lbl"><span>🎓</span> Active Learners</div>
+            <span class="stat-num" data-count="<?= $total_courses ?>">0</span>
+            <div class="stat-lbl"><span>📚</span> Courses</div>
           </div>
           <div class="stat-chip">
-            <span class="stat-num" data-count="<?= $total_courses ?>">0<sup>+</sup></span>
-            <div class="stat-lbl"><span>📚</span> Verified Courses</div>
+            <span class="stat-num" data-count="<?= $total_lessons ?>">0</span>
+            <div class="stat-lbl"><span>📖</span> Lessons</div>
           </div>
           <div class="stat-chip">
-            <span class="stat-num" data-count="<?= $total_tutors ?>">0<sup>+</sup></span>
-            <div class="stat-lbl"><span>🌍</span> Global Mentors</div>
+            <span class="stat-num" data-count="<?= $total_tutorials ?>">0</span>
+            <div class="stat-lbl"><span>💻</span> Free Coding Tutorials</div>
           </div>
           <div class="stat-chip">
-            <span class="stat-num" data-count="<?= $total_hours ?>">0<sup>+</sup></span>
-            <div class="stat-lbl"><span>⏱️</span> Learning Hours</div>
+            <span class="stat-num" data-count="<?= $total_paths ?>">0</span>
+            <div class="stat-lbl"><span>🧭</span> Learning Paths</div>
           </div>
         </div>
       </div>
 
-      <!-- RIGHT: Scholarship Card -->
-      <div class="schol-card">
-        <?php if($featured_scholarship): ?>
-            <div class="schol-tag"><i class="fas fa-star"></i> Featured Program 2026</div>
-            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
-              <?= htmlspecialchars($featured_scholarship['title']) ?>
-            </h2>
-            <p style="color:#475569; font-size:0.92rem; line-height:1.7; margin-bottom:24px;">
-              <?= nl2br(htmlspecialchars($featured_scholarship['description'])) ?>
-            </p>
-            <a href="scholarships?id=<?= $featured_scholarship['id'] ?>" class="btn-cta-primary" style="width:100%; justify-content:center;">
-              <i class="fas fa-graduation-cap"></i> View Active Scholarships
-            </a>
-            <div class="schol-deadline">
-              <i class="fas fa-calendar-alt" style="color:#FF8C00;"></i>
-              <span>Deadline: <strong style="color:#0f172a;"><?= $featured_scholarship['expiry_date'] ? date('M j, Y', strtotime($featured_scholarship['expiry_date'])) : 'Rolling Admission' ?></strong></span>
-            </div>
-            <div class="schol-mini-stats">
-              <div>
-                <div class="val" style="color:#00BFFF;">80%+</div>
-                <div class="lbl">Funding Grade</div>
-              </div>
-              <div style="width:1px;background:#e2e8f0;"></div>
-              <div>
-                <div class="val" style="color:#FF8C00;">KES <?= number_format($featured_scholarship['amount']/1000) ?>k</div>
-                <div class="lbl">Max Award</div>
-              </div>
-              <div style="width:1px;background:#e2e8f0;"></div>
-              <div>
-                <div class="val" style="color:#10b981;"><?= $total_courses ?>+</div>
-                <div class="lbl">Eligible Paths</div>
-              </div>
-            </div>
-        <?php else: ?>
-            <div class="schol-tag"><i class="fas fa-info-circle"></i> Updates Pending</div>
-            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
-              New Programs<br>Launching Soon.
-            </h2>
-            <p style="color:#475569; font-size:0.97rem; line-height:1.75; margin-bottom:24px;">
-              We are currently finalizing our next round of institutional funding. Join our waitlist to be notified first when seats open for Q2 2026.
-            </p>
-            <button class="btn-cta-primary" style="width:100%; justify-content:center;" onclick="SDA.showToast('We will notify you of new openings!', 'info')">
-              <i class="fas fa-bell"></i> Notify Me
-            </button>
-            <div class="schol-mini-stats" style="filter:grayscale(1); opacity:0.5;">
-              <div>
-                <div class="val">100%</div>
-                <div class="lbl">Funding Hub</div>
-              </div>
-            </div>
-        <?php endif; ?>
+      <!-- RIGHT: Learner photo, branded -->
+      <div class="hv" aria-hidden="false">
+        <div class="hv-blob"></div>
+        <div class="hv-ring"></div>
+        <picture>
+          <source srcset="assets/images/hero-learner.webp" type="image/webp">
+          <img class="hv-photo" src="assets/images/hero-learner.jpg" width="626" height="626" alt="A smiling young African learner holding a laptop with the Skope Digital Academy logo" fetchpriority="high">
+        </picture>
+        <div class="hv-card hv-c1"><span class="hv-ic" style="background:#e0f7ff;color:#0080FF"><i class="fas fa-code"></i></span><span><b>Free coding tutorials</b><small>Run code in your browser</small></span></div>
+        <div class="hv-card hv-c2"><span class="hv-ic" style="background:#fff3e0;color:#FF8C00"><i class="fas fa-award"></i></span><span><b>Earn a certificate</b><small>Verifiable online</small></span></div>
+        <div class="hv-card hv-c3"><img src="assets/pwa/icon-192.png" alt="" width="34" height="34"><span><b>Skope Digital Academy</b><small>Kisumu, Kenya</small></span></div>
       </div>
     </div>
   </div>
@@ -571,6 +551,57 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
       <?php endforeach; ?>
     </div>
   </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCHOLARSHIPS
+══════════════════════════════════ -->
+<div class="container schol-wrap">
+      <div class="schol-card">
+        <?php if($featured_scholarship): ?>
+            <div class="schol-tag"><i class="fas fa-star"></i> Featured Program 2026</div>
+            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
+              <?= htmlspecialchars($featured_scholarship['title']) ?>
+            </h2>
+            <p style="color:#475569; font-size:0.92rem; line-height:1.7; margin-bottom:24px;">
+              <?= nl2br(htmlspecialchars($featured_scholarship['description'])) ?>
+            </p>
+            <a href="scholarships?id=<?= $featured_scholarship['id'] ?>" class="btn-cta-primary" style="width:100%; justify-content:center;">
+              <i class="fas fa-graduation-cap"></i> View Active Scholarships
+            </a>
+            <div class="schol-deadline">
+              <i class="fas fa-calendar-alt" style="color:#FF8C00;"></i>
+              <span>Deadline: <strong style="color:#0f172a;"><?= $featured_scholarship['expiry_date'] ? date('M j, Y', strtotime($featured_scholarship['expiry_date'])) : 'Rolling Admission' ?></strong></span>
+            </div>
+            <div class="schol-mini-stats">
+              <div>
+                <div class="val" style="color:#00BFFF;">80%+</div>
+                <div class="lbl">Funding Grade</div>
+              </div>
+              <div style="width:1px;background:#e2e8f0;"></div>
+              <div>
+                <div class="val" style="color:#FF8C00;">KES <?= number_format($featured_scholarship['amount']/1000) ?>k</div>
+                <div class="lbl">Max Award</div>
+              </div>
+              <div style="width:1px;background:#e2e8f0;"></div>
+              <div>
+                <div class="val" style="color:#10b981;"><?= $total_courses ?>+</div>
+                <div class="lbl">Eligible Paths</div>
+              </div>
+            </div>
+        <?php else: ?>
+            <div class="schol-tag"><i class="fas fa-info-circle"></i> Scholarships</div>
+            <h2 style="font-family:'Poppins',sans-serif; font-size:1.8rem; font-weight:900; color:#0f172a; line-height:1.15; margin-bottom:14px;">
+              No open round<br>right now.
+            </h2>
+            <p style="color:#475569; font-size:0.97rem; line-height:1.75; margin-bottom:24px;">
+              New scholarship rounds are announced on our scholarships page and to registered learners by email. Create a free account so you hear first, and start with the free tutorials today.
+            </p>
+            <a href="register" class="btn-cta-primary" style="width:100%; justify-content:center;">
+              <i class="fas fa-user-plus"></i> Create a free account
+            </a>
+        <?php endif; ?>
+      </div>
 </div>
 
 <!-- ══════════════════════════════════
@@ -632,24 +663,24 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 <section class="achieve-banner">
   <div class="container" style="position:relative;z-index:1;">
     <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:2.5px;opacity:0.7;margin-bottom:52px;font-weight:800;">
-      Our Impact — Live Community Numbers
+      What you can learn here — live numbers
     </p>
     <div class="achieve-grid">
       <div>
-        <span class="ach-num" data-count="<?= $total_students ?>"><?= number_format($total_students) ?><sup>+</sup></span>
-        <div class="ach-lbl">🎓 Students Transformed</div>
+        <span class="ach-num" data-count="<?= $total_courses ?>"><?= number_format($total_courses) ?></span>
+        <div class="ach-lbl">📚 Courses</div>
       </div>
       <div>
-        <span class="ach-num" data-count="<?= $total_courses ?>"><?= number_format($total_courses) ?><sup>+</sup></span>
-        <div class="ach-lbl">📚 Expert Courses</div>
+        <span class="ach-num" data-count="<?= $total_lessons ?>"><?= number_format($total_lessons) ?></span>
+        <div class="ach-lbl">📖 Lessons</div>
       </div>
       <div>
-        <span class="ach-num" data-count="<?= $total_tutors ?>"><?= number_format($total_tutors) ?><sup>+</sup></span>
-        <div class="ach-lbl">🌍 Industry Mentors</div>
+        <span class="ach-num" data-count="<?= $total_tutorials ?>"><?= number_format($total_tutorials) ?></span>
+        <div class="ach-lbl">💻 Free Coding Tutorials</div>
       </div>
       <div>
-        <span class="ach-num" data-count="98">98<sup>%</sup></span>
-        <div class="ach-lbl">⭐ Satisfaction Rate</div>
+        <span class="ach-num" data-count="<?= $total_paths ?>"><?= number_format($total_paths) ?></span>
+        <div class="ach-lbl">🧭 Learning Paths</div>
       </div>
     </div>
   </div>
@@ -698,15 +729,14 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
               <?= ucfirst($c['level'] ?? 'All Levels') ?>
             </div>
             <div class="c-pills">
-              <span><i class="fas fa-star" style="color:#f59e0b;"></i> 4.9</span>
-              <span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= number_format(max(($c['enrolled_count'] ?? 0) + 180, 180)) ?> Learners</span>
-              <span><i class="fas fa-clock" style="color:#94a3b8;"></i> <?= $c['duration_hours'] ?? rand(8,40) ?>h</span>
+              <?php if ((int)($c['enrolled_count'] ?? 0) > 0): ?><span><i class="fas fa-users" style="color:#00BFFF;"></i> <?= number_format((int)$c['enrolled_count']) ?> enrolled</span><?php endif; ?>
+              <?php if ((float)($c['duration_hours'] ?? 0) > 0): ?><span><i class="fas fa-clock" style="color:#94a3b8;"></i> <?= (float)$c['duration_hours'] ?>h</span><?php endif; ?>
+              <span><i class="fas fa-award" style="color:#10b981;"></i> Certificate</span>
             </div>
             <div class="c-footer">
-              <span class="c-price">KES <?= number_format($c['price']) ?></span>
-              <a href="course-details?id=<?= $c['id'] ?>" class="btn-cta-primary" style="padding:10px 20px;border-radius:10px;font-size:0.82rem;">
-                Enroll Now
-              </a>
+              <?php $from = course_from_price($c); ?>
+              <span class="c-price"><?= $from <= 0 ? 'Free' : e(money($from)) ?></span>
+              <?= sda_enroll_button($c, in_array((int)$c['id'], $enrolled_ids, true), 'btn-cta-primary c-enroll') ?>
             </div>
           </div>
         </div>

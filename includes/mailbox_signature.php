@@ -86,7 +86,7 @@ function sda_mbx_save_signature(PDO $pdo, array $in): array {
 /** Image for the signature: [url, alt] or null */
 function sda_sig_image(array $sig): ?array {
     if (($sig['image'] ?? 'logo') === 'none') return null;
-    return [sda_sig_base() . '/assets/images/' . rawurlencode('Skope Digital  logo.png'), sda_sig_brand()];
+    return [sda_sig_base() . '/assets/images/' . rawurlencode('skope-logo-512.png'), sda_sig_brand()];
 }
 
 /** Branded HTML signature in the chosen template */

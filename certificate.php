@@ -63,7 +63,7 @@ http_response_code($cert ? 200 : 404);
 <?php endif; ?>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <style>
   :root { --navy: #0b1324; --blue: #0080ff; --cyan: #00bfff; --gold: #c9a227; --gold-2: #e9c75b; --orange: #ff8c00; --ink: #0f172a; --muted: #64748b; }
   * { box-sizing: border-box; }
@@ -145,7 +145,7 @@ http_response_code($cert ? 200 : 404);
 </head>
 <body>
 <div class="bar noprint">
-  <a class="home" href="./"><img src="assets/images/Skope Digital  logo.png" alt=""> Skope Digital Academy</a>
+  <a class="home" href="./"><img src="assets/images/skope-logo-512.png" alt=""> Skope Digital Academy</a>
   <?php if ($cert && $valid): ?>
     <button class="btn primary" type="button" onclick="window.print()"><i class="fas fa-file-pdf"></i> Download / Print PDF</button>
     <button class="btn" type="button" id="copyLink"><i class="fas fa-link"></i> Copy link</button>
@@ -173,7 +173,7 @@ http_response_code($cert ? 200 : 404);
     <article class="sheet" aria-label="Certificate">
       <div class="corner tl"></div><div class="corner br"></div><div class="stripe"></div>
       <div class="content">
-        <div class="head"><img src="assets/images/Skope Digital  logo.png" alt=""><span>SKOPE <em>DIGITAL</em><br>ACADEMY</span></div>
+        <div class="head"><img src="assets/images/skope-logo-512.png" alt=""><span>SKOPE <em>DIGITAL</em><br>ACADEMY</span></div>
         <div class="kicker"><?= $isPath ? 'Learning Path Certificate' : 'Certificate of Completion' ?></div>
         <h1 class="title"><?= $isPath ? 'Professional Certificate' : 'Certificate of Achievement' ?></h1>
         <div class="present">This is proudly presented to</div>

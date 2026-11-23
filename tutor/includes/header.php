@@ -53,8 +53,9 @@ $impersonating = isset($_SESSION['admin_impersonator_id']);
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="../assets/css/tutor-layout.css?v=<?= (int)$cssVer ?>">
-    <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="../assets/pwa/favicon-32.png">
     <script src="../assets/js/tutor.js?v=<?= (int)$jsVer ?>" defer></script>
+<?php require_once __DIR__ . '/../../includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="dashboard-body<?= $impersonating ? ' tp-impersonating' : '' ?>">
 <?php if (isset($_SESSION['admin_impersonator_id'])): ?>

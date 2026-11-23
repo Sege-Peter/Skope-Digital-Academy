@@ -72,7 +72,7 @@ if ($amount <= 0) {
         header("Location: enroll?id=$id&mode=" . urlencode($mode) . "&cohort=$cohort_id");
     } else {
         $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ?")->execute([$user['id']]);
-        header("Location: student/");
+        header('Location: ' . sda_after_activation('student/'));
     }
     exit;
 }

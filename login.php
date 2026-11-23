@@ -9,6 +9,7 @@ if (isLoggedIn()) {
 
 $error = '';
 if (!empty($_SESSION['google_error'])) { $error = (string)$_SESSION['google_error']; unset($_SESSION['google_error']); }
+if (!empty($_SESSION['session_expired']) && $_SERVER['REQUEST_METHOD'] !== 'POST') { $error = 'You were signed out after a period of inactivity. Please sign in again.'; unset($_SESSION['session_expired']); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrf()) {
@@ -17,8 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email    = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
+        require_once __DIR__ . '/includes/security.php';
         if (empty($email) || empty($password)) {
             $error = 'Please fill in all fields.';
+        } elseif (($blocked = sda_login_blocked($email)) !== null) {
+            $error = $blocked;                  // too many failed attempts: password guessing is paused
         } else {
             try {
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? LIMIT 1");
@@ -26,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $stmt->fetch();
 
                 if ($user && password_verify($password, $user['password'])) {
+                    sda_login_succeeded($email);
                     if ($user['status'] === 'suspended') {
                         $error = 'Your account has been suspended. Please contact support.';
                     } elseif ($user['status'] === 'pending') {
@@ -61,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         redirectByRole($user['role']);
                     }
                 } else {
+                    sda_login_failed($email);
                     $error = 'Incorrect email or password. Please try again.';
                 }
             } catch (Exception $e) {
@@ -81,14 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
-    <link rel="stylesheet" href="assets/css/auth.css?v=9">
+    <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
+    <link rel="stylesheet" href="assets/css/auth.css?v=10">
 </head>
 <body>
 <div class="auth">
     <aside class="auth-brand">
         <a class="auth-logo" href="./">
-            <img src="assets/images/Skope Digital  logo.png" alt="">
+            <img src="assets/images/skope-logo-512.png" alt="">
             <span>SKOPE <em>DIGITAL</em><small>ACADEMY</small></span>
         </a>
         <div class="auth-pitch">

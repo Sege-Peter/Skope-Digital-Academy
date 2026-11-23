@@ -271,6 +271,10 @@ if (!$active && $lessons) {
 }
 $prev = ($active && $idx > 0) ? $lessons[$idx - 1] : null;
 $next = ($active && $idx < count($lessons) - 1) ? $lessons[$idx + 1] : null;
+// Every lesson can be read, but completing it (and moving on) needs the previous lesson done and this lesson's tests passed.
+$blockReason = ($student_id && $active && ($active['progress_status'] ?? '') !== 'completed')
+    ? lesson_completion_block($pdo, (int)$student_id, $lessons, (int)$active['id']) : null;
+$prevDone = !$prev || ($prev['progress_status'] ?? '') === 'completed';
 
 // Old query-string links to a tutorial that has pretty URLs: send them to the clean address.
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['course']) && !empty($course['slug']) && preg_match('/^[a-z0-9-]+$/', $course['slug'])
@@ -299,6 +303,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['track']) && !$enrolled && $free_self_paced) {
         enroll_student($pdo, $student_id, $course, 'self_paced', null, 0);
         header('Location: ' . sda_base_href() . learn_url($course, $active, 'tracking=1'));
+        exit;
+    }
+    if (isset($_POST['complete']) && $blockReason !== null) {
+        header('Location: ' . sda_base_href() . learn_url($course, $active, 'blocked=1') . '#lrGate');
         exit;
     }
     if (isset($_POST['complete']) && $enrolled && $active && $active['can_read'] && empty($active['is_locked'])) {
@@ -347,6 +355,7 @@ $track = ($student_id && $active && $active['can_read'] && $view === 'lesson' &&
     'endpoint' => 'api/track', 'csrf' => csrfToken(), 'lesson' => (int)$active['id'],
     'minSecs' => max(20, min(120, (int)round((int)($active['duration_mins'] ?: 5) * 60 * 0.3))),
     'completed' => ($active['progress_status'] ?? '') === 'completed', 'next' => $next ? learn_url($course, $next) : null,
+    'blocked' => $blockReason !== null, 'prevDone' => $prevDone,
 ] : null;
 $tutName = $course['tutorial_short'] ?: $course['title'];
 // Course project: learner state (chip in the sidebar, project page).
@@ -524,7 +533,10 @@ include 'includes/learn-top.php';
             <?php if (($active['progress_status'] ?? '') === 'completed'): ?>
               <span class="lr-pill free"><i class="fas fa-check"></i> Completed</span>
             <?php else: ?>
-              <form method="post" action="<?= e($here) ?>"><input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+              <?php if ($blockReason !== null): ?>
+                <div class="lr-gate" id="lrGate" role="status"><i class="fas fa-lock"></i><span><?= e($blockReason) ?></span></div>
+              <?php endif; ?>
+              <form method="post" action="<?= e($here) ?>" id="lrCompleteForm"<?= $blockReason !== null ? ' hidden' : '' ?>><input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
                 <button class="lr-btn lr-btn-ok" name="complete" value="1"><i class="fas fa-check"></i> Mark complete<?= $next ? ' &amp; continue' : '' ?></button></form>
             <?php endif; ?>
             <?php if (!empty($active['attached_quiz_id'])): ?>
@@ -533,6 +545,7 @@ include 'includes/learn-top.php';
             <?php if (!empty($active['due_at'])): ?><span class="lr-muted">Due <?= date('D, M j', $active['due_at']) ?></span><?php endif; ?>
           <?php elseif ($student_id && $free_self_paced): ?>
             <span class="lr-pill self"><i class="fas fa-satellite-dish"></i> Your progress is saved automatically</span>
+            <?php if ($blockReason !== null): ?><div class="lr-gate" id="lrGate" role="status"><i class="fas fa-lock"></i><span><?= e($blockReason) ?></span></div><?php endif; ?>
           <?php elseif (!$user): ?>
             <span class="lr-muted"><a href="login">Sign in</a> or <a href="register">create a free account</a> to track progress, earn XP, badges and a certificate.</span>
           <?php elseif (!$enrolled && !$is_staff && !$course['is_open_tutorial']): ?>
@@ -576,6 +589,6 @@ include 'includes/learn-top.php';
 <div class="lr-celebrate" id="celebrate" hidden></div>
 <div class="lr-xp-toast" id="xpToast" role="status" aria-live="polite"></div>
 <script>window.SDA_TRACK = <?= json_encode($track, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_FLASH = <?= json_encode($flash, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_LEVEL = <?= json_encode($meLevel) ?>;</script>
-<script src="assets/js/learn.js?v=6"></script>
+<script src="assets/js/learn.js?v=8"></script>
 </body>
 </html>

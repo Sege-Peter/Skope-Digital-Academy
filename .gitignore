@@ -3,3 +3,6 @@ includes/private/
 uploads/proofs/
 uploads/id_docs/
 uploads/projects/
+
+# Generated link-preview images (rebuilt on demand)
+uploads/og/

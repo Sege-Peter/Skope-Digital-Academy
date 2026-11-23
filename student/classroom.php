@@ -74,7 +74,8 @@ try {
         $l_to_complete = (int)$_POST['complete_lesson'];
         $target = null;
         foreach ($lessons as $l) { if ($l['id'] == $l_to_complete) { $target = $l; break; } }
-        if (verifyCsrf() && $target && !$target['is_locked']) {
+        // Lessons can be read any time; completing one needs the previous lesson done and this lesson's tests passed.
+        if (verifyCsrf() && $target && !$target['is_locked'] && lesson_completion_block($pdo, (int)$student['id'], $lessons, $l_to_complete) === null) {
             complete_lesson($pdo, $enrollment, $l_to_complete);
             $go = (!empty($_POST['and_next']) && $next_lesson) ? $next_lesson['id'] : $l_to_complete;
             header("Location: classroom?id=$course_id&lesson=$go&success=1");
@@ -342,6 +343,9 @@ $lesson_kind = $is_quiz_lesson ? 'Quiz' : ($active_lesson['lesson_type'] === 'vi
                     <?php else: ?>
                         <a class="sp-btn" href="courses">Back to my courses</a>
                     <?php endif; ?>
+                <?php elseif (($crBlock = lesson_completion_block($pdo, (int)$student['id'], $lessons, (int)$active_lesson['id'])) !== null): ?>
+                    <div class="sp-alert warning" style="margin:0;flex:1 1 100%"><i class="fas fa-lock" style="margin-top:3px"></i><div><?= e($crBlock) ?></div></div>
+                    <?php if ($next_lesson): ?><a class="sp-btn ghost" href="?id=<?= $course_id ?>&lesson=<?= (int)$next_lesson['id'] ?>">Read next lesson <i class="fas fa-chevron-right"></i></a><?php endif; ?>
                 <?php else: ?>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">

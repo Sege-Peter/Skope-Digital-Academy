@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/auth.php';
 
 // Must be logged in
 if (!isLoggedIn()) {
-    header('Location: /Skope Digital Academy/login');
+    header('Location: ' . sda_path('login'));
     exit;
 }
 
@@ -75,9 +75,9 @@ try {
 
 // Back-link differs by role
 $backLink = match($currentUser['role']) {
-    'admin'  => '/Skope Digital Academy/admin/certificates',
-    'tutor'  => '/Skope Digital Academy/tutor/students',
-    default  => '/Skope Digital Academy/student/certificates',
+    'admin'  => sda_path('admin/certificates'),
+    'tutor'  => sda_path('tutor/students'),
+    default  => sda_path('student/certificates'),
 };
 ?>
 <!DOCTYPE html>
@@ -91,7 +91,7 @@ $backLink = match($currentUser['role']) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
+<link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="../assets/pwa/favicon-32.png">
 
 <style>
 /* ─── Reset & Base (page around the certificate: student portal look) ─── */
@@ -518,7 +518,7 @@ body {
 
             <!-- Top: Logo + Title -->
             <div class="dc-top">
-                <img src="../assets/images/Skope Digital  logo.png" class="dc-logo" alt="Skope Digital Academy" onerror="this.style.display='none'">
+                <img src="../assets/images/skope-logo-512.png" class="dc-logo" alt="Skope Digital Academy" onerror="this.style.display='none'">
                 <div class="dc-title">Certificate of Completion</div>
                 <div class="dc-subtitle">Awarded by Skope Digital Academy &nbsp;•&nbsp; <?= htmlspecialchars(ucfirst($cert['course_level'] ?? 'Professional')) ?> Level</div>
             </div>

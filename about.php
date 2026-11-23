@@ -3,16 +3,14 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 
 // Fetch live stats from DB
-$BASE_STUDENTS = 2400; $BASE_COURSES = 118; $BASE_TUTORS = 80;
+// Real numbers only (no padding)
+$total_courses = $total_lessons = $total_tutorials = $total_paths = 0;
 try {
-    $total_students = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn() + $BASE_STUDENTS;
-    $total_courses  = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status='published'")->fetchColumn() + $BASE_COURSES;
-    $total_tutors   = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='tutor' AND status='active'")->fetchColumn() + $BASE_TUTORS;
-} catch(Exception $e) {
-    $total_students = $BASE_STUDENTS;
-    $total_courses  = $BASE_COURSES;
-    $total_tutors   = $BASE_TUTORS;
-}
+    $total_courses   = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status='published'")->fetchColumn();
+    $total_lessons   = (int)$pdo->query("SELECT COUNT(*) FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status='published'")->fetchColumn();
+    $total_tutorials = (int)$pdo->query("SELECT COUNT(*) FROM courses WHERE status='published' AND is_open_tutorial = 1")->fetchColumn();
+    $total_paths     = (int)$pdo->query("SELECT COUNT(*) FROM learning_paths")->fetchColumn();
+} catch (Exception $e) { /* keep zeros */ }
 $user = isLoggedIn() ? currentUser() : null;
 ?>
 <!DOCTYPE html>
@@ -26,7 +24,7 @@ $user = isLoggedIn() ? currentUser() : null;
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/css/main.css">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <style>
 /* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -288,20 +286,20 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
   <div class="container">
     <div class="stats-strip-grid">
       <div class="stat-item" data-aos>
-        <span class="stat-item-num"><?= number_format($total_students) ?><span>+</span></span>
-        <div class="stat-item-lbl">🎓 Active Learners</div>
+        <span class="stat-item-num"><?= number_format($total_courses) ?></span>
+        <div class="stat-item-lbl">📚 Courses</div>
       </div>
       <div class="stat-item" data-aos style="transition-delay:0.1s;">
-        <span class="stat-item-num"><?= number_format($total_courses) ?><span>+</span></span>
-        <div class="stat-item-lbl">📚 Published Courses</div>
+        <span class="stat-item-num"><?= number_format($total_lessons) ?></span>
+        <div class="stat-item-lbl">📖 Lessons</div>
       </div>
       <div class="stat-item" data-aos style="transition-delay:0.2s;">
-        <span class="stat-item-num"><?= number_format($total_tutors) ?><span>+</span></span>
-        <div class="stat-item-lbl">🌍 Expert Mentors</div>
+        <span class="stat-item-num"><?= number_format($total_tutorials) ?></span>
+        <div class="stat-item-lbl">💻 Free Coding Tutorials</div>
       </div>
       <div class="stat-item" data-aos style="transition-delay:0.3s;">
-        <span class="stat-item-num">98<span>%</span></span>
-        <div class="stat-item-lbl">⭐ Satisfaction Rate</div>
+        <span class="stat-item-num"><?= number_format($total_paths) ?></span>
+        <div class="stat-item-lbl">🧭 Learning Paths</div>
       </div>
     </div>
   </div>
@@ -411,7 +409,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
   <div class="container">
     <div class="about-cta-inner" data-aos>
       <h2>Ready to <span>Transform</span> Your Career?</h2>
-      <p>Join <?= number_format($total_students) ?>+ learners already mastering the future of technology with Africa's most innovative learning platform.</p>
+      <p>Start free today: <?= number_format($total_courses) ?> courses and <?= number_format($total_lessons) ?> lessons in coding and digital skills, built for learners in Kenya and East Africa.</p>
       <div class="about-cta-btns">
         <a href="courses" class="btn-cta-w"><i class="fas fa-rocket"></i> Start Learning Free</a>
         <a href="scholarships" class="btn-cta-ow"><i class="fas fa-graduation-cap"></i> Apply for Scholarship</a>

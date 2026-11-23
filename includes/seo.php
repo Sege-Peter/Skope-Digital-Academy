@@ -36,6 +36,45 @@ function sda_seo_abs(string $path): string
     return sda_seo_base() . '/' . $enc . ($q !== null && $q !== '' ? '?' . $q : '');
 }
 
+/**
+ * Share image for link previews (WhatsApp, Facebook, X, LinkedIn): a 1200x630 JPEG copy of a local image,
+ * made once in uploads/og/ and reused. WhatsApp often drops WebP, very large or oddly sized images.
+ * Returns [relative path, width, height], or null to fall back to the default share image.
+ */
+function sda_seo_share_image(string $rel): ?array
+{
+    $root = dirname(__DIR__);
+    $rel = ltrim(rawurldecode($rel), '/');
+    $src = realpath($root . '/' . $rel);
+    if (!$src || !str_starts_with($src, realpath($root)) || !is_file($src)) return null;
+    $info = @getimagesize($src);
+    if (!$info) return null;
+    [$w, $h, $type] = $info;
+    // Already a sensible JPEG/PNG share image: use it as is
+    if (in_array($type, [IMAGETYPE_JPEG, IMAGETYPE_PNG], true) && $w >= 600 && $w <= 2400 && abs($w / max(1, $h) - 1.91) < 0.12 && filesize($src) < 900000) return [$rel, $w, $h];
+    $out = 'uploads/og/' . substr(sha1($rel . '|' . filemtime($src)), 0, 16) . '.jpg';
+    if (is_file($root . '/' . $out)) return [$out, 1200, 630];
+    if (!function_exists('imagecreatetruecolor')) return null;
+    $im = match ($type) {
+        IMAGETYPE_JPEG => @imagecreatefromjpeg($src),
+        IMAGETYPE_PNG => @imagecreatefrompng($src),
+        IMAGETYPE_WEBP => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($src) : false,
+        IMAGETYPE_GIF => @imagecreatefromgif($src),
+        default => false,
+    };
+    if (!$im) return null;
+    $W = 1200; $H = 630;
+    $dst = imagecreatetruecolor($W, $H);
+    imagefill($dst, 0, 0, imagecolorallocate($dst, 11, 18, 32));          // brand dark behind transparent parts
+    $scale = max($W / $w, $H / $h);                                         // cover, centred
+    $cw = (int)round($W / $scale); $ch = (int)round($H / $scale);
+    imagecopyresampled($dst, $im, 0, 0, (int)(($w - $cw) / 2), (int)(($h - $ch) / 2), $W, $H, $cw, $ch);
+    if (!is_dir($root . '/uploads/og')) @mkdir($root . '/uploads/og', 0775, true);
+    $ok = @imagejpeg($dst, $root . '/' . $out, 84);
+    imagedestroy($im); imagedestroy($dst);
+    return $ok ? [$out, 1200, 630] : null;
+}
+
 /** The current page's path relative to the site root (for canonical links), keeping only $keepQuery params. */
 function sda_seo_current_path(array $keepQuery = []): string
 {
@@ -72,7 +111,7 @@ function sda_seo_org(): array
         'name' => SDA_SEO_SITE,
         'alternateName' => ['Skope Digital', 'SDA'],
         'url' => $base . '/',
-        'logo' => ['@type' => 'ImageObject', 'url' => sda_seo_abs('assets/images/Skope Digital  logo.png'), 'width' => 512, 'height' => 512],
+        'logo' => ['@type' => 'ImageObject', 'url' => sda_seo_abs('assets/images/skope-logo-512.png'), 'width' => 512, 'height' => 512],
         'image' => sda_seo_abs('assets/images/og-image.jpg'),
         'description' => 'Online academy in Kisumu, Kenya teaching coding and income skills through free tutorials, self-paced and structured courses, with verifiable certificates.',
         'email' => $c['email'],
@@ -97,8 +136,12 @@ function sda_seo(array $o): void
     if (mb_strlen($desc) > 160) $desc = rtrim(mb_substr($desc, 0, 157), " ,.;:-") . '…';
     $path = ltrim((string)($o['path'] ?? ''), '/');
     $url = $path === '' ? $base . '/' : sda_seo_abs($path);
-    $image = sda_seo_abs((string)(!empty($o['image']) ? $o['image'] : 'assets/images/og-image.jpg'));
-    $isDefaultImage = empty($o['image']);
+    $img = ['assets/images/og-image.jpg', 1200, 630];
+    if (!empty($o['image'])) {
+        $img = preg_match('#^https?://#i', (string)$o['image']) ? [(string)$o['image'], 0, 0] : (sda_seo_share_image((string)$o['image']) ?? $img);
+    }
+    $image = sda_seo_abs($img[0]);
+    $imgType = str_ends_with(strtolower($img[0]), '.png') ? 'image/png' : 'image/jpeg';
     $robots = !empty($o['noindex']) ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
 
     echo "\n    <!-- SEO -->\n";
@@ -107,10 +150,9 @@ function sda_seo(array $o): void
     echo '    <link rel="canonical" href="' . $h($url) . "\">\n";
     if (!empty($o['keywords'])) echo '    <meta name="keywords" content="' . $h($o['keywords']) . "\">\n";
     echo '    <meta name="author" content="' . SDA_SEO_SITE . "\">\n";
-    echo '    <meta name="theme-color" content="#0b1220">' . "\n";
     echo '    <meta name="geo.region" content="KE-17"><meta name="geo.placename" content="Kisumu">' . "\n";
-    echo '    <link rel="icon" type="image/png" href="' . $h(sda_seo_abs('assets/images/Skope Digital  logo.png')) . '">' . "\n";
-    echo '    <link rel="apple-touch-icon" href="' . $h(sda_seo_abs('assets/images/Skope Digital  logo.png')) . '">' . "\n";
+    require_once __DIR__ . '/pwa.php';
+    sda_pwa_head();
     // Open Graph (Facebook, WhatsApp, LinkedIn)
     echo '    <meta property="og:site_name" content="' . SDA_SEO_SITE . "\">\n";
     echo '    <meta property="og:locale" content="en_KE">' . "\n";
@@ -119,7 +161,8 @@ function sda_seo(array $o): void
     if ($desc !== '') echo '    <meta property="og:description" content="' . $h($desc) . "\">\n";
     echo '    <meta property="og:url" content="' . $h($url) . "\">\n";
     echo '    <meta property="og:image" content="' . $h($image) . "\">\n";
-    if ($isDefaultImage) echo '    <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">' . "\n";
+    echo '    <meta property="og:image:secure_url" content="' . $h($image) . "\">\n";
+    if ($img[1]) echo '    <meta property="og:image:type" content="' . $imgType . '"><meta property="og:image:width" content="' . (int)$img[1] . '"><meta property="og:image:height" content="' . (int)$img[2] . "\">\n";
     echo '    <meta property="og:image:alt" content="' . $h($o['image_alt'] ?? SDA_SEO_SITE . ' – learn digital skills that pay') . "\">\n";
     // Twitter / X
     echo '    <meta name="twitter:card" content="summary_large_image">' . "\n";

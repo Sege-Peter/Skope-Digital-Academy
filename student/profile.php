@@ -60,6 +60,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Exception $e) { $error = 'Could not change your password. Please try again.'; }
     }
 
+    // Delete my account: personal details are erased; anonymous payment and certificate records stay for the books.
+    elseif (isset($_POST['delete_account'])) {
+        $me = $pdo->prepare("SELECT email, avatar, id_document FROM users WHERE id = ? AND role = 'student'");
+        $me->execute([$sid]);
+        $me = $me->fetch();
+        if (!$me) {
+            $error = 'This account cannot be deleted here.';
+        } elseif (trim((string)($_POST['confirm_word'] ?? '')) !== 'DELETE' || mb_strtolower(trim((string)($_POST['confirm_email'] ?? ''))) !== mb_strtolower((string)$me['email'])) {
+            $error = 'To delete your account, type DELETE and your email address exactly.';
+        } else {
+            try {
+                foreach (['avatars' => $me['avatar'], 'id_docs' => $me['id_document']] as $dir => $file) {
+                    if ($file && preg_match('/^[\w.-]+$/', basename((string)$file))) @unlink(__DIR__ . '/../uploads/' . $dir . '/' . basename((string)$file));
+                }
+                $pdo->prepare("UPDATE users SET name = 'Deleted learner', email = ?, password = ?, phone = NULL, avatar = NULL, bio = NULL, dob = NULL,
+                                      gender = NULL, county = NULL, nationality = NULL, national_id = NULL, education_level = NULL, id_document = NULL,
+                                      status = 'suspended', show_on_leaderboard = 0 WHERE id = ? AND role = 'student'")
+                    ->execute(['deleted-' . $sid . '-' . bin2hex(random_bytes(4)) . '@deleted.invalid', password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $sid]);
+                try { $pdo->prepare("INSERT INTO activity_log (user_id, action, description) VALUES (?, 'account_deleted', 'Learner deleted their own account')")->execute([$sid]); } catch (Throwable $e) {}
+                logoutUser();
+                header('Location: ../?msg=account_deleted');
+                exit;
+            } catch (Throwable $e) { error_log('[delete account] ' . $e->getMessage()); $error = 'Could not delete your account. Please contact support.'; }
+        }
+    }
+
     // Avatar upload
     elseif (isset($_FILES['avatar'])) {
         $file = $_FILES['avatar'];
@@ -183,6 +209,23 @@ require_once 'includes/layout-top.php';
                         <button type="submit" name="change_password" class="sp-btn ghost"><i class="fas fa-lock"></i> Change password</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Delete account -->
+            <div class="sp-card" style="border:1px solid #fecaca">
+                <div class="sp-card-head"><h3 style="color:#b91c1c">Delete my account</h3></div>
+                <details>
+                    <summary style="cursor:pointer;font-weight:600;color:#b91c1c">I want to delete my account</summary>
+                    <p style="margin:12px 0;color:var(--text-muted,#64748b);line-height:1.6">This erases your name, email, phone, photo and ID details and signs you out for good. Your course progress and certificates can no longer be opened by you. Anonymous payment records are kept for the academy's accounts. This cannot be undone.</p>
+                    <form method="POST" class="sp-form" autocomplete="off" onsubmit="return confirm('Delete your account permanently? This cannot be undone.')">
+                        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                        <div class="pf-two">
+                            <div class="sp-field"><label for="del-word">Type DELETE</label><input id="del-word" name="confirm_word" required pattern="DELETE" autocomplete="off"></div>
+                            <div class="sp-field"><label for="del-email">Your email address</label><input id="del-email" type="email" name="confirm_email" required autocomplete="off"></div>
+                        </div>
+                        <div class="sp-row" style="justify-content:flex-end"><button type="submit" name="delete_account" value="1" class="sp-btn" style="background:#dc2626"><i class="fas fa-user-xmark"></i> Delete my account</button></div>
+                    </form>
+                </details>
             </div>
         </div>
 

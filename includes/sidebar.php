@@ -13,7 +13,7 @@
     <!-- Branding Hub -->
     <div class="sidebar-brand-container">
         <a href="../" class="sidebar-logo">
-            <img src="../assets/images/Skope Digital  logo.png" style="height: 36px;" alt="Skope Digital Academy Logo">
+            <img src="../assets/images/skope-logo-512.png" style="height: 36px;" alt="Skope Digital Academy Logo">
             <div class="brand-text">
                 <span class="main">SKOPE <span class="accent">DIGITAL</span></span>
                 <span class="sub">ACADEMY</span>

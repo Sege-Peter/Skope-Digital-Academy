@@ -31,7 +31,7 @@ $navAct = fn($p) => $navCur === $p ? ' class="active" aria-current="page"' : '';
 
     <!-- Logo -->
     <a href="./" class="navbar-logo" style="display: flex; align-items: center; gap: 15px; text-decoration: none;">
-      <img src="assets/images/Skope Digital  logo.png" alt="Skope Digital" style="height: 54px;">
+      <img src="assets/images/skope-logo-512.png" alt="Skope Digital" style="height: 54px;">
       <div style="line-height: 1.1;">
         <div style="font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.2rem; color: #0f172a; letter-spacing: -0.5px;">SKOPE <span style="color:#FF8C00">DIGITAL</span></div>
         <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">ACADEMY</div>

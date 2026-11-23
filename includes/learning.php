@@ -268,7 +268,7 @@ function apply_lesson_schedule(array $lessons, ?array $enrollment): array {
     $expired = $enrollment && !empty($enrollment['expires_at']) && strtotime($enrollment['expires_at']) < time();
     $start = strtotime(($enrollment['starts_on'] ?? null) ?: date('Y-m-d'));
     $week_days = max(1, (int)setting('structured_week_days'));
-    $pass = (int)setting('structured_pass_score');
+
     $weeks = array_map(fn($l) => (int)($l['week_num'] ?: 1), $lessons);
     $first_week = $weeks ? min($weeks) : 1;
 
@@ -289,14 +289,9 @@ function apply_lesson_schedule(array $lessons, ?array $enrollment): array {
             $l['opens_at'] = strtotime($l['release_date']);
             continue;
         }
-        if ($mode !== 'structured') {
-            // Self-paced: still one lesson at a time when the platform rule is on
-            if ($i > 0 && setting('sequential_lessons') === '1' && ($lessons[$i - 1]['progress_status'] ?? '') !== 'completed') {
-                $l['is_locked'] = true;
-                $l['lock_reason'] = 'Finish "' . ($lessons[$i - 1]['title'] ?? 'the previous lesson') . '" first';
-            }
-            continue;
-        }
+        // Lesson order is enforced when completing (lesson_completion_block: previous lesson done and this
+        // lesson's tests passed), not when reading: every released lesson can be opened and read.
+        if ($mode !== 'structured') continue;
 
         $offset = ((int)($l['week_num'] ?: 1) - $first_week) * $week_days;
         $opens = strtotime("+$offset days", $start);
@@ -305,17 +300,6 @@ function apply_lesson_schedule(array $lessons, ?array $enrollment): array {
         if ($opens > time()) {
             $l['is_locked'] = true;
             $l['lock_reason'] = 'Opens ' . date('D, M j', $opens);
-            continue;
-        }
-        if ($i > 0) {
-            $prev = $lessons[$i - 1];
-            if (($prev['progress_status'] ?? '') !== 'completed') {
-                $l['is_locked'] = true;
-                $l['lock_reason'] = 'Finish "' . ($prev['title'] ?? 'the previous lesson') . '" first';
-            } elseif (!empty($prev['attached_quiz_id']) && (float)($prev['quiz_score'] ?? 0) < $pass) {
-                $l['is_locked'] = true;
-                $l['lock_reason'] = "Score $pass% on the previous quiz first";
-            }
         }
     }
     unset($l);
@@ -337,7 +321,7 @@ function reader_can_view(array $course, array $lesson, ?array $enrollment): arra
 /** Lessons of a course in order, with this learner's progress and best linked-quiz score. */
 function load_course_lessons(PDO $pdo, int $course_id, ?int $student_id): array {
     $sid = $student_id ?: 0;
-    $stmt = $pdo->prepare("SELECT l.*, q.id AS attached_quiz_id, q.title AS attached_quiz_title,
+    $stmt = $pdo->prepare("SELECT l.*, q.id AS attached_quiz_id, q.title AS attached_quiz_title, q.pass_score AS attached_quiz_pass,
                                   (SELECT status FROM lesson_progress WHERE student_id = ? AND lesson_id = l.id) AS progress_status,
                                   (SELECT MAX(score) FROM quiz_attempts WHERE student_id = ? AND quiz_id = q.id) AS quiz_score
                            FROM lessons l
@@ -360,6 +344,63 @@ function complete_lesson(PDO $pdo, array $enrollment, int $lesson_id): float {
     $res = track_lesson_complete($pdo, (int)$enrollment['student_id'], ['id' => $lesson_id, 'course_id' => (int)$enrollment['course_id']]);
     progress_flash_add($res);
     return (float)($res['progress'] ?? 0);
+}
+
+/* ── Lesson tests: finish them before moving on ───────────────────────── */
+
+/**
+ * The tests inside a lesson (fill-in exercises, the quiz block, an attached quiz) and which ones this
+ * learner has passed. Returns ['total', 'done', 'missing' => [labels], 'ok' => bool].
+ * $l is a row from load_course_lessons() (needs id, content, attached_quiz_id, attached_quiz_pass, quiz_score).
+ */
+function lesson_tests_status(PDO $pdo, int $uid, array $l): array {
+    require_once __DIR__ . '/lesson_render.php';
+    $ex = 0; $qz = 0;
+    foreach (lr_blocks((string)($l['content'] ?? '')) as $b) {
+        if ($b['type'] !== 'fence') continue;
+        if ($b['info'] === 'exercise') $ex++;
+        elseif ($b['info'] === 'quiz') $qz++;
+    }
+    $lid = (int)$l['id'];
+    $want = [];
+    for ($i = 1; $i <= $ex; $i++) $want["exercise:$lid:$i"] = $ex > 1 ? "Exercise $i" : 'Exercise';
+    for ($i = 1; $i <= $qz; $i++) $want["quiz:$lid:$i"] = $qz > 1 ? "Quiz $i" : 'Quiz';
+    $have = [];
+    if ($want) {
+        $in = implode(',', array_fill(0, count($want), '?'));
+        $st = $pdo->prepare("SELECT event_key FROM learning_events WHERE user_id = ? AND event_key IN ($in)");
+        $st->execute(array_merge([$uid], array_keys($want)));
+        $have = array_flip($st->fetchAll(PDO::FETCH_COLUMN));
+    }
+    $missing = [];
+    foreach ($want as $k => $label) if (!isset($have[$k])) $missing[] = $label;
+    $total = count($want);
+    if (!empty($l['attached_quiz_id'])) {
+        $total++;
+        $pass = (float)($l['attached_quiz_pass'] ?? 0) ?: (float)setting('structured_pass_score');
+        if ($l['quiz_score'] === null || (float)$l['quiz_score'] < $pass) $missing[] = 'Lesson quiz (' . (int)$pass . '%)';
+    }
+    return ['total' => $total, 'done' => $total - count($missing), 'missing' => $missing, 'ok' => !$missing];
+}
+
+/**
+ * Why this lesson cannot be completed yet (null = it can). Lessons can always be read; completing one
+ * needs the lesson before it completed and every test in this lesson passed.
+ */
+function lesson_completion_block(PDO $pdo, int $uid, array $lessons, int $lessonId): ?string {
+    foreach (array_values($lessons) as $i => $l) {
+        if ((int)$l['id'] !== $lessonId) continue;
+        $prev = $i > 0 ? array_values($lessons)[$i - 1] : null;
+        if ($prev && ($prev['progress_status'] ?? '') !== 'completed') {
+            return 'Complete the previous lesson, "' . $prev['title'] . '", and its tests first.';
+        }
+        $t = lesson_tests_status($pdo, $uid, $l);
+        if (!$t['ok']) {
+            return 'Finish the tests in this lesson to continue (' . $t['done'] . ' of ' . $t['total'] . ' done). Still to do: ' . implode(', ', $t['missing']) . '.';
+        }
+        return null;
+    }
+    return null;
 }
 
 /** YouTube/Vimeo watch link → embeddable URL; anything else returned as-is (or null). */
@@ -438,4 +479,28 @@ function render_lesson_text(?string $text): string {
 /** Languages the Try-it editor can run in the browser sandbox. */
 function tryit_runnable(?string $lang): bool {
     return in_array($lang, ['html', 'css', 'javascript'], true);
+}
+
+/**
+ * "Enroll me" button for a course card. Enrolled -> "Continue learning" (classroom).
+ * Signed-in learner -> one-tap POST to enroll-me (free: straight into the classroom; paid: payment step).
+ * Everyone else -> enroll-me (signs in first, then comes back).
+ * $prefix is the path back to the site root ('' on public pages, '../' inside /student).
+ */
+function sda_enroll_button(array $c, bool $enrolled, string $class = 'btn-enroll', string $prefix = ''): string
+{
+    $id = (int)$c['id'];
+    $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    if ($enrolled) {
+        return '<a href="' . $h($prefix . 'student/classroom?id=' . $id) . '" class="' . $h($class) . ' is-enrolled"><i class="fas fa-play-circle"></i> Continue learning</a>';
+    }
+    $free = in_array('self_paced', course_modes($c), true) && course_price($c, 'self_paced') <= 0;
+    $label = '<i class="fas fa-' . ($free ? 'bolt' : 'user-plus') . '"></i> Enroll me' . ($free ? ' · Free' : '');
+    $u = function_exists('currentUser') && function_exists('isLoggedIn') && isLoggedIn() ? currentUser() : null;
+    if ($u && ($u['role'] ?? '') === 'student' && function_exists('csrfToken')) {
+        return '<form method="post" action="' . $h($prefix . 'enroll-me') . '" class="sda-enroll-form" style="display:contents">'
+            . '<input type="hidden" name="csrf_token" value="' . $h(csrfToken()) . '"><input type="hidden" name="id" value="' . $id . '">'
+            . '<button type="submit" class="' . $h($class) . '" style="cursor:pointer;font:inherit">' . $label . '</button></form>';
+    }
+    return '<a href="' . $h($prefix . 'enroll-me?id=' . $id) . '" class="' . $h($class) . '" rel="nofollow">' . $label . '</a>';
 }

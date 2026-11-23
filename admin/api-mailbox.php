@@ -28,6 +28,8 @@ require_once __DIR__ . '/../includes/mailbox.php';
 $out = function (array $d, int $code = 200): never { http_response_code($code); echo json_encode($d, JSON_INVALID_UTF8_SUBSTITUTE); exit; };
 
 if (!isLoggedIn() || ($_SESSION['role'] ?? '') !== 'admin') $out(['success' => false, 'message' => 'Your session has ended. Please sign in again.'], 401);
+require_once __DIR__ . '/../includes/security.php';
+if (!sda_mfa_ok()) $out(['success' => false, 'message' => 'Confirm your two-factor sign-in first, then reload this page.'], 401);
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'POST' && !verifyCsrf()) $out(['success' => false, 'message' => 'Your session expired or the page is out of date. Refresh the page and try again.'], 403);
 $user = currentUser();                 // ax_log() reads the global $user

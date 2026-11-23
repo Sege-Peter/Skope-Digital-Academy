@@ -5,8 +5,8 @@
  */
 
 // DO NOT SHARE THIS FILE
-define('GEMINI_API_KEY', 'AIzaSyAdInQlcrhpXm6y1I-9kSqLeMYlosdZz4k');
-define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent');
+require_once __DIR__ . '/db.php';   // defines GEMINI_API_KEY (Admin > Settings > AI, or includes/private/config.php)
+defined('GEMINI_API_URL') || define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent');
 
 /**
  * Core function to interact with Gemini API
@@ -25,7 +25,7 @@ function callGemini(string $prompt): ?string {
         ]
     ];
 
-    $ch = curl_init(GEMINI_API_URL . "?key=" . GEMINI_API_KEY);
+    $ch = curl_init(str_contains(GEMINI_API_URL, 'key=') ? GEMINI_API_URL : GEMINI_API_URL . '?key=' . GEMINI_API_KEY);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));

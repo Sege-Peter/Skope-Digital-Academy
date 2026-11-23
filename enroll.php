@@ -10,14 +10,23 @@ require_once 'includes/learning.php';
 require_once 'includes/coupons.php';
 
 $id = (int)($_GET['id'] ?? 0);
+// Only registered learners enroll: visitors sign up first, unactivated accounts finish registration first.
 if (!isLoggedIn()) {
-    $_SESSION['redirect_after_login'] = "enroll?id=" . $id;
-    header('Location: login?msg=login_to_enroll');
+    $_SESSION['redirect_after_login'] = $_SESSION['after_activation'] = "enroll?id=" . $id;
+    header('Location: register?msg=signup_to_enroll');
     exit;
 }
 $user = currentUser();
 if ($user['role'] !== 'student') { header('Location: course-details?id=' . $id); exit; }
 if (!$id) { header('Location: courses'); exit; }
+$st = $pdo->prepare("SELECT status FROM users WHERE id = ?");
+$st->execute([$user['id']]);
+if (($ust = (string)$st->fetchColumn()) !== 'active') {
+    if ($ust === 'suspended') { header('Location: course-details?id=' . $id); exit; }
+    $_SESSION['after_activation'] = "enroll?id=" . $id;
+    header('Location: checkout?type=registration');
+    exit;
+}
 
 $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ? AND status = 'published'");
 $stmt->execute([$id]);
@@ -188,7 +197,7 @@ $hero_title = $is_active ? 'Change your learning track' : ($step === 1 ? 'How do
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/css/main.css">
 <link rel="stylesheet" href="assets/css/enroll.css?v=1">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 </head>
 <body class="en-body">
 <?php require_once 'includes/nav.php'; ?>

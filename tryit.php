@@ -129,12 +129,12 @@ $config = [
 <link rel="stylesheet" href="<?= $cm ?>/codemirror.min.css">
 <link rel="stylesheet" href="<?= $cm ?>/theme/material-darker.min.css">
 <link rel="stylesheet" href="assets/css/tryit.css?v=2">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 </head>
 <body class="ti">
 <header class="ti-top">
   <a class="ti-back" href="<?= e($back) ?>" title="<?= e($backLabel) ?>"><i class="fas fa-arrow-left"></i><span><?= e($backLabel) ?></span></a>
-  <a class="ti-brand" href="learn" title="Skope tutorials"><img src="assets/images/Skope Digital  logo.png" alt=""><span>Try it <b>Yourself</b></span></a>
+  <a class="ti-brand" href="learn" title="Skope tutorials"><img src="assets/images/skope-logo-512.png" alt=""><span>Try it <b>Yourself</b></span></a>
   <div class="ti-title" title="<?= e($title) ?>"><?= e($title) ?></div>
   <?php if (!$lesson_id): ?>
     <nav class="ti-langs" aria-label="Language">

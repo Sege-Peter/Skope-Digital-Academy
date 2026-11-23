@@ -262,7 +262,17 @@ body { font-family: 'Inter', sans-serif; color: var(--ink-2); background: #fff; 
 /* Continue with Google */
 .auth > * { min-width: 0; }                      /* let the columns shrink on phones (no sideways scroll) */
 .gsi-wrap { display: grid; gap: 8px; width: 100%; margin: 4px 0 0; }
-.gsi-slot { width: 100%; height: 44px; display: flex; justify-content: center; align-items: flex-start; overflow: visible; }
+.gsi-box { position: relative; width: 100%; height: 44px; }
+.gsi-slot { position: absolute; inset: 0; width: 100%; display: flex; justify-content: center; align-items: flex-start; overflow: visible; opacity: 0; transition: opacity .2s; }
+.gsi-box.ready .gsi-slot { opacity: 1; }
+.gsi-ph { position: absolute; inset: 0; width: 100%; height: 44px; display: flex; align-items: center; justify-content: center; gap: 10px;
+          border: 1px solid #dadce0; border-radius: 999px; background: #fff; color: #3c4043; font: 500 .92rem 'Inter', system-ui, sans-serif; cursor: pointer; transition: opacity .2s; }
+.gsi-ph:hover { background: #f8fafd; border-color: #d2e3fc; }
+.gsi-box.ready .gsi-ph { opacity: 0; pointer-events: none; }
+.gsi-busy { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 999px;
+            background: rgba(255,255,255,.92); border: 1px solid #dadce0; font: 600 .9rem 'Inter', system-ui, sans-serif; color: #0f172a; }
+.gsi-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #c7d2fe; border-top-color: #0080ff; animation: gsi-spin .8s linear infinite; }
+@keyframes gsi-spin { to { transform: rotate(360deg); } }
 .gsi-slot > div { transform: scale(var(--gsi-scale, 1)); transform-origin: top center; }
 .gsi-note { margin: 0; font-size: .85rem; color: #64748b; text-align: center; }
 .gsi-terms { margin: 2px 0 0; font-size: .78rem; line-height: 1.5; color: #94a3b8; text-align: center; }
@@ -316,3 +326,7 @@ body { font-family: 'Inter', sans-serif; color: var(--ink-2); background: #fff; 
     .secondary { grid-template-columns: 1fr; }
 }
 .auth-card h2 + .gsi-wrap { margin-top: 18px; }
+
+.gsi-busy[hidden] { display: none; }
+
+a.gsi-ph { text-decoration: none; }

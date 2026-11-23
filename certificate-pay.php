@@ -103,7 +103,7 @@ if ($cert && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['payment_pro
     <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Unlock your certificate', 'path' => 'certificate-pay', 'noindex' => true]); ?>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
+<link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <style>
   :root { --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --blue: #0080ff; --gold: #c9a227; }
   * { box-sizing: border-box; }
@@ -150,7 +150,7 @@ if ($cert && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['payment_pro
 </style>
 </head>
 <body>
-<div class="top"><a href="./"><img src="assets/images/Skope Digital  logo.png" alt=""> Skope Digital Academy</a><a class="back" href="student/achievements"><i class="fas fa-arrow-left"></i> My achievements</a></div>
+<div class="top"><a href="./"><img src="assets/images/skope-logo-512.png" alt=""> Skope Digital Academy</a><a class="back" href="student/achievements"><i class="fas fa-arrow-left"></i> My achievements</a></div>
 <?php if (!$cert): ?>
   <div class="wrap" style="grid-template-columns:1fr"><div class="card"><h1>Certificate not found</h1><p class="muted">We couldn't find that certificate on your account. Open it from <a href="student/achievements">My achievements</a>.</p></div></div>
 <?php else: ?>

@@ -1,4 +1,5 @@
 <?php
+ob_start(); // pages may still redirect after including this header
 date_default_timezone_set('Africa/Nairobi'); // portal dates follow Kenyan time
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
@@ -47,8 +48,9 @@ $user = $student; // Shared variable for sidebar compatibility
     <link rel="stylesheet" href="../assets/css/student-ui.css?v=<?= @filemtime(__DIR__ . '/../../assets/css/student-ui.css') ?>">
     <script>try { if (localStorage.getItem('sp_mini') === '1' && innerWidth > 1024) document.documentElement.classList.add('sp-mini-pending'); } catch (e) {}</script>
     
-    <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
+    <link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="../assets/pwa/favicon-32.png">
 
+<?php require_once __DIR__ . '/../../includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="dashboard-body student-portal">
 <script>if (document.documentElement.classList.contains('sp-mini-pending')) document.body.classList.add('sp-mini');</script>

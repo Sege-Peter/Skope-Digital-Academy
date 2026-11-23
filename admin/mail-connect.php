@@ -10,6 +10,10 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/includes/ui.php';
 require_once __DIR__ . '/../includes/mail_account.php';
+// This address is also the registered return address for "Continue with Google" sign-in (anyone, not just
+// admins): hand those returns to the sign-in code before the admin check.
+require_once __DIR__ . '/../includes/google_auth.php';
+if (sda_google_is_login_return()) sda_google_oauth_return();
 requireRole('admin');
 $user = currentUser();
 

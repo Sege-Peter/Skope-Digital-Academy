@@ -125,7 +125,8 @@ function sda_mime_build(array $m): string
     $h[] = 'MIME-Version: 1.0';
     $h[] = 'X-Mailer: Skope Digital Academy';
 
-    $nl = fn(string $s) => str_replace(["\r\n", "\r", "\n"], "\r\n", $s);
+    // One pass. str_replace(["\r\n", "\r", "\n"], "\r\n") runs the pairs in turn and turns \r\n into \r\r\n\r\n.
+    $nl = fn(string $s) => preg_replace('/\r\n|\r|\n/', "\r\n", $s);
     $html = (string)($m['html'] ?? '');
     $text = (string)($m['text'] ?? ($html !== '' ? sda_mail_text($html) : ''));
     $b64 = fn(string $s) => chunk_split(base64_encode($s));
@@ -212,7 +213,7 @@ function sda_smtp_deliver(array $rcpts, string $raw): void
         foreach ($rcpts as $r) $cmd("RCPT TO:<$r>", [250, 251], 'recipient ' . $r);
         $cmd('DATA', [354], 'DATA');
         // Dot-stuffing: a line starting with "." gets an extra "."
-        $data = preg_replace('/^\./m', '..', str_replace(["\r\n", "\r", "\n"], "\r\n", rtrim($raw, "\r\n")));
+        $data = preg_replace('/^\./m', '..', preg_replace('/\r\n|\r|\n/', "\r\n", rtrim($raw, "\r\n")));
         $cmd($data . "\r\n.", [250], 'send');
         @fwrite($fp, "QUIT\r\n");
     } finally {
@@ -290,26 +291,68 @@ function sda_site_url(): string
     return sda_site_base();
 }
 
-/** A button for use inside email content. */
-function sda_mail_button(string $href, string $label): string
+/** Public address used for images and links in emails (a local copy still shows the live logo). */
+function sda_mail_public_base(): string
 {
-    return '<p style="text-align:center;margin:28px 0"><a href="' . htmlspecialchars($href) . '" style="background:#00BFFF;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:10px;font-weight:700;display:inline-block">'
-        . htmlspecialchars($label) . '</a></p>';
+    $b = rtrim(sda_site_base(), '/');
+    return preg_match('#^https?://(localhost|127\.0\.0\.1)([:/]|$)#', $b) ? 'https://skopedigital.co.ke' : $b;
 }
 
+/** A button for use inside email content (brand orange, works in Outlook too). */
+function sda_mail_button(string $href, string $label): string
+{
+    $h = htmlspecialchars($href);
+    return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:28px auto"><tr>'
+        . '<td align="center" bgcolor="#FF8C00" style="border-radius:12px;background:#FF8C00;background-image:linear-gradient(135deg,#FF8C00,#FF6A00)">'
+        . '<a href="' . $h . '" style="display:inline-block;padding:14px 30px;font:700 15px/1.2 Arial,Helvetica,sans-serif;color:#ffffff;text-decoration:none;border-radius:12px">'
+        . htmlspecialchars($label) . ' &rarr;</a></td></tr></table>';
+}
+
+/**
+ * The academy's branded email: navy header with logo, cyan-to-orange accent bar, white card, footer with
+ * contacts and links. Table layout with inline styles so it holds up in Gmail, Outlook and phone mail apps.
+ */
 function sda_mail_layout(string $subject, string $html, string $unsubscribe = ''): string
 {
-    $name = htmlspecialchars(setting('academy_name') ?: 'Skope Digital Academy');
-    $support = htmlspecialchars(setting('support_email') ?: (setting('smtp_username') ?: ''));
-    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . htmlspecialchars($subject) . '</title></head>'
-        . '<body style="margin:0;background:#f1f5f9;font-family:Inter,Segoe UI,Arial,sans-serif;color:#334155">'
-        . '<div style="max-width:600px;margin:0 auto;padding:28px 16px">'
-        . '<div style="background:#0b1220;color:#ffffff;padding:18px 28px;border-radius:14px 14px 0 0;font-weight:800;letter-spacing:.5px">SKOPE <span style="color:#00BFFF">DIGITAL</span> ACADEMY</div>'
-        . '<div style="background:#ffffff;padding:32px 28px;border-radius:0 0 14px 14px;line-height:1.6;font-size:15px">' . $html . '</div>'
-        . '<p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:18px">' . $name . ' · Kisumu, Kenya'
-        . ($support ? '<br>Questions? Write to <a href="mailto:' . $support . '" style="color:#64748b">' . $support . '</a>' : '')
-        . ($unsubscribe ? '<br><a href="' . htmlspecialchars($unsubscribe) . '" style="color:#94a3b8">Email preferences / unsubscribe</a>' : '') . '</p>'
-        . '</div></body></html>';
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $base = sda_mail_public_base();
+    $name = setting('academy_name') ?: 'Skope Digital Academy';
+    $phone = trim(setting('support_phone')) ?: '0742 380 183';
+    $wa = preg_replace('/^0/', '254', preg_replace('/\D+/', '', $phone));
+    $emails = array_values(array_unique(array_filter(['info@skopedigital.co.ke', setting('support_email'), 'skopedigitalacademy@gmail.com'])));
+    $emails = array_slice($emails, 0, 2);
+    // Inbox preview line: the first words of the message (hidden in the body)
+    $pre = mb_substr(trim(preg_replace('/\s+/', ' ', sda_mail_text($html))), 0, 140);
+    $font = "font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+    $link = fn($href, $label) => '<a href="' . $e($href) . '" style="color:#00BFFF;text-decoration:none;font-weight:600">' . $e($label) . '</a>';
+
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>' . $e($subject) . '</title>'
+        . '<style>a{color:#0080FF}h1,h2,h3{color:#0f172a}@media (max-width:620px){.sda-pad{padding:24px 20px!important}.sda-wrap{padding:16px 10px!important}}</style></head>'
+        . '<body style="margin:0;padding:0;background:#eef2f7;' . $font . ';color:#334155">'
+        . '<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">' . $e($pre) . str_repeat('&#847;&zwnj;&nbsp;', 30) . '</div>'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2f7" style="background:#eef2f7"><tr><td align="center" class="sda-wrap" style="padding:28px 16px">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%">'
+        // Header
+        . '<tr><td bgcolor="#0b1220" style="background:#0b1220;background-image:linear-gradient(135deg,#0b1220 0%,#0f2847 100%);border-radius:16px 16px 0 0;padding:22px 28px">'
+        . '<a href="' . $e($base) . '/" style="text-decoration:none"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+        . '<td style="padding-right:14px"><img src="' . $e($base) . '/assets/images/email-logo.png?v=2" width="52" height="52" alt="Skope Digital Academy" style="display:block;width:52px;height:52px;border:0;border-radius:12px;background:#ffffff"></td>'
+        . '<td style="' . $font . ';line-height:1.15"><div style="font-size:19px;font-weight:800;letter-spacing:.3px;color:#ffffff">SKOPE <span style="color:#FF8C00">DIGITAL</span></div>'
+        . '<div style="font-size:11px;font-weight:700;letter-spacing:4px;color:#7dd3fc;margin-top:3px">ACADEMY</div></td>'
+        . '</tr></table></a></td></tr>'
+        // Accent bar
+        . '<tr><td height="4" bgcolor="#00BFFF" style="height:4px;line-height:4px;font-size:0;background:#00BFFF;background-image:linear-gradient(90deg,#00BFFF,#0080FF 55%,#FF8C00)">&nbsp;</td></tr>'
+        // Content
+        . '<tr><td bgcolor="#ffffff" class="sda-pad" style="background:#ffffff;padding:34px 32px;border-radius:0 0 16px 16px;font-size:15px;line-height:1.65;color:#334155;' . $font . '">' . $html . '</td></tr>'
+        // Footer
+        . '<tr><td align="center" style="padding:26px 12px 6px;' . $font . ';font-size:12.5px;line-height:1.7;color:#64748b">'
+        . '<div style="margin-bottom:8px">' . $link($base . '/courses', 'Courses') . ' &nbsp;·&nbsp; ' . $link($base . '/learn', 'Free tutorials') . ' &nbsp;·&nbsp; '
+        . $link('https://www.facebook.com/profile.php?id=100090014799182', 'Facebook') . ' &nbsp;·&nbsp; ' . $link('https://wa.me/' . $wa, 'WhatsApp') . '</div>'
+        . '<div><b style="color:#0f172a">' . $e($name) . '</b> · Kisumu, Kenya · <a href="tel:+' . $e($wa) . '" style="color:#64748b;text-decoration:none">' . $e($phone) . '</a></div>'
+        . '<div>' . implode(' · ', array_map(fn($m) => '<a href="mailto:' . $e($m) . '" style="color:#64748b">' . $e($m) . '</a>', $emails)) . '</div>'
+        . ($unsubscribe ? '<div style="margin-top:8px"><a href="' . $e($unsubscribe) . '" style="color:#94a3b8">Email preferences / unsubscribe</a></div>' : '')
+        . '<div style="margin-top:12px;font-size:11px;color:#94a3b8">Powered by <a href="https://skopedesigns.co.ke" style="color:#94a3b8;font-weight:700">Skope Designs</a></div>'
+        . '</td></tr></table></td></tr></table></body></html>';
 }
 
 /** Plain-text version for mail apps that do not show HTML. */
