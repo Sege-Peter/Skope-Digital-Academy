@@ -36,6 +36,9 @@ $fields = [
     'smtp_password'     => ['SMTP password', 'secret', 'For Gmail: a 16-letter App password from myaccount.google.com/apppasswords (needs 2-Step Verification), not the normal password.', 'email'],
     'google_client_id'  => ['Google Client ID', 'text', 'From Google Cloud Console > APIs & Services > Credentials (OAuth client, type Web application). Ends in .apps.googleusercontent.com. Leave empty to hide the Google button.', 'signin'],
     'ai_enabled'        => ['AI features on', 'bool', 'Turns the AI study helpers on or off.', 'ai'],
+    'ai_provider'       => ['AI provider', 'select:anthropic|Anthropic Claude,gemini|Google Gemini', 'Powers the AI mentor, the tutors\' lesson and quiz generators and the admin insights. If the chosen one has no key, the other is used.', 'ai'],
+    'anthropic_api_key' => ['Anthropic API key', 'secret', 'From console.anthropic.com > API keys. Starts with sk-ant-.', 'ai'],
+    'anthropic_model'   => ['Claude model', 'select:claude-haiku-5-5|Claude Haiku 5.5 – fastest and lowest cost,claude-sonnet-5-5|Claude Sonnet 5.5 – balanced,claude-opus-5-5|Claude Opus 5.5 – most capable and highest cost', 'Haiku suits quick mentor hints; Sonnet or Opus write better long lessons and quizzes.', 'ai'],
     'gemini_api_key'    => ['Gemini API key', 'secret', 'From Google AI Studio.', 'ai'],
     'gemini_model'      => ['Gemini model', 'text', 'e.g. gemini-2.5-flash (leave empty for the default)', 'ai'],
 ];
@@ -44,8 +47,18 @@ $sections = [
     'payments' => ['Payments', 'credit-card', 'Card (Paystack) and M-Pesa (Safaricom Daraja or Cyzora) checkout. Keys are entered here, never in code.'],
     'email'    => ['Email', 'envelope', 'How the academy sends email (password resets, welcome emails, receipts).'],
     'signin'   => ['Sign-in', 'right-to-bracket', '"Continue with Google" on the sign-in and sign-up pages.'],
-    'ai'       => ['AI', 'wand-magic-sparkles', 'Google Gemini powers the AI helpers.'],
+    'ai'       => ['AI', 'wand-magic-sparkles', 'Choose Anthropic Claude or Google Gemini for the AI mentor and tutor tools.'],
 ];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_ai'])) {
+    ax_post_guard();
+    require_once __DIR__ . '/../includes/ai_provider.php';
+    $t0 = microtime(true);
+    $r = sda_ai_complete('Reply with one short, friendly sentence confirming you are connected to Skope Digital Academy.', 'You are a connection test. Keep it under 20 words.', ['max_tokens' => 200, 'timeout' => 45]);
+    $ms = (int)round((microtime(true) - $t0) * 1000);
+    ax_flash($r['ok'] ? 'ok' : 'err', $r['ok'] ? sda_ai_label() . ' answered in ' . $ms . ' ms: "' . mb_strimwidth(trim($r['text']), 0, 160, '…') . '"' : sda_ai_label() . ' failed: ' . $r['error']);
+    ax_back('settings#ai');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['test_email'])) {
     ax_post_guard();
@@ -78,10 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($type === 'number') {
             $v = $v === '' ? '' : (string)max(0, min(65535, (int)$v));
         } elseif (str_starts_with($type, 'select:')) {
-            if (!in_array($v, explode(',', substr($type, 7)), true)) $v = explode(',', substr($type, 7))[0];
+            $opts = array_map(fn($o) => explode('|', $o)[0], explode(',', substr($type, 7)));
+            if (!in_array($v, $opts, true)) $v = $opts[0];
         } else {
             $v = mb_substr($v, 0, 255);
         }
+        if ($key === 'anthropic_api_key' && !preg_match('/^sk-ant-[\w-]+$/', $v)) { ax_flash('err', 'The Anthropic API key should start with sk-ant-.'); ax_back('settings#ai'); }
         if ($key === 'google_client_id' && $v !== '' && !preg_match('/^[\w-]+\.apps\.googleusercontent\.com$/', $v)) { ax_flash('err', 'The Google Client ID should end in .apps.googleusercontent.com.'); ax_back(); }
         if ($key === 'paystack_public_key' && $v !== '' && !preg_match('/^pk_(test|live)_\w+$/', $v)) { ax_flash('err', 'The Paystack public key should start with pk_test_ or pk_live_.'); ax_back(); }
         if ($key === 'paystack_secret_key' && !preg_match('/^sk_(test|live)_\w+$/', $v)) { ax_flash('err', 'The Paystack secret key should start with sk_test_ or sk_live_.'); ax_back(); }
@@ -190,8 +205,8 @@ require_once 'includes/sidebar.php';
                             <br>Daraja sends its result back automatically. For Cyzora, add this webhook address on app.cyzora.co.ke &gt; Webhooks, then paste the whsec_ secret below: <span class="ax-code"><?= e(sda_pay_public_url('cyzora-webhook')) ?></span>
                             <br>Secret fields stay hidden: leave one empty to keep what is saved.
                         </div></div>
-                        <?php elseif ($sk === 'ai'): ?>
-                        <div class="st-note"><i class="fas fa-circle-info"></i><div>The AI helpers read their key from <span class="ax-code">this setting, or includes/private/config.php</span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
+                        <?php elseif ($sk === 'ai'): require_once __DIR__ . '/../includes/ai_provider.php'; ?>
+                        <div class="st-note"><i class="fas fa-circle-info"></i><div><b>In use now:</b> <?= e(sda_ai_label()) ?><?= sda_anthropic_key() === '' && (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') ? ' – <b style="color:var(--danger,#ef4444)">no key saved, so AI features are off</b>' : '' ?>. Save, then press <b>Test AI</b> below to check the key works.<br>The Gemini key is read from <span class="ax-code">this setting, or includes/private/config.php</span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
                         <?php elseif ($sk === 'email'): ?>
                         <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $val('smtp_host') !== '' && $val('smtp_username') !== '' && $val('smtp_password') !== '' ? 'Emails are sent through <b>' . e($val('smtp_host')) . '</b> as ' . e($val('smtp_username')) . '.' : 'SMTP is not complete, so emails fall back to the server’s built-in mail (often lands in spam or fails). For Gmail use smtp.gmail.com, port 587, TLS.' ?></div></div>
                         <?php elseif ($sk === 'signin'): ?>
@@ -202,7 +217,7 @@ require_once 'includes/sidebar.php';
                             <?php if ($type === 'bool'): ?>
                             <div class="ax-field" style="grid-column:1/-1"><label class="ax-check"><input type="checkbox" name="<?= $key ?>" <?= ($cur === '' ? '1' : $cur) === '1' ? 'checked' : '' ?>> <?= e($label) ?></label><?= $hint ? '<div class="hint">' . e($hint) . '</div>' : '' ?></div>
                             <?php elseif (str_starts_with($type, 'select:')): ?>
-                            <div class="ax-field"><label for="<?= $id ?>"><?= e($label) ?></label><select id="<?= $id ?>" name="<?= $key ?>"><?php foreach (explode(',', substr($type, 7)) as $o): ?><option value="<?= $o ?>" <?= $cur === $o ? 'selected' : '' ?>><?= $o === 'none' ? 'None' : strtoupper($o) ?></option><?php endforeach; ?></select><?= $hint ? '<div class="hint">' . e($hint) . '</div>' : '' ?></div>
+                            <div class="ax-field"><label for="<?= $id ?>"><?= e($label) ?></label><select id="<?= $id ?>" name="<?= $key ?>"><?php foreach (explode(',', substr($type, 7)) as $o): [$ov, $ol] = array_pad(explode('|', $o, 2), 2, null); $cur2 = $cur !== '' ? $cur : ($key === 'anthropic_model' ? 'claude-haiku-5-5' : ($key === 'ai_provider' ? 'anthropic' : '')); ?><option value="<?= e($ov) ?>" <?= $cur2 === $ov ? 'selected' : '' ?>><?= e($ol ?? ($ov === 'none' ? 'None' : strtoupper($ov))) ?></option><?php endforeach; ?></select><?= $hint ? '<div class="hint">' . e($hint) . '</div>' : '' ?></div>
                             <?php elseif ($type === 'secret'): ?>
                             <div class="ax-field"><label for="<?= $id ?>"><?= e($label) ?></label><input id="<?= $id ?>" type="password" name="<?= $key ?>" value="" placeholder="<?= $cur !== '' ? 'Leave blank to keep the saved key' : 'Not saved yet' ?>" autocomplete="new-password">
                                 <div class="st-saved"><?php if ($cur !== ''): ?><span>Saved: <span class="ax-code"><?= e($last4($cur)) ?></span></span><label class="ax-check" style="font-size:.74rem"><input type="checkbox" name="clear_<?= $key ?>" style="width:14px;height:14px"> Remove</label><?php else: ?><span>Nothing saved</span><?php endif; ?></div>
@@ -214,6 +229,12 @@ require_once 'includes/sidebar.php';
                         </div>
                         <div class="ax-form-actions"><button class="ax-btn"><i class="fas fa-floppy-disk"></i> Save <?= $sk === 'ai' ? 'AI' : strtolower($sl) ?> settings</button></div>
                     </form>
+                    <?php if ($sk === 'ai'): ?>
+                    <form method="post" class="ax-panel-b ax-form" style="border-top:1px solid var(--border)">
+                        <?= ax_csrf() ?><input type="hidden" name="test_ai" value="1">
+                        <div class="ax-form-actions" style="justify-content:flex-start"><button class="ax-btn ghost"><i class="fas fa-plug-circle-check"></i> Test AI</button><span style="font-size:.8rem;color:var(--text-muted)">Sends one short request to the provider in use and shows its reply.</span></div>
+                    </form>
+                    <?php endif; ?>
                     <?php if ($sk === 'email'): ?>
                     <form method="post" class="ax-panel-b ax-form" style="border-top:1px solid var(--border)">
                         <?= ax_csrf() ?>

@@ -8,46 +8,13 @@
 require_once __DIR__ . '/db.php';   // defines GEMINI_API_KEY (Admin > Settings > AI, or includes/private/config.php)
 // GEMINI_API_URL (with the current model) comes from includes/db.php
 
+require_once __DIR__ . '/ai_provider.php';
+
 /**
- * Core function to interact with Gemini API
+ * Ask the configured AI (Claude or Gemini) for a JSON answer. Returns the JSON text, or null on failure.
  */
 function callGemini(string $prompt): ?string {
-    $data = [
-        "contents" => [
-            [
-                "parts" => [
-                    ["text" => $prompt]
-                ]
-            ]
-        ],
-        "generationConfig" => [
-            "responseMimeType" => "application/json"
-        ]
-    ];
-
-    $ch = curl_init(str_contains(GEMINI_API_URL, 'key=') ? GEMINI_API_URL : GEMINI_API_URL . '?key=' . GEMINI_API_KEY);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For local XAMPP dev
-
-    $response = curl_exec($ch);
-    $err = curl_error($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($err) {
-        error_log("Gemini CURL Error: " . $err);
-        return null;
-    }
-
-    $result = json_decode($response, true);
-    
-    if ($httpCode !== 200) {
-        error_log("Gemini API Error (HTTP $httpCode): " . ($result['error']['message'] ?? $response));
-        return null;
-    }
-
-    return $result['candidates'][0]['content']['parts'][0]['text'] ?? null;
+    $r = sda_ai_complete($prompt, '', ['json' => true, 'max_tokens' => 4096]);
+    if (!$r['ok']) { error_log('[ai] ' . sda_ai_label() . ': ' . $r['error']); return null; }
+    return $r['text'];
 }

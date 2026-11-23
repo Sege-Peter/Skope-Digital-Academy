@@ -1,10 +1,11 @@
 <?php
 /**
- * 🤖 SDAC AI Engine – Google Gemini 1.5 Flash Integration
+ * 🤖 SDAC AI Engine – Anthropic Claude or Google Gemini (Admin > Settings > AI)
  * Orchestrates all AI logic for Students, Tutors, and Admins.
  */
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/ai_provider.php';
 
 class SDAC_AI {
     /**
@@ -12,34 +13,13 @@ class SDAC_AI {
      */
     public static function ask($prompt, $system_instruction = "You are the official SDAC AI Mentor. You are professional, encouraging, and highly knowledgeable about the academy's curriculum and the tech ecosystem.") {
         if (empty($prompt)) return "I require a prompt to assist you.";
-        
-        $payload = [
-            "contents" => [
-                [
-                    "role" => "user",
-                    "parts" => [
-                        ["text" => $prompt]
-                    ]
-                ]
-            ],
-            "generationConfig" => [
-                "temperature" => 0.7,
-                "topK" => 40,
-                "topP" => 0.95,
-                "maxOutputTokens" => 2048,
-            ]
-        ];
-
-        // Support for official systemInstruction field
-        if (!empty($system_instruction)) {
-            $payload["systemInstruction"] = [
-                "parts" => [
-                    ["text" => $system_instruction]
-                ]
-            ];
+        // Claude or Gemini, as chosen in Admin > Settings > AI (includes/ai_provider.php)
+        $r = sda_ai_complete((string)$prompt, (string)$system_instruction, ['max_tokens' => 4096]);
+        if (!$r['ok']) {
+            error_log('[ai] ' . sda_ai_label() . ': ' . $r['error']);
+            return "The AI assistant isn't available right now. Please try again in a few minutes.";
         }
-
-        return self::execute($payload);
+        return $r['text'];
     }
 
     /**
@@ -93,36 +73,5 @@ class SDAC_AI {
     public static function academicCommendation($metrics) {
         $system = "You are the SDAC Provost. Write a formal 50-word commendation for a student with these metrics: " . json_encode($metrics);
         return self::ask("Write the official commendation.", $system);
-    }
-
-    /**
-     * Build the network request
-     */
-    private static function execute($payload) {
-        $ch = curl_init(GEMINI_API_URL);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $data = json_decode($response, true);
-        
-        if ($http_code !== 200) {
-            $msg = $data['error']['message'] ?? "Institutional Registry Offline (Code $http_code)";
-            return "SDAC Registry Error: $msg";
-        }
-
-        // Handle Safety Blocks
-        if (isset($data['candidates'][0]['finishReason']) && $data['candidates'][0]['finishReason'] === 'SAFETY') {
-            return "Institutional Protocol: Content blocked for safety compliance.";
-        }
-
-        return $data['candidates'][0]['content']['parts'][0]['text'] ?? "Intelligence stream capped. Please refine your query.";
     }
 }

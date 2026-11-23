@@ -132,6 +132,15 @@ function sda_google_complete(array $t, string $mode, string $ref = ''): never
                 $pdo->prepare("UPDATE users SET last_login = NOW(), email_verified = 1 WHERE id = ?")->execute([$user['id']]);
             }
             loginUser($user);
+            // Google has already verified this person (and their own Google 2-Step Verification, if on),
+            // so admins and staff skip the emailed sign-in code.
+            if (in_array($user['role'], ['admin', 'staff'], true)) {
+                $_SESSION['mfa_ok'] = time();
+                $_SESSION['mfa_uid'] = (int)$user['id'];
+                $_SESSION['mfa_via'] = 'google';
+                try { $pdo->prepare("INSERT INTO audit_log (user_id, action, description, ip_address) VALUES (?, 'login_google', 'Signed in with Google (sign-in code not needed)', ?)")
+                        ->execute([$user['id'], function_exists('sda_client_ip') ? sda_client_ip() : ($_SERVER['REMOTE_ADDR'] ?? '')]); } catch (Throwable $e) {}
+            }
             redirectByRole($user['role']);
         }
 
