@@ -12,7 +12,7 @@ $add = function (string $path, ?string $lastmod = null, string $freq = 'weekly',
     $urls[] = [sda_seo_abs($path), $lastmod ? date('Y-m-d', strtotime($lastmod)) : null, $freq, $prio];
 };
 foreach ([['', 'daily', '1.0'], ['courses', 'daily', '0.9'], ['learn', 'weekly', '0.9'], ['about', 'monthly', '0.6'], ['scholarships', 'monthly', '0.7'],
-          ['contact', 'yearly', '0.5'], ['careers', 'monthly', '0.4'], ['donate', 'monthly', '0.4'], ['register', 'yearly', '0.5'],
+          ['contact', 'yearly', '0.5'], ['careers', 'weekly', '0.5'], ['careers-guide', 'monthly', '0.3'], ['donate', 'monthly', '0.4'], ['register', 'yearly', '0.5'],
           ['verify', 'yearly', '0.3'], ['privacy', 'yearly', '0.2'], ['terms', 'yearly', '0.2']] as [$p, $f, $pr]) {
     $add($p, null, $f, $pr);
 }

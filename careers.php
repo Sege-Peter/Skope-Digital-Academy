@@ -129,7 +129,7 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
             <div class="cr-tag">Learn Smart. Achieve More.</div>
             <div class="cr-cta">
                 <a href="#openings" class="cr-btn pri"><i class="fas fa-list-check"></i> <?= $jobs ? 'View open positions' : 'Current openings' ?></a>
-                <a href="#apply" class="cr-btn ghost"><i class="fas fa-paper-plane"></i> How to apply</a>
+                <a href="careers-guide" class="cr-btn ghost"><i class="fas fa-book-open"></i> Applicant rules &amp; instructions</a>
             </div>
         </div>
         <div class="cr-art">
@@ -215,7 +215,8 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
                     <?php if ($sharedDeadline): ?><div><b>Deadline</b><span style="color:#c2410c;font-weight:700"><?= e(cr_date($sharedDeadline)) ?></span></div>
                     <?php elseif ($deadlines): ?><div><b>Deadline</b><span>See the closing date on each role.</span></div><?php endif; ?>
                 </div>
-                <p class="cr-note"><i class="fas fa-circle-info" style="margin-top:3px"></i> Only shortlisted candidates will be contacted.</p>
+                <a href="careers-guide" class="cr-btn ghost" style="margin-top:16px;width:100%;justify-content:center"><i class="fas fa-book-open"></i> Read the full applicant rules &amp; instructions</a>
+                <p class="cr-note"><i class="fas fa-circle-info" style="margin-top:3px"></i> Only shortlisted candidates will be contacted. Recruitment is free – we never ask for money.</p>
             </div>
         </div>
     </div>

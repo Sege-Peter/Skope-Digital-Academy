@@ -228,6 +228,7 @@ function sda_app_send_invite(PDO $pdo, array $app, string $jobTitle, int $minute
         . '<li>Use a laptop or desktop with a stable connection, in a quiet place.</li>'
         . '<li>Once you start, stay on the test: leaving the tab or window, exiting full screen or reloading the page is recorded. After ' . SDA_AX_MAX_STRIKES . ' warnings the test submits itself.</li>'
         . '<li>The link works on one device only and expires in ' . SDA_AX_INVITE_DAYS . ' days. Please don\'t share it.</li></ul>'
+        . '<p>Before you start, please read the <a href="' . $e(rtrim(sda_mail_public_base(), '/') . '/careers-guide') . '" style="color:#0080FF;font-weight:700">Applicant rules &amp; instructions</a>. Recruitment is free: we never ask for money.</p>'
         . '<p style="margin:22px 0"><a href="' . $e($link) . '" style="background:#00BFFF;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">Open my assessment</a></p>'
         . '<p style="font-size:13px;color:#64748b">Or paste this link into your browser:<br>' . $e($link) . '</p>'
         . '<p>Good luck!<br>Skope Digital Academy Recruitment</p>';

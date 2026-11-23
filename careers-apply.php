@@ -246,7 +246,7 @@ $resp = sda_lines($job['responsibilities']);
             </div>
 
             <div class="ap-sec"><h2><span>4</span> Confirm &amp; send</h2>
-                <label class="ap-check"><input type="checkbox" name="declare" value="1" required> <span>The information I've given is true<?= $assess ? ', and I will complete the online assessment myself without help or outside tools' : '' ?>.</span></label>
+                <label class="ap-check"><input type="checkbox" name="declare" value="1" required> <span>I have read the <a href="careers-guide" target="_blank" rel="noopener" style="color:#0284c7;font-weight:700">Applicant rules &amp; instructions</a>. The information I've given is true<?= $assess ? ', and I will complete the online assessment myself without help or outside tools' : '' ?>.</span></label>
                 <label class="ap-check"><input type="checkbox" name="consent" value="1" required> <span>Skope Digital Academy may store and use my details and documents for this recruitment process.</span></label>
                 <?= $err('confirm') ?>
                 <button class="ap-btn" id="apBtn" style="margin-top:8px"><i class="fas fa-paper-plane"></i> Send my application</button>
@@ -255,6 +255,7 @@ $resp = sda_lines($job['responsibilities']);
         </form>
 
         <aside class="ap-side">
+            <?php if ($job['deadline']): ?><div class="ap-card" style="background:#fff7ed;border-color:#fed7aa;padding:16px 20px"><b style="color:#9a3412"><i class="fas fa-calendar-xmark"></i> Closes <?= $e(date('l, j F Y', strtotime($job['deadline']))) ?></b><div style="font-size:.84rem;color:#9a3412;margin-top:4px">at 11:59 pm East Africa Time</div></div><?php endif; ?>
             <div class="ap-card">
                 <h3>About the role</h3>
                 <p><?= $e($job['summary']) ?></p>
@@ -272,6 +273,7 @@ $resp = sda_lines($job['responsibilities']);
                     <li><i class="fas fa-2"></i><span>Shortlisted candidates are invited to interview.</span></li>
                     <?php endif; ?>
                 </ul>
+                <a href="careers-guide" target="_blank" rel="noopener" style="display:inline-flex;gap:8px;align-items:center;margin-top:14px;font-weight:700;color:#0284c7;text-decoration:none;font-size:.88rem"><i class="fas fa-book-open"></i> Full rules &amp; instructions</a>
             </div>
         </aside>
     </div>

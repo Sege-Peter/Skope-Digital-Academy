@@ -378,6 +378,7 @@ $secIcon = ['knowledge' => 'book-open', 'practical' => 'screwdriver-wrench', 'si
                 <li><i class="fas fa-laptop"></i><span>One attempt, on one device. Once started it can't be moved to another device or restarted.</span></li>
                 <li><i class="fas fa-clock"></i><span>When time runs out, everything you've written is submitted for you.</span></li>
             </ul>
+            <p style="margin:16px 0 0"><a href="careers-guide#before" target="_blank" rel="noopener" style="display:inline-flex;gap:8px;align-items:center;font-weight:700;color:#0284c7;text-decoration:none"><i class="fas fa-book-open"></i> Read the full applicant rules &amp; instructions (opens in a new tab)</a></p>
         </div>
 
         <form method="post" id="startForm" class="card">
