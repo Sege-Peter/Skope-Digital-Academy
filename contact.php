@@ -62,6 +62,15 @@ $preselect = $_GET['topic'] ?? '';
         }
         .ct-hero::before { width: 460px; height: 460px; top: -180px; right: -120px; background: radial-gradient(circle, rgba(0,191,255,.16), transparent 70%); }
         .ct-hero::after  { width: 380px; height: 380px; bottom: -200px; left: -120px; background: radial-gradient(circle, rgba(255,140,0,.12), transparent 70%); }
+        .ct-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: center; text-align: left; }
+        .ct-hero-text p { margin: 0 !important; }
+        .ct-hero-text .ct-quick { justify-content: flex-start; }
+        .ct-hero-art { position: relative; }
+        .ct-hero-art img { display: block; width: 100%; height: auto; aspect-ratio: 1100 / 733; border-radius: 26px; border: 6px solid #fff; box-shadow: 0 30px 60px -28px rgba(15,23,42,.45); }
+        .ct-hero-chip { position: absolute; left: -18px; bottom: 22px; display: flex; gap: 10px; align-items: center; padding: 10px 14px 10px 10px; border-radius: 14px; background: #fff; box-shadow: 0 14px 34px -14px rgba(15,23,42,.35); }
+        .ct-hero-chip i { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #e0f2fe; color: #0284c7; }
+        .ct-hero-chip b { display: block; font-size: .85rem; color: #0f172a; } .ct-hero-chip small { display: block; font-size: .72rem; color: #64748b; }
+        @media (max-width: 900px) { .ct-hero-grid { grid-template-columns: 1fr; gap: 30px; text-align: center; } .ct-hero-text p { margin: 0 auto !important; } .ct-hero-text .ct-quick { justify-content: center; } .ct-hero-art { max-width: 560px; margin: 0 auto; } .ct-hero-chip { left: 10px; bottom: 10px; } }
         .ct-badge {
             display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 99px;
             background: rgba(0,191,255,.1); border: 1px solid rgba(0,191,255,.25); color: #0284c7;
@@ -212,7 +221,8 @@ $preselect = $_GET['topic'] ?? '';
 <div class="ct">
     <!-- Hero -->
     <section class="ct-hero">
-        <div class="container" style="position: relative; z-index: 1;">
+        <div class="container ct-hero-grid" style="position: relative; z-index: 1;">
+          <div class="ct-hero-text">
             <h1>Let's <span class="c">Connect</span> &amp; <span class="o">Learn</span></h1>
             <p>Questions about a course, a payment, your account or a partnership? Send us a message, or reach the admissions team directly.</p>
             <div class="ct-quick">
@@ -220,6 +230,11 @@ $preselect = $_GET['topic'] ?? '';
                 <a class="mail" href="mailto:info@skopedigital.co.ke"><i class="fas fa-envelope"></i> info@skopedigital.co.ke</a>
                 <a class="wa" href="https://chat.whatsapp.com/IT9spiypi6q3VJX2hn4hhT" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Join our community</a>
             </div>
+          </div>
+          <div class="ct-hero-art">
+            <picture><source type="image/webp" srcset="assets/images/promo/contact.webp"><img src="assets/images/promo/contact.jpg" width="1100" height="733" alt="A smiling Skope Digital Academy team member on the phone at her laptop, ready to help." fetchpriority="high"></picture>
+            <div class="ct-hero-chip"><i class="fas fa-headset"></i><span><b>We're here to help</b><small>Call, WhatsApp or email us</small></span></div>
+          </div>
         </div>
     </section>
 
