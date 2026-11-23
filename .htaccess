@@ -7,6 +7,8 @@ Options -Indexes
 # Safe Rewrite (Only if mod_rewrite is enabled)
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    # XML sitemap for search engines
+    RewriteRule ^sitemap\.xml$ sitemap.php [L]
     # Prevent direct access to core folders
     RewriteRule ^includes/.*$ - [F,L]
     RewriteRule ^\.env$ - [F,L]
@@ -24,7 +26,15 @@ Options -Indexes
     # Tutorial pages: learn/<tutorial>/<lesson>
     RewriteRule ^learn/([a-z0-9-]+)/?$ learn.php?c=$1 [L,QSA]
     RewriteRule ^learn/([a-z0-9-]+)/leaderboard/?$ learn.php?c=$1&view=leaderboard [L,QSA]
+    RewriteRule ^learn/([a-z0-9-]+)/project/?$ learn.php?c=$1&view=project [L,QSA]
     RewriteRule ^learn/([a-z0-9-]+)/([a-z0-9-]+)/?$ learn.php?c=$1&l=$2 [L,QSA]
+
+    # Learning Lab (non-programming skills courses): lab/<course>/<lesson>, same engine as learn.php
+    RewriteRule ^lab/?$ learn.php?labhome=1 [L,QSA]
+    RewriteRule ^lab/([a-z0-9-]+)/?$ learn.php?c=$1&lab=1 [L,QSA]
+    RewriteRule ^lab/([a-z0-9-]+)/leaderboard/?$ learn.php?c=$1&view=leaderboard&lab=1 [L,QSA]
+    RewriteRule ^lab/([a-z0-9-]+)/project/?$ learn.php?c=$1&view=project&lab=1 [L,QSA]
+    RewriteRule ^lab/([a-z0-9-]+)/([a-z0-9-]+)/?$ learn.php?c=$1&l=$2&lab=1 [L,QSA]
 
     # 2. Clean URL -> the PHP file that serves it (internal, invisible to the browser).
     RewriteCond %{REQUEST_FILENAME} !-d

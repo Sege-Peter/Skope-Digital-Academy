@@ -28,7 +28,7 @@ $preselect = $_GET['topic'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contact Us – Skope Digital Academy</title>
-    <meta name="description" content="Contact Skope Digital Academy in Kisumu: admissions, payments, technical support, scholarships and partnerships.">
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Contact Us', 'path' => 'contact', 'description' => 'Contact Skope Digital Academy in Kisumu, Kenya: call or WhatsApp 0742 380 183, or email info@skopedigital.co.ke for admissions, payments and support.', 'breadcrumbs' => [['Contact', 'contact']], 'schema' => [['@type' => 'ContactPage', 'name' => 'Contact Skope Digital Academy', 'url' => sda_seo_abs('contact')]]]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -53,7 +53,7 @@ $preselect = $_GET['topic'] ?? '';
         /* ── Hero ── */
         .ct-hero {
             position: relative; overflow: hidden; text-align: center;
-            padding: 130px 0 120px;
+            padding: 80px 0 110px;
             background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 55%, #fff7ed 100%);
             border-bottom: 1px solid var(--ct-line);
         }
@@ -213,12 +213,11 @@ $preselect = $_GET['topic'] ?? '';
     <!-- Hero -->
     <section class="ct-hero">
         <div class="container" style="position: relative; z-index: 1;">
-            <span class="ct-badge"><i class="fas fa-headset"></i> We're here to help</span>
             <h1>Let's <span class="c">Connect</span> &amp; <span class="o">Learn</span></h1>
             <p>Questions about a course, a payment, your account or a partnership? Send us a message, or reach the admissions team directly.</p>
             <div class="ct-quick">
                 <a class="call" href="tel:+254742380183"><i class="fas fa-phone-alt"></i> Call 0742 380 183</a>
-                <a class="mail" href="mailto:info@skopedigital.ac.ke"><i class="fas fa-envelope"></i> info@skopedigital.ac.ke</a>
+                <a class="mail" href="mailto:info@skopedigital.co.ke"><i class="fas fa-envelope"></i> info@skopedigital.co.ke</a>
                 <a class="wa" href="https://chat.whatsapp.com/IT9spiypi6q3VJX2hn4hhT" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> Join our community</a>
             </div>
         </div>
@@ -238,7 +237,7 @@ $preselect = $_GET['topic'] ?? '';
                         </div>
                         <div class="ct-row">
                             <div class="ic"><i class="fas fa-envelope"></i></div>
-                            <div><small>Email</small><a href="mailto:info@skopedigital.ac.ke">info@skopedigital.ac.ke</a><span class="sub">General and course enquiries</span></div>
+                            <div><small>Email</small><a href="mailto:info@skopedigital.co.ke">info@skopedigital.co.ke</a><span class="sub">General and course enquiries</span></div>
                         </div>
                         <div class="ct-row">
                             <div class="ic"><i class="fas fa-map-marker-alt"></i></div>

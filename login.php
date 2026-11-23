@@ -8,6 +8,7 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+if (!empty($_SESSION['google_error'])) { $error = (string)$_SESSION['google_error']; unset($_SESSION['google_error']); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrf()) {
@@ -76,11 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Sign In', 'path' => 'login', 'description' => 'Sign in to your Skope Digital Academy account.', 'noindex' => true]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
-    <link rel="stylesheet" href="assets/css/auth.css?v=3">
+    <link rel="stylesheet" href="assets/css/auth.css?v=9">
 </head>
 <body>
 <div class="auth">
@@ -120,6 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php elseif (($_GET['error'] ?? '') === 'unauthorized'): ?>
                 <div class="alert info" role="status"><i class="fas fa-lock"></i><span>Please sign in with an account that can open that page.</span></div>
             <?php endif; ?>
+
+            <?php require_once __DIR__ . '/includes/google_auth.php'; sda_google_block('login'); ?>
 
             <form action="login" method="POST" id="loginForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">

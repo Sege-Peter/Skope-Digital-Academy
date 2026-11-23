@@ -1,391 +1,278 @@
 <?php
-$pageTitle = 'Payments & Revenue';
-require_once 'includes/header.php';
+/**
+ * Admin: Master Ledger – every payment, filterable, with totals for the filtered set,
+ * CSV export (?export=csv, admin only) and a detail dialog per payment.
+ * Approve / reject buttons post to verifications.php, which owns the approval rules.
+ */
+$PL_TYPES = ['course' => 'Course fee', 'certificate' => 'Certificate fee', 'registration' => 'Registration', 'donation' => 'Donation'];
+$PL_STATUS = ['pending' => 'Pending', 'verified' => 'Approved', 'failed' => 'Rejected'];
 
-$success_msg = '';
-$error_msg = '';
-
-// Handle Verification Action
-if (isset($_GET['verify_id'])) {
-    $verify_id = (int)$_GET['verify_id'];
-    try {
-        $pdo->beginTransaction();
-        
-        // 1. Update payment status (only once: a verified payment is never credited twice)
-        $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_at = NOW(), verified_by = ? WHERE id = ? AND status = 'pending'");
-        $stmt->execute([$admin['id'], $verify_id]);
-        $newly_verified = $stmt->rowCount() > 0;
-
-        // 2. Fetch student, course and chosen track for this payment
-        $stmt = $pdo->prepare("SELECT student_id, course_id, amount, learning_mode, cohort_id, payment_type, certificate_id FROM payments WHERE id = ?");
-        $stmt->execute([$verify_id]);
-        $payment = $newly_verified ? $stmt->fetch() : null;
-
-        if ($payment && $payment['payment_type'] === 'certificate' && $payment['certificate_id']) {
-            // Certificate fee: unlock the learner's certificate (no enrollment change).
-            require_once __DIR__ . '/../includes/progress.php';
-            unlock_certificate($pdo, (int)$payment['certificate_id'], (float)$payment['amount']);
-        } elseif ($payment && $payment['course_id']) {
-            require_once '../includes/gamified_logic.php';
-            require_once __DIR__ . '/../includes/learning.php';
-
-            // 3-4. Activate the enrollment on the track the learner paid for (credits the amount, counts the seat)
-            $cstmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
-            $cstmt->execute([$payment['course_id']]);
-            $pcourse = $cstmt->fetch();
-            $pmode = in_array($payment['learning_mode'], SDA_MODES, true) ? $payment['learning_mode'] : course_modes($pcourse)[0];
-            enroll_student($pdo, (int)$payment['student_id'], $pcourse, $pmode, $payment['cohort_id'] ? (int)$payment['cohort_id'] : null, (float)$payment['amount']);
-
-            // 5. Referral Reward (4% of amount)
-            $stmt = $pdo->prepare("SELECT amount FROM payments WHERE id = ?");
-            $stmt->execute([$verify_id]);
-            $amount = $stmt->fetchColumn();
-            rewardReferrer($payment['student_id'], $amount, $pdo);
-            
-            // 6. Send Notification to Student
-            $stmt = $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, 'student', ?)");
-            $stmt->execute(['Payment Verified!', 'Your payment has been verified. You can now access your course.', $payment['student_id']]);
-        }
-        
-        $pdo->commit();
-        $success_msg = "Payment verified successfully and student enrolled.";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $error_msg = "Error verifying payment: " . $e->getMessage();
+/** WHERE clause + params for the current filters. */
+function pl_filters(array $g, array $types): array {
+    $w = ['1=1'];
+    $p = [];
+    $f = [
+        'status' => in_array($g['status'] ?? '', ['pending', 'verified', 'failed'], true) ? $g['status'] : '',
+        'type'   => isset($types[$g['type'] ?? '']) ? $g['type'] : '',
+        'from'   => preg_match('/^\d{4}-\d{2}-\d{2}$/', $g['from'] ?? '') ? $g['from'] : '',
+        'to'     => preg_match('/^\d{4}-\d{2}-\d{2}$/', $g['to'] ?? '') ? $g['to'] : '',
+        'q'      => mb_substr(trim((string)($g['q'] ?? '')), 0, 100),
+    ];
+    if ($f['type'])  { $w[] = 'p.payment_type = ?'; $p[] = $f['type']; }
+    if ($f['from'])  { $w[] = 'p.created_at >= ?'; $p[] = $f['from'] . ' 00:00:00'; }
+    if ($f['to'])    { $w[] = 'p.created_at <= ?'; $p[] = $f['to'] . ' 23:59:59'; }
+    if ($f['q'] !== '') {
+        $like = '%' . addcslashes($f['q'], '%_\\') . '%';
+        $w[] = '(u.name LIKE ? OR u.email LIKE ? OR c.title LIKE ? OR p.paystack_reference LIKE ? OR p.transaction_message LIKE ? OR p.id = ?)';
+        array_push($p, $like, $like, $like, $like, $like, (int)ltrim($f['q'], '#'));
     }
+    $base = implode(' AND ', $w);     // without status (for the tab counts)
+    $full = $base;
+    $fp = $p;
+    if ($f['status']) { $full .= ' AND p.status = ?'; $fp[] = $f['status']; }
+    return [$f, $base, $p, $full, $fp];
 }
 
-// Fetch all payments with filtering
-try {
-    $status_filter = $_GET['status'] ?? 'all';
-    $where = $status_filter !== 'all' ? "WHERE p.status = ?" : "WHERE 1=1";
-    $params = $status_filter !== 'all' ? [$status_filter] : [];
+const PL_FROM = "FROM payments p
+                 LEFT JOIN users u ON u.id = p.student_id
+                 LEFT JOIN courses c ON c.id = p.course_id
+                 LEFT JOIN course_cohorts co ON co.id = p.cohort_id
+                 LEFT JOIN certificates ce ON ce.id = p.certificate_id
+                 LEFT JOIN users a ON a.id = p.verified_by";
+const PL_COLS = "p.*, u.name AS student_name, u.email AS student_email, u.phone AS student_phone, u.avatar,
+                 c.title AS course_title, co.name AS cohort_name, co.start_date AS cohort_start,
+                 ce.verification_code, ce.status AS cert_status, ce.fee AS cert_fee, a.name AS admin_name";
 
-    $stmt = $pdo->prepare("SELECT p.*, u.name as student_name, c.title as course_title, c.price as course_price
-                         FROM payments p 
-                         JOIN users u ON p.student_id = u.id 
-                         JOIN courses c ON p.course_id = c.id 
-                         $where
-                         ORDER BY p.created_at DESC");
-    $stmt->execute($params);
-    $payments = $stmt->fetchAll();
-    
-    // Summary Stats
-    $total_collected = $pdo->query("SELECT SUM(amount) FROM payments WHERE status = 'verified'")->fetchColumn() ?: 0;
-    $pending_count = $pdo->query("SELECT COUNT(*) FROM payments WHERE status = 'pending'")->fetchColumn() ?: 0;
-} catch (Exception $e) { $payments = []; $total_collected = 0; $pending_count = 0; }
+/* ── CSV export: before the page header (which prints HTML) ───────────── */
+if (($_GET['export'] ?? '') === 'csv') {
+    require_once __DIR__ . '/../includes/db.php';
+    require_once __DIR__ . '/../includes/auth.php';
+    requireRole('admin');
+    require_once __DIR__ . '/../includes/learning.php';
+    [$f, , , $where, $params] = pl_filters($_GET, $PL_TYPES);
+    $st = $pdo->prepare("SELECT " . PL_COLS . " " . PL_FROM . " WHERE $where ORDER BY p.created_at DESC");
+    $st->execute($params);
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="payments-' . date('Y-m-d') . '.csv"');
+    header('Cache-Control: no-store');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['Payment ID', 'Date', 'Status', 'Type', 'Learner', 'Email', 'Course', 'Track', 'Cohort', 'Certificate code', 'Amount', 'Currency', 'Reference', 'Message', 'Proof file', 'Decided by', 'Decided at']);
+    $csv = fn($v) => preg_match('/^[=+\-@\t\r]/', (string)$v) ? "'" . $v : $v;   // stop spreadsheet formula injection
+    while ($r = $st->fetch()) {
+        fputcsv($out, array_map($csv, [
+            $r['id'], $r['created_at'], $PL_STATUS[$r['status']] ?? $r['status'], $PL_TYPES[$r['payment_type']] ?? $r['payment_type'],
+            $r['student_name'] ?? 'Deleted account', $r['student_email'] ?? '', $r['course_title'] ?? '',
+            in_array($r['learning_mode'], SDA_MODES, true) ? mode_label($r['learning_mode']) : '', $r['cohort_name'] ?? '', $r['verification_code'] ?? '',
+            number_format((float)$r['amount'], 2, '.', ''), setting('currency'), $r['paystack_reference'] ?? '', $r['transaction_message'] ?? '',
+            $r['proof_file'] ?? '', $r['admin_name'] ?? '', $r['verified_at'] ?? '',
+        ]));
+    }
+    fclose($out);
+    exit;
+}
+
+$pageTitle = 'Master Ledger';
+require_once 'includes/header.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {   // approvals are handled on verifications.php
+    ax_post_guard();
+    ax_back();
+}
+
+[$f, $baseWhere, $baseParams, $where, $params] = pl_filters($_GET, $PL_TYPES);
+
+$counts = ['all' => 0, 'pending' => 0, 'verified' => 0, 'failed' => 0];
+$st = $pdo->prepare("SELECT p.status, COUNT(*) n " . PL_FROM . " WHERE $baseWhere GROUP BY p.status");
+$st->execute($baseParams);
+foreach ($st->fetchAll(PDO::FETCH_KEY_PAIR) as $k => $n) { if (isset($counts[$k])) $counts[$k] = (int)$n; $counts['all'] += (int)$n; }
+
+$st = $pdo->prepare("SELECT COUNT(*) n, COALESCE(SUM(p.amount),0) total,
+                            COALESCE(SUM(CASE WHEN p.status='verified' THEN p.amount END),0) approved,
+                            COALESCE(SUM(CASE WHEN p.status='pending' THEN p.amount END),0) pending,
+                            COALESCE(SUM(CASE WHEN p.status='failed' THEN p.amount END),0) rejected,
+                            COALESCE(SUM(CASE WHEN p.status='verified' AND p.payment_type='certificate' THEN p.amount END),0) cert,
+                            COALESCE(SUM(CASE WHEN p.status='verified' AND p.payment_type='course' THEN p.amount END),0) course
+                     " . PL_FROM . " WHERE $where");
+$st->execute($params);
+$tot = $st->fetch();
+
+$per = 50;
+$pages = max(1, (int)ceil($tot['n'] / $per));
+$page = min($pages, max(1, (int)($_GET['page'] ?? 1)));
+$st = $pdo->prepare("SELECT " . PL_COLS . " " . PL_FROM . " WHERE $where ORDER BY p.created_at DESC, p.id DESC LIMIT $per OFFSET " . (($page - 1) * $per));
+$st->execute($params);
+$rows = $st->fetchAll();
+
+$typesPresent = $pdo->query("SELECT payment_type, COUNT(*) FROM payments GROUP BY payment_type")->fetchAll(PDO::FETCH_KEY_PAIR);
+$filtered = $f['type'] || $f['from'] || $f['to'] || $f['q'] !== '' || $f['status'];
+
+function pl_url(array $f, array $over = []): string {
+    $q = array_filter(array_merge($f, $over), fn($v) => $v !== '' && $v !== null);
+    return 'payments' . ($q ? '?' . http_build_query($q) : '');
+}
+function pl_status_pill(string $s): string {
+    return ['pending' => '<span class="ax-pill warn"><i class="fas fa-hourglass-half"></i> Pending</span>',
+            'verified' => '<span class="ax-pill ok"><i class="fas fa-check"></i> Approved</span>',
+            'failed' => '<span class="ax-pill bad"><i class="fas fa-xmark"></i> Rejected</span>'][$s] ?? '<span class="ax-pill">' . e($s) . '</span>';
+}
+function pl_type_pill(string $t, array $types): string {
+    $cls = ['course' => 'info', 'certificate' => 'violet', 'registration' => 'dark', 'donation' => 'ok'][$t] ?? '';
+    return '<span class="ax-pill ' . $cls . '">' . e($types[$t] ?? ucfirst($t)) . '</span>';
+}
+function pl_proof(?string $file): ?string {
+    if (!$file) return null;
+    $file = basename($file);
+    return is_file(__DIR__ . '/../uploads/proofs/' . $file) ? '../uploads/proofs/' . rawurlencode($file) : null;
+}
+
+$returnTo = basename($_SERVER['REQUEST_URI']);
+$returnTo = preg_match('/^payments(\?[A-Za-z0-9_=&%.+\-]*)?$/', $returnTo) ? $returnTo : 'payments';
+$exportUrl = pl_url($f, ['export' => 'csv']);
+require_once 'includes/sidebar.php';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
 <style>
-    /* Page-level overflow containment */
-    .main-content { overflow-x: hidden; }
-    .admin-body { width: 100%; box-sizing: border-box; }
-
-    /* Payments Page Header */
-    .payments-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-bottom: 32px;
-        background: rgba(13,17,23,0.8);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--dark-border);
-        padding: 0 32px;
-        height: auto;
-        min-height: 70px;
-        padding-top: 12px;
-        padding-bottom: 12px;
-    }
-    .payments-header-left { display: flex; align-items: center; gap: 14px; }
-    .payments-header-right { display: flex; gap: 10px; flex-wrap: wrap; }
-
-    /* Stats grid responsive */
-    .dash-stats-grid { grid-template-columns: repeat(4, 1fr); }
-    @media (max-width: 991px) { .dash-stats-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-    @media (max-width: 480px)  { .dash-stats-grid { grid-template-columns: repeat(2, 1fr) !important; } }
-
-    /* Table card + scrollbar */
-    .table-card { overflow: hidden; }
-    .table-responsive { display: block; overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
-    .table-responsive::-webkit-scrollbar { height: 8px; }
-    .table-responsive::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
-    .table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    .table-responsive::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-    .admin-table { min-width: 900px; }
-    .admin-table td, .admin-table th { white-space: nowrap; }
-
-    /* Table header responsive */
-    .table-header { flex-wrap: wrap; gap: 12px; }
-
-    @media (max-width: 768px) {
-        .payments-header { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
-        .payments-header-right { width: 100%; }
-        .payments-header-right .btn { flex: 1; justify-content: center; }
-        .admin-body { padding: 16px; }
-    }
+  .pl-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: end; }
+  .pl-filters .ax-field { margin: 0; }
+  .pl-filters .pl-btns { display: flex; gap: 8px; }
+  .pl-totals { display: flex; flex-wrap: wrap; gap: 10px 26px; padding: 14px 22px; border-bottom: 1px solid var(--border-light); background: var(--surface-2); font-size: .84rem; color: var(--text-dim); }
+  .pl-totals b { color: var(--text-main); font-variant-numeric: tabular-nums; }
+  .pl-pager { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding: 14px 22px; border-top: 1px solid var(--border-light); font-size: .82rem; color: var(--text-muted); flex-wrap: wrap; }
+  .pl-detail img { max-width: 100%; max-height: 50vh; border-radius: 12px; border: 1px solid var(--border); display: block; margin: 0 auto; }
+  .pl-detail .ax-kv { margin-bottom: 18px; }
+  .pl-msg { white-space: pre-wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: .85rem; color: var(--text-main); overflow-wrap: anywhere; }
+  .pl-print-head { display: none; }
+  @media (max-width: 1100px) { .pl-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pl-filters .pl-q { grid-column: 1 / -1; } }
+  @media (max-width: 520px) { .pl-filters { grid-template-columns: 1fr; } }
+  @media print {
+    .pl-print-head { display: block; margin-bottom: 16px; }
+    .ax-stats, .pl-filters-panel, .pl-pager, .ax-table .actions, dialog { display: none !important; }
+    .ax-table td, .ax-table th { padding: 6px 8px; font-size: .72rem; }
+  }
 </style>
-
-<style>
-    .main-content { overflow-x: hidden; }
-    .admin-body { width: 100%; box-sizing: border-box; padding: 32px; }
-
-    .pay-header {
-        display: flex; justify-content: space-between; align-items: center;
-        flex-wrap: wrap; gap: 16px; padding: 20px 32px;
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        border-bottom: 1px solid rgba(0,191,255,0.15);
-        position: sticky; top: 0; z-index: 100;
-    }
-    .pay-header-left { display: flex; align-items: center; gap: 14px; }
-    .pay-header-title { font-family: 'Poppins', sans-serif; font-size: clamp(1.1rem, 3vw, 1.5rem); font-weight: 800; color: #fff; }
-    .pay-header-title span { color: var(--primary); }
-    .pay-header-sub { font-size: 0.72rem; color: #94a3b8; margin-top: 3px; }
-    .pay-header-right { display: flex; gap: 10px; flex-wrap: wrap; }
-
-    .pay-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }
-    .pay-stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: 0.3s; }
-    .pay-stat-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
-    .pay-stat-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
-    .pay-stat-icon.green  { background: #d1fae5; color: #059669; }
-    .pay-stat-icon.orange { background: #fed7aa; color: #ea580c; }
-    .pay-stat-icon.blue   { background: #dbeafe; color: #2563eb; }
-    .pay-stat-val { font-family: 'Poppins', sans-serif; font-size: 1.5rem; font-weight: 900; color: #0f172a; line-height: 1; }
-    .pay-stat-lbl { font-size: 0.68rem; color: #64748b; font-weight: 600; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-    .pay-table-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .pay-table-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
-    .pay-table-header h3 { font-family: 'Poppins', sans-serif; font-size: 1rem; font-weight: 800; color: #0f172a; }
-    .pay-table-header select { padding: 6px 12px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 0.8rem; outline: none; }
-
-    .pay-table-scroll { display: block; overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
-    .pay-table-scroll::-webkit-scrollbar { height: 8px; }
-    .pay-table-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
-    .pay-table-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    .pay-table-scroll::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-
-    .pay-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-    .pay-table th { background: #f8fafc; padding: 13px 20px; text-align: left; font-size: 0.65rem; font-weight: 800; color: #64748b; letter-spacing: 0.8px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    .pay-table td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-size: 0.88rem; color: #334155; white-space: nowrap; vertical-align: middle; }
-    .pay-table tr:last-child td { border-bottom: none; }
-    .pay-table tr:hover td { background: #f8faff; }
-
-    .pay-badge { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.5px; }
-    .pay-badge.pending  { background: #fef9c3; color: #854d0e; }
-    .pay-badge.verified { background: #d1fae5; color: #065f46; }
-    .pay-badge.failed   { background: #fee2e2; color: #991b1b; }
-
-    .pay-alert { padding: 14px 20px; border-radius: 14px; font-size: 0.88rem; font-weight: 600; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; }
-    .pay-alert.success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
-    .pay-alert.danger  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
-    
-    .nav-toggle {
-        display: none;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.15);
-        color: white;
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-
-    @media (max-width: 1024px) {
-        .pay-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-        .pay-header { padding: 16px 20px; }
-        .admin-body { padding: 20px; }
-        .nav-toggle { display: flex !important; }
-    }
-    @media (max-width: 600px) {
-        .pay-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-        .pay-header { flex-direction: column; align-items: flex-start; }
-        .pay-header-right { width: 100%; }
-        .pay-header-right .btn { flex: 1; justify-content: center; }
-        .admin-body { padding: 16px; }
-    }
-</style>
-
 <main class="main-content">
-    <header class="pay-header">
-        <div class="pay-header-left">
-            <button class="nav-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div>
-                <div class="pay-header-title">Revenue <span>&amp; Payments</span></div>
-                <div class="pay-header-sub"><i class="fas fa-circle" style="color: #10b981; font-size: 0.45rem; margin-right: 5px; vertical-align: middle;"></i>Live transaction audit &amp; verification control</div>
-            </div>
-        </div>
-        <div class="pay-header-right">
-            <button class="btn btn-ghost btn-sm" style="border-color: rgba(255,255,255,0.2); color: #e2e8f0; background: rgba(255,255,255,0.06);"><i class="fas fa-file-export"></i> Export CSV</button>
-            <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
-        </div>
-    </header>
+    <?php ax_header('Master', 'Ledger', 'Every payment in one place',
+        '<a class="ax-btn ghost" href="' . e($exportUrl) . '"><i class="fas fa-file-csv"></i> Export CSV</a>'
+        . '<button type="button" class="ax-btn ghost" onclick="window.print()"><i class="fas fa-print"></i> Print</button>'
+        . '<a class="ax-btn" href="verifications"><i class="fas fa-shield-halved"></i> Approvals' . ($counts['pending'] && !$filtered ? ' (' . $counts['pending'] . ')' : '') . '</a>'); ?>
+    <div class="ax-body">
+        <?php ax_alerts(); ?>
+        <div class="pl-print-head"><h2>Skope Digital Academy – payments ledger</h2><p>Printed <?= date('M j, Y g:i a') ?><?= $filtered ? ' · filtered view' : '' ?></p></div>
 
-    <div class="admin-body">
-        <?php if($success_msg): ?>
-            <div class="pay-alert success"><i class="fas fa-check-circle"></i> <?= $success_msg ?></div>
-        <?php endif; ?>
-        <?php if($error_msg): ?>
-            <div class="pay-alert danger"><i class="fas fa-times-circle"></i> <?= $error_msg ?></div>
-        <?php endif; ?>
-
-        <div class="pay-stats-grid">
-            <div class="pay-stat-card">
-                <div class="pay-stat-icon green"><i class="fas fa-vault"></i></div>
-                <div><div class="pay-stat-val">KES <?= number_format($total_collected) ?></div><div class="pay-stat-lbl">Total Revenue</div></div>
-            </div>
-            <div class="pay-stat-card">
-                <div class="pay-stat-icon orange"><i class="fas fa-clock"></i></div>
-                <div><div class="pay-stat-val"><?= $pending_count ?></div><div class="pay-stat-lbl">Pending Verifications</div></div>
-            </div>
-            <div class="pay-stat-card">
-                <div class="pay-stat-icon blue"><i class="fas fa-calendar-check"></i></div>
-                <div><div class="pay-stat-val">100%</div><div class="pay-stat-lbl">Verification Rate</div></div>
-            </div>
-            <div class="pay-stat-card">
-                <div class="pay-stat-icon blue"><i class="fas fa-users-viewfinder"></i></div>
-                <div><div class="pay-stat-val"><?= count($payments) ?></div><div class="pay-stat-lbl">Total Transactions</div></div>
-            </div>
+        <div class="ax-stats">
+            <?= ax_stat('vault', ax_money($tot['approved']), 'Approved' . ($filtered ? ' (filtered)' : ''), 'Courses ' . ax_money($tot['course']) . ' · Certificates ' . ax_money($tot['cert']), 'green') ?>
+            <?= ax_stat('hourglass-half', ax_money($tot['pending']), 'Waiting for approval', number_format($counts['pending']) . ' payment' . ($counts['pending'] == 1 ? '' : 's'), 'amber') ?>
+            <?= ax_stat('ban', ax_money($tot['rejected']), 'Rejected', number_format($counts['failed']) . ' payment' . ($counts['failed'] == 1 ? '' : 's'), 'red') ?>
+            <?= ax_stat('receipt', number_format((int)$tot['n']), 'Payments listed', $counts['all'] ? round($counts['verified'] / $counts['all'] * 100) . '% approved' : 'No payments', 'slate') ?>
         </div>
 
-        <!-- ── Print-Only Fiscal Ledger Audit ── -->
-        <div class="print-only" style="padding: 50px; font-family: 'Inter', sans-serif;">
-            <div style="text-align: center; border-bottom: 3px double #0f172a; padding-bottom: 32px; margin-bottom: 48px;">
-                <img src="../assets/images/Skope Digital  logo.png" style="height: 70px; margin-bottom: 20px; filter: grayscale(1);">
-                <h1 style="font-size: 2.2rem; font-weight: 900; margin: 0; color: #0f172a; text-transform: uppercase;">Official Fiscal Ledger Audit</h1>
-                <p style="font-size: 0.85rem; color: #94a3b8; letter-spacing: 4px; text-transform: uppercase; margin-top: 8px;">Treasury Archives • Skope Digital Academy</p>
-            </div>
+        <section class="ax-panel pl-filters-panel">
+            <form class="ax-panel-b ax-form pl-filters" method="get" action="payments">
+                <?php if ($f['status']): ?><input type="hidden" name="status" value="<?= e($f['status']) ?>"><?php endif; ?>
+                <div class="ax-field pl-q"><label for="pl-q">Search</label><input id="pl-q" type="text" name="q" value="<?= e($f['q']) ?>" placeholder="Learner, email, course, reference, #ID"></div>
+                <div class="ax-field"><label for="pl-type">Type</label>
+                    <select id="pl-type" name="type"><option value="">All types</option>
+                        <?php foreach ($PL_TYPES as $k => $lbl): if (!isset($typesPresent[$k]) && $f['type'] !== $k) continue; ?>
+                            <option value="<?= $k ?>" <?= $f['type'] === $k ? 'selected' : '' ?>><?= e($lbl) ?> (<?= (int)($typesPresent[$k] ?? 0) ?>)</option>
+                        <?php endforeach; ?></select></div>
+                <div class="ax-field"><label for="pl-from">From</label><input id="pl-from" type="date" name="from" value="<?= e($f['from']) ?>"></div>
+                <div class="ax-field"><label for="pl-to">To</label><input id="pl-to" type="date" name="to" value="<?= e($f['to']) ?>"></div>
+                <div class="pl-btns"><button class="ax-btn"><i class="fas fa-filter"></i> Apply</button><?php if ($filtered): ?><a class="ax-btn ghost" href="payments">Clear</a><?php endif; ?></div>
+            </form>
+        </section>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 48px;">
-                <div style="border: 1px solid #e2e8f0; padding: 24px; border-radius: 4px;">
-                    <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; margin-bottom: 8px;">Total Verified Revenue</div>
-                    <div style="font-size: 1.8rem; font-weight: 900; color: #10B981;">KES <?= number_format($total_collected) ?></div>
-                </div>
-                <div style="border: 1px solid #e2e8f0; padding: 24px; border-radius: 4px; background: #f8fafc;">
-                    <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 800; margin-bottom: 8px;">Audit Status</div>
-                    <div style="font-size: 1.2rem; font-weight: 900; color: #0f172a;">Fiscal Year 2026 Registry</div>
-                    <div style="font-size: 0.8rem; color: #475569; margin-top: 4px;">Registry ID: SDA-PY-<?= date('Ymd') ?></div>
-                </div>
-            </div>
-
-            <h3 style="font-size: 1rem; text-transform: uppercase; letter-spacing: 2.5px; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 24px;">Transaction History Registry</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 48px; font-size: 0.8rem;">
-                <thead>
-                    <tr style="background: #f1f5f9;">
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid #cbd5e1;">Transaction Ref</th>
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid #cbd5e1;">Scholar Name</th>
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid #cbd5e1;">Curriculum Track</th>
-                        <th style="text-align: right; padding: 12px; border-bottom: 1px solid #cbd5e1;">Gross Amount</th>
-                        <th style="text-align: center; padding: 12px; border-bottom: 1px solid #cbd5e1;">Status</th>
-                        <th style="text-align: right; padding: 12px; border-bottom: 1px solid #cbd5e1;">Timestamp</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach($payments as $p): ?>
-                    <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-family: monospace; font-size: 0.75rem; font-weight: 700;"><?= htmlspecialchars($p['paystack_reference'] ?? ('PAY-' . $p['id'])) ?></td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700;"><?= htmlspecialchars($p['student_name']) ?></td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;"><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 800; color: #1e293b;">KES <?= number_format($p['amount']) ?></td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">
-                            <span style="font-size: 0.65rem; font-weight: 900; color: <?= $p['status'] === 'verified' ? '#166534' : '#92400e' ?>;">
-                                <?= strtoupper($p['status']) ?>
-                            </span>
-                        </td>
-                        <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; color: #94a3b8;"><?= date('M j, Y H:i', strtotime($p['created_at'])) ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 80px; margin-top: 100px; text-align: center;">
-                <div>
-                    <div style="border-top: 2px solid #0f172a; padding-top: 12px; font-size: 0.95rem; font-weight: 900; font-family: 'Poppins', sans-serif;">Finance Comptroller</div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px;">Institutional Treasury</div>
-                </div>
-                <div>
-                    <div style="border-top: 2px solid #0f172a; padding-top: 12px; font-size: 0.95rem; font-weight: 900; font-family: 'Poppins', sans-serif;">Audit Board Seal</div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px;">Verified Fiscal Registry</div>
-                </div>
-            </div>
-
-            <div style="text-align: center; margin-top: 80px; font-size: 0.7rem; color: #b4becb;">
-                This ledger is for institutional auditing purposes. All transaction state changes are logged. <br>
-                Audit System ID: SDA-FIS-<?= strtoupper(substr(md5(count($payments)), 0, 10)) ?> • Generated <?= date('F j, Y \a\t g:i a') ?>.
-            </div>
+        <div class="ax-toolbar">
+            <nav class="ax-tabs" aria-label="Status">
+                <?php foreach (['' => 'All', 'pending' => 'Pending', 'verified' => 'Approved', 'failed' => 'Rejected'] as $k => $lbl): ?>
+                    <a href="<?= e(pl_url($f, ['status' => $k, 'page' => null])) ?>" class="<?= $f['status'] === $k ? 'on' : '' ?>"><?= $lbl ?> <span class="n"><?= $counts[$k ?: 'all'] ?></span></a>
+                <?php endforeach; ?>
+            </nav>
         </div>
 
-        <div class="pay-table-card">
-            <div class="pay-table-header">
-                <h3><i class="fas fa-receipt" style="color: var(--primary); margin-right: 8px;"></i>Transaction History</h3>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 0.78rem; color: #64748b; font-weight: 600;">Filter Status:</span>
-                    <select onchange="location.href='?status=' + this.value">
-                        <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Ecosystem Records</option>
-                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending Audits</option>
-                        <option value="verified" <?= $status_filter == 'verified' ? 'selected' : '' ?>>Verified Payments</option>
-                        <option value="failed" <?= $status_filter == 'failed' ? 'selected' : '' ?>>Failed Attempts</option>
-                    </select>
-                </div>
+        <section class="ax-panel">
+            <div class="pl-totals">
+                <span>Listed: <b><?= number_format((int)$tot['n']) ?></b></span>
+                <span>Total value: <b><?= e(ax_money($tot['total'])) ?></b></span>
+                <span>Approved: <b><?= e(ax_money($tot['approved'])) ?></b></span>
+                <span>Pending: <b><?= e(ax_money($tot['pending'])) ?></b></span>
+                <span>Rejected: <b><?= e(ax_money($tot['rejected'])) ?></b></span>
             </div>
-            <div class="pay-table-scroll">
-                <table class="pay-table">
-                    <thead>
-                        <tr>
-                            <th>Student</th><th>Course</th><th>Amount</th>
-                            <th>Proof</th><th>Status</th><th>Date</th><th>Actions</th>
-                        </tr>
-                    </thead>
+            <?php if (!$rows): ?>
+                <div class="ax-empty"><i class="fas fa-receipt"></i><b><?= $filtered ? 'No payments match these filters' : 'No payments yet' ?></b><?= $filtered ? '<a href="payments">Clear the filters</a>' : 'Payments will be listed here as learners pay.' ?></div>
+            <?php else: ?>
+            <div class="ax-table-wrap">
+                <table class="ax-table cards">
+                    <thead><tr><th>#</th><th>Learner</th><th>For</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
                     <tbody>
-                        <?php foreach($payments as $p): ?>
+                    <?php foreach ($rows as $r): ?>
                         <tr>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <div style="width:36px;height:36px;border-radius:50%;background:var(--primary-glow);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem;flex-shrink:0;"><?= strtoupper(substr($p['student_name'],0,1)) ?></div>
-                                    <div>
-                                        <div style="font-weight:700;color:#0f172a;"><?= htmlspecialchars($p['student_name']) ?></div>
-                                        <div style="font-size:0.7rem;color:#94a3b8;">TXN #P-<?= $p['id'] ?></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
-                            <td><span style="font-weight:800;color:#0f172a;font-family:'Poppins',sans-serif;">KES <?= number_format($p['amount']) ?></span></td>
-                            <td>
-                                <?php if($p['proof_file']): ?>
-                                    <a href="../uploads/proofs/<?= $p['proof_file'] ?>" target="_blank" class="btn btn-ghost btn-sm" style="font-size:0.72rem;border-radius:8px;"><i class="fas fa-file-image"></i> View</a>
-                                <?php else: ?>
-                                    <span style="font-size:0.72rem;color:#94a3b8;font-style:italic;">No proof</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><span class="pay-badge <?= $p['status'] ?>"><?= ucfirst($p['status']) ?></span></td>
-                            <td style="color:#64748b;font-size:0.8rem;"><?= date('M j, Y · g:i a', strtotime($p['created_at'])) ?></td>
-                            <td>
-                                <?php if($p['status'] === 'pending'): ?>
-                                    <a href="?verify_id=<?= $p['id'] ?>" class="btn btn-primary btn-sm" style="border-radius:8px;font-size:0.75rem;" onclick="return confirm('Verify this payment and enroll the student?')"><i class="fas fa-check"></i> Verify</a>
-                                <?php else: ?>
-                                    <span style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem;color:#059669;font-weight:700;"><i class="fas fa-check-circle"></i> Done</span>
-                                <?php endif; ?>
-                            </td>
+                            <td data-label="Payment" class="num muted">#<?= (int)$r['id'] ?></td>
+                            <td data-label="Learner"><div class="ax-who"><?= ax_avatar($r['student_name'] ?? '?', $r['avatar'] ?? null) ?><div><b><?= e($r['student_name'] ?? 'Deleted account') ?></b><small><?= e($r['student_email'] ?? 'User #' . $r['student_id']) ?></small></div></div></td>
+                            <td data-label="For"><div><?= pl_type_pill((string)$r['payment_type'], $PL_TYPES) ?>
+                                <?php if ($r['course_title']): ?><div class="strong" style="margin-top:4px"><?= e($r['course_title']) ?></div><?php endif; ?>
+                                <?php if ($r['payment_type'] === 'course' && in_array($r['learning_mode'], SDA_MODES, true)): ?><div class="muted"><?= e(mode_label($r['learning_mode'])) ?><?= $r['cohort_name'] ? ' · ' . e($r['cohort_name']) : '' ?></div><?php endif; ?></div></td>
+                            <td data-label="Amount" class="num strong"><?= e(money((float)$r['amount'])) ?></td>
+                            <td data-label="Status"><?= pl_status_pill((string)$r['status']) ?></td>
+                            <td data-label="Date" class="num"><?= e(ax_date($r['created_at'], 'M j, Y')) ?><div class="muted"><?= e(ax_date($r['created_at'], 'g:i a')) ?></div></td>
+                            <td class="actions" data-label=""><button type="button" class="ax-btn ghost sm" data-open="pd-<?= (int)$r['id'] ?>"><i class="fas fa-eye"></i> Details</button></td>
                         </tr>
-                        <?php endforeach; ?>
-                        <?php if(empty($payments)): ?>
-                        <tr><td colspan="7" style="text-align:center;padding:60px;color:#94a3b8;"><i class="fas fa-receipt" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:12px;"></i>No transactions recorded yet.</td></tr>
-                        <?php endif; ?>
+                    <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-        </div>
+            <?php if ($pages > 1): ?>
+            <div class="pl-pager">
+                <span>Page <?= $page ?> of <?= $pages ?> · <?= $per ?> per page</span>
+                <span style="display:flex;gap:8px">
+                    <?php if ($page > 1): ?><a class="ax-btn ghost sm" href="<?= e(pl_url($f, ['page' => $page - 1])) ?>"><i class="fas fa-chevron-left"></i> Newer</a><?php endif; ?>
+                    <?php if ($page < $pages): ?><a class="ax-btn ghost sm" href="<?= e(pl_url($f, ['page' => $page + 1])) ?>">Older <i class="fas fa-chevron-right"></i></a><?php endif; ?>
+                </span>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
+        </section>
     </div>
 </main>
 
+<?php foreach ($rows as $r): $proof = pl_proof($r['proof_file']); $isImg = $proof && in_array(strtolower(pathinfo($r['proof_file'], PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp', 'gif'], true); ?>
+<dialog class="ax-modal pl-detail" id="pd-<?= (int)$r['id'] ?>" aria-label="Payment #<?= (int)$r['id'] ?>">
+    <div class="ax-panel-h"><div><h3><i class="fas fa-receipt"></i> Payment #<?= (int)$r['id'] ?></h3><p><?= pl_status_pill((string)$r['status']) ?> <?= pl_type_pill((string)$r['payment_type'], $PL_TYPES) ?></p></div>
+        <button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+    <div class="ax-panel-b">
+        <dl class="ax-kv">
+            <dt>Amount</dt><dd><?= e(money((float)$r['amount'])) ?></dd>
+            <dt>Learner</dt><dd><?= e($r['student_name'] ?? 'Deleted account') ?><?= $r['student_email'] ? ' · ' . e($r['student_email']) : '' ?><?= $r['student_phone'] ? ' · ' . e($r['student_phone']) : '' ?>
+                <?php if ($r['student_name']): ?> · <a href="user-profile?id=<?= (int)$r['student_id'] ?>">Profile</a><?php endif; ?></dd>
+            <?php if ($r['course_title'] || $r['course_id']): ?><dt>Course</dt><dd><?= $r['course_title'] ? '<a href="../course-details?id=' . (int)$r['course_id'] . '" target="_blank">' . e($r['course_title']) . '</a>' : 'Removed course #' . (int)$r['course_id'] ?></dd><?php endif; ?>
+            <?php if ($r['payment_type'] === 'course'): ?><dt>Track</dt><dd><?= in_array($r['learning_mode'], SDA_MODES, true) ? e(mode_label($r['learning_mode'])) : 'Not recorded' ?><?= $r['cohort_name'] ? ' · cohort ' . e($r['cohort_name']) . ' (starts ' . e(ax_date($r['cohort_start'])) . ')' : '' ?></dd><?php endif; ?>
+            <?php if ($r['payment_type'] === 'certificate'): ?><dt>Certificate</dt><dd><?= $r['verification_code'] ? '<a href="../certificate?code=' . rawurlencode($r['verification_code']) . '" target="_blank">' . e($r['verification_code']) . '</a> · ' . e(['pending' => 'locked', 'approved' => 'unlocked', 'revoked' => 'revoked'][$r['cert_status']] ?? $r['cert_status']) . ' · fee ' . e(money((float)$r['cert_fee'])) : 'Not linked' ?></dd><?php endif; ?>
+            <dt>Reference</dt><dd><?= $r['paystack_reference'] ? '<span class="ax-code">' . e($r['paystack_reference']) . '</span> (Paystack)' : '—' ?></dd>
+            <dt>Sent</dt><dd><?= e(ax_date($r['created_at'], 'M j, Y g:i a')) ?></dd>
+            <?php if ($r['status'] !== 'pending'): ?><dt><?= $r['status'] === 'verified' ? 'Approved' : 'Rejected' ?></dt><dd><?= e(ax_date($r['verified_at'], 'M j, Y g:i a')) ?><?= $r['admin_name'] ? ' by ' . e($r['admin_name']) : ($r['paystack_reference'] ? ' (automatic)' : '') ?></dd><?php endif; ?>
+        </dl>
+        <?php if (trim((string)$r['transaction_message']) !== ''): ?><div class="ax-field"><label>Message / M-Pesa text</label><div class="pl-msg"><?= e($r['transaction_message']) ?></div></div><?php endif; ?>
+        <?php if ($proof): ?>
+            <div class="ax-field"><label>Proof of payment</label>
+                <?= $isImg ? '<a href="' . e($proof) . '" target="_blank" rel="noopener"><img src="' . e($proof) . '" alt="Proof of payment" loading="lazy"></a>' : '<a class="ax-btn ghost sm" href="' . e($proof) . '" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Open proof (PDF)</a>' ?></div>
+        <?php elseif ($r['proof_file']): ?><p class="muted">The proof file (<?= e($r['proof_file']) ?>) is missing from uploads/proofs.</p><?php endif; ?>
+        <?php if ($r['status'] === 'pending'): ?>
+        <div class="ax-form-actions">
+            <form method="post" action="verifications" class="ax-form" data-confirm="Reject payment #<?= (int)$r['id'] ?>? The learner is notified." data-danger style="display:flex;gap:8px;flex-wrap:wrap;flex:1">
+                <?= ax_csrf() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="return" value="<?= e($returnTo) ?>">
+                <input type="text" name="reason" maxlength="300" placeholder="Reason for rejecting (sent to the learner)" aria-label="Reason" style="flex:1;min-width:180px">
+                <button class="ax-btn danger"><i class="fas fa-xmark"></i> Reject</button>
+            </form>
+            <form method="post" action="verifications" data-confirm="Approve payment #<?= (int)$r['id'] ?>?<?= $r['payment_type'] === 'course' ? ' The learner will be enrolled on the track they paid for.' : ($r['payment_type'] === 'certificate' ? ' The certificate will be unlocked.' : '') ?>">
+                <?= ax_csrf() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="return" value="<?= e($returnTo) ?>">
+                <button class="ax-btn ok"><i class="fas fa-check"></i> Approve</button>
+            </form>
+        </div>
+        <?php endif; ?>
+    </div>
+</dialog>
+<?php endforeach; ?>
+
 <script src="../assets/js/main.js"></script>
-</body>
-</html>
+<?php ax_footer_js(); ?>
+<script>document.querySelectorAll('dialog.ax-modal').forEach(function(d){d.addEventListener('click',function(e){if(e.target===d)d.close();});});</script>
+</body></html>

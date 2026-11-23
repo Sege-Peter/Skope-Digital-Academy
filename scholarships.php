@@ -15,8 +15,8 @@ $user = isLoggedIn() ? currentUser() : null;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Apply for scholarships at Skope Digital Academy. We offer merit-based funding and a direct path to a tech career for talented individuals in Kenya.">
 <title>Scholarships & Funding – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Scholarships & Funding', 'path' => 'scholarships', 'description' => 'Apply for Skope Digital Academy scholarships: funded places for talented learners in Kenya to study coding and digital skills online.', 'breadcrumbs' => [['Scholarships', 'scholarships']]]); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -25,7 +25,7 @@ $user = isLoggedIn() ? currentUser() : null;
 <style>
 /* ── Reset & Base ── */
 *, *::before, *::after { box-sizing: border-box; }
-body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overflow-x: clip; }
 
 /* ── Navbar Fix ── */
 .navbar {
@@ -37,7 +37,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 
 /* ── HERO ── */
 .sch-hero {
-  padding: 130px 0 100px;
+  padding: 88px 0 96px;
   background: linear-gradient(160deg, #f0f9ff 0%, #e8f4fd 50%, #fff8ee 100%);
   position: relative; overflow: hidden; text-align: center;
 }
@@ -168,10 +168,19 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 /* ══ MOBILE COMPONENT OVERRIDES ══ */
 @media (max-width: 991px) {
   .sch-grid { grid-template-columns: 1fr; }
-  .kit-card { grid-template-columns: 1fr; padding: 40px; text-align: center; }
+  .kit-card { grid-template-columns: minmax(0, 1fr); padding: 40px; gap: 36px; text-align: center; }
+  .kit-card > * { min-width: 0; }
   .kit-list { justify-content: center; text-align: left; }
   .sch-stats { flex-direction: column; gap: 32px; align-items: center; }
   .sch-stats div[style*="width: 1px"] { display: none; }
+}
+
+@media (max-width: 600px) {
+  .kit-section { padding: 64px 0; }
+  .kit-card { padding: 28px 18px; border-radius: 24px; }
+  .kit-badge { top: -12px; right: -6px; padding: 8px 14px; }
+  .kit-heading { font-size: 1.7rem; }
+  .kit-card .btn-hero-primary { width: 100%; padding: 16px 20px !important; white-space: normal; justify-content: center; }
 }
 
 @media (max-width: 850px) {
@@ -195,6 +204,9 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
   #sch-paystack-btn { height: 64px !important; font-size: 1rem !important; }
   .sch-amount-chip { padding: 12px !important; font-size: 0.95rem !important; }
 }
+@media (max-width: 640px) {
+  .kit-badge { top: -14px; right: 8px; padding: 9px 14px; font-size: .72rem; }
+}
 </style>
 </head>
 <body>
@@ -204,7 +216,6 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 <!-- ══ HERO ══ -->
 <header class="sch-hero">
   <div class="sch-hero-inner" data-aos>
-    <div class="sch-tag"><i class="fas fa-hand-holding-heart"></i> Empowerment Initiative</div>
     <h1>Unlock Your Learning <span>Future</span>.</h1>
     <p>We bridge the gap between ambition and opportunity. Skope Digital Academy offers merit-based scholarships to ensure Kenyan talent isn't limited by financial barriers.</p>
     

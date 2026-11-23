@@ -59,6 +59,7 @@ if ($course['status'] !== 'published' && !$is_admin && !$is_tutor && !$is_enroll
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($course['title']) ?> – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => $course['title'] . ' – Online Course', 'path' => 'course-details?id=' . (int)$course['id'], 'image' => (!empty($course['thumbnail']) && is_file(__DIR__ . '/uploads/courses/' . basename($course['thumbnail']))) ? 'uploads/courses/' . basename($course['thumbnail']) : '', 'description' => trim(strip_tags((string)($course['description'] ?? ''))) ?: ('Learn ' . $course['title'] . ' online with Skope Digital Academy and earn a certificate.'), 'breadcrumbs' => [['Courses', 'courses'], [$course['title'], 'course-details?id=' . (int)$course['id']]], 'schema' => [sda_seo_course($course, sda_seo_abs('course-details?id=' . (int)$course['id']))]]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -95,6 +96,7 @@ if ($course['status'] !== 'published' && !$is_admin && !$is_tutor && !$is_enroll
             inset: 0;
             background: linear-gradient(to top, rgba(13, 17, 23, 0.8), transparent 40%);
         }
+        .course-vignette:has(img)::after { display: none; }   /* designed thumbnails carry their own shading */
 
         .purchase-sticky {
             background: #fff;
@@ -146,7 +148,11 @@ if ($course['status'] !== 'published' && !$is_admin && !$is_tutor && !$is_enroll
         }
         @media (max-width: 600px) {
             .lesson-row { padding: 16px 18px; gap: 12px; }
-            .lesson-row > div:first-child { gap: 14px !important; flex-wrap: wrap; }
+            /* number | title, with the Preview pill and code icon tucked under the title */
+            .lesson-row > div:first-child { display: grid !important; grid-template-columns: 24px minmax(0, 1fr); align-items: center; column-gap: 12px !important; row-gap: 6px !important; flex: 1; min-width: 0; }
+            .lesson-row > div:first-child > :nth-child(n+3) { grid-column: 2; justify-self: start; }
+            .lesson-row > div:first-child > :nth-child(2) { font-size: .98rem !important; line-height: 1.35; }
+            .lesson-row > div:last-child { flex-shrink: 0; gap: 6px !important; }
             .lesson-row:hover { transform: none; }
             .course-main-column h2 { font-size: 1.6rem !important; }
         }

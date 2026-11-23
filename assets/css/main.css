@@ -1468,6 +1468,11 @@ html, body {
   min-height: 100vh;
   width: 100%;
 }
+/* No sideways scrolling on phones: clip anything that pokes past the edge (slide-in animations,
+   decorative glows, offset badges). `clip` keeps position: sticky working, unlike `hidden`. */
+html { overflow-x: clip; }
+body { overflow-x: clip; }
+img, video, iframe, svg, canvas { max-width: 100%; }
 
 .main-content {
   margin-left: var(--sidebar-w);

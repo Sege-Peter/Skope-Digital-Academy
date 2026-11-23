@@ -56,6 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
 
                 // Delete token
                 $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
+                require_once __DIR__ . '/includes/notify.php';
+                $pwUid = $pdo->prepare("SELECT id FROM users WHERE email = ?"); $pwUid->execute([$email]);
+                if ($pwUid = (int)$pwUid->fetchColumn()) sda_notify('password_changed', $pwUid, [], ['inapp' => false]);
 
                 header("Location: login?msg=pw_updated");
                 exit;
@@ -74,10 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid_token) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>Choose a New Password – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Choose a New Password', 'path' => 'reset-password', 'noindex' => true]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=3">
+    <link rel="stylesheet" href="assets/css/auth.css?v=9">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
 </head>
 <body>

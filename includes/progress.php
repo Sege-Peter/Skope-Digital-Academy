@@ -25,6 +25,9 @@ const XP_RULES = [
     'path_complete'   => 250,
     'daily_streak'    => 5,
     'review'          => 10,
+    'project_submit'  => 20,
+    'project_review'  => 10,
+    'project_pass'    => 50,
 ];
 const QUIZ_PASS_PCT = 70;
 
@@ -176,13 +179,32 @@ function check_course_completion(PDO $pdo, int $uid, int $courseId): array {
         $quizPct = best_quiz_pct($pdo, $uid, $courseId);
         if ($quizPct === null || $quizPct < QUIZ_PASS_PCT) return $r;   // finish the quiz to complete
     }
+    if (!course_project_passed($pdo, $uid, $courseId)) return $r;      // pass the peer-graded project to complete
     $pdo->prepare("UPDATE enrollments SET status = 'completed', completed_at = COALESCE(completed_at, NOW()) WHERE student_id = ? AND course_id = ? AND status IN ('active','completed')")
         ->execute([$uid, $courseId]);
     $r['xp'] += record_event($pdo, $uid, 'course_complete', 'course:' . $courseId, XP_RULES['course_complete'], $courseId);
     $r['completed'] = true;
+    $ct = $pdo->prepare("SELECT title FROM courses WHERE id = ?"); $ct->execute([$courseId]);
+    require_once __DIR__ . '/notify.php';
+    sda_notify('course_completed', $uid, ['course' => (string)$ct->fetchColumn(), 'course_id' => $courseId], ['inapp' => false, 'dedupe' => "completed:$uid:$courseId"]);
     $r['certificate'] = issue_certificate($pdo, $uid, $courseId, null, $quizPct);
     merge_result($r, check_paths($pdo, $uid));
     return $r;
+}
+
+/** True when the course has no active peer-graded project, or this learner passed it (includes/projects.php). */
+function course_project_passed(PDO $pdo, int $uid, int $courseId): bool {
+    try {
+        $st = $pdo->prepare("SELECT id FROM course_projects WHERE course_id = ? AND status = 'active'");
+        $st->execute([$courseId]);
+        $pid = $st->fetchColumn();
+        if (!$pid) return true;
+        $st = $pdo->prepare("SELECT 1 FROM project_submissions WHERE project_id = ? AND student_id = ? AND status = 'passed' LIMIT 1");
+        $st->execute([$pid, $uid]);
+        return (bool)$st->fetchColumn();
+    } catch (Exception $e) {
+        return true;   // tables missing before the migration: no project requirement
+    }
 }
 
 function new_cert_code(PDO $pdo): string {
@@ -239,9 +261,11 @@ function issue_certificate(PDO $pdo, int $uid, ?int $courseId, ?int $pathId = nu
         $title = (string)$t->fetchColumn();
     }
     if ($fee > 0) {
-        notify($pdo, $uid, 'Certificate ready to unlock 🎓', "You completed \"$title\"! Unlock your certificate for " . money($fee) . " from My Achievements or the course page.");
+        notify($pdo, $uid, 'Certificate ready to unlock 🎓', "You completed \"$title\"! Unlock your certificate for " . money($fee) . " from My Achievements or the course page.",
+               'certificate_ready', ['title' => $title, 'fee' => money($fee), 'certificate_id' => $id, 'code' => $code]);
     } else {
-        notify($pdo, $uid, 'Certificate earned 🎓', "Your certificate for \"$title\" is ready. Verification code: $code");
+        notify($pdo, $uid, 'Certificate earned 🎓', "Your certificate for \"$title\" is ready. Verification code: $code",
+               'certificate_unlocked', ['title' => $title, 'code' => $code]);
     }
     return ['id' => $id, 'code' => $code, 'title' => $title, 'new' => true, 'locked' => $fee > 0, 'fee' => $fee, 'fee_label' => $fee > 0 ? money($fee) : null];
 }
@@ -253,7 +277,8 @@ function unlock_certificate(PDO $pdo, int $certId, float $amountPaid): bool {
     $c = $st->fetch();
     if (!$c || $c['status'] !== 'pending' || $amountPaid + 0.001 < (float)$c['fee']) return false;
     $pdo->prepare("UPDATE certificates SET status = 'approved', paid_at = NOW() WHERE id = ? AND status = 'pending'")->execute([$certId]);
-    notify($pdo, (int)$c['student_id'], 'Certificate unlocked 🎉', "Your certificate for \"{$c['title']}\" is unlocked. Download and share it any time. Code: {$c['verification_code']}");
+    notify($pdo, (int)$c['student_id'], 'Certificate unlocked 🎉', "Your certificate for \"{$c['title']}\" is unlocked. Download and share it any time. Code: {$c['verification_code']}",
+           'certificate_unlocked', ['title' => $c['title'], 'code' => $c['verification_code']]);
     return true;
 }
 
@@ -270,7 +295,16 @@ function progress_flash_take(): ?array {
     return ($f && ($f['xp'] || $f['badges'] || $f['certificate'])) ? $f : null;
 }
 
-function notify(PDO $pdo, int $uid, string $title, string $msg): void {
+/**
+ * Bell notification for a user. With $event (a key of SDA_NOTIFY_EVENTS in includes/notify.php) the
+ * matching email is sent too, using $vars for the template; the bell keeps this $title/$msg.
+ */
+function notify(PDO $pdo, int $uid, string $title, string $msg, ?string $event = null, array $vars = []): void {
+    if ($event !== null) {
+        require_once __DIR__ . '/notify.php';
+        sda_notify($event, $uid, $vars, ['title' => $title, 'message' => $msg]);
+        return;
+    }
     try {
         $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, 'student', ?)")->execute([$title, $msg, $uid]);
     } catch (Exception $e) { error_log($e->getMessage()); }
@@ -334,10 +368,14 @@ const ACHIEVEMENTS = [
     'rising-star'    => ['Rising Star',     'Earned 1,000 XP.',                          'fa-star',            '#eab308', 'xp', 1000, 0],
     'superstar'      => ['Superstar',       'Earned 5,000 XP.',                          'fa-meteor',          '#ca8a04', 'xp', 5000, 0],
     'critic'         => ['Helpful Critic',  'Reviewed a course you took.',               'fa-comment-dots',    '#14b8a6', 'reviews', 1, 10],
+    'helpful-reviewer' => ['Helpful Reviewer', "Gave feedback on 5 classmates' projects.", 'fa-handshake-angle', '#0d9488', 'peer_reviews', 5, 25],
+    'project-passed' => ['Project Passed',  'Passed a peer-graded course project.',      'fa-diagram-project', '#16a34a', 'projects', 1, 25],
 ];
 
 function user_stats(PDO $pdo, int $uid): array {
     $q = function (string $sql) use ($pdo, $uid): int { $s = $pdo->prepare($sql); $s->execute([$uid]); return (int)$s->fetchColumn(); };
+    // Peer-project counts (0 until the project tables exist).
+    $qp = function (string $sql) use ($q): int { try { return $q($sql); } catch (Exception $e) { return 0; } };
     return [
         'lessons'   => $q("SELECT COUNT(*) FROM lesson_progress WHERE student_id = ? AND status = 'completed'"),
         'exercises' => $q("SELECT COUNT(*) FROM learning_events WHERE user_id = ? AND event_type = 'exercise_pass'"),
@@ -348,6 +386,8 @@ function user_stats(PDO $pdo, int $uid): array {
         'xp'        => $q("SELECT xp FROM users WHERE id = ?"),
         'reviews'   => $q("SELECT COUNT(*) FROM course_ratings WHERE student_id = ?"),
         'seconds'   => $q("SELECT COALESCE(SUM(time_spent_secs),0) FROM lesson_progress WHERE student_id = ?"),
+        'peer_reviews' => $qp("SELECT COUNT(*) FROM project_reviews WHERE reviewer_id = ? AND removed_at IS NULL"),
+        'projects'     => $qp("SELECT COUNT(DISTINCT project_id) FROM project_submissions WHERE student_id = ? AND status = 'passed'"),
     ];
 }
 
@@ -356,10 +396,22 @@ function ensure_badges(PDO $pdo): void {
     static $done = false;
     if ($done) return;
     $done = true;
-    $ins = $pdo->prepare("INSERT INTO badges (code, name, description, icon, color, kind, criteria_type, criteria_value, xp_reward, course_id, path_id, sort_order)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                          ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), icon = VALUES(icon), color = VALUES(color),
-                                                  criteria_value = VALUES(criteria_value), xp_reward = VALUES(xp_reward), sort_order = VALUES(sort_order)");
+    // New seeded badges are inserted; existing ones keep what an admin set (name, text, icon, colour, XP),
+    // only their rule value and order follow the code. Checking first also avoids burning auto-increment ids.
+    $have = [];
+    foreach ($pdo->query("SELECT code, criteria_value, sort_order FROM badges WHERE code IS NOT NULL")->fetchAll() as $r) $have[$r['code']] = $r;
+    $insert = $pdo->prepare("INSERT INTO badges (code, name, description, icon, color, kind, criteria_type, criteria_value, xp_reward, course_id, path_id, sort_order)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $sync = $pdo->prepare("UPDATE badges SET criteria_value = ?, sort_order = ? WHERE code = ?");
+    $ins = new class($have, $insert, $sync) {
+        public function __construct(private array $have, private PDOStatement $insert, private PDOStatement $sync) {}
+        public function execute(array $v): void {
+            [$code, , , , , , , $crit, , , , $sort] = $v;
+            if (!isset($this->have[$code])) { $this->insert->execute($v); $this->have[$code] = ['criteria_value' => $crit, 'sort_order' => $sort]; return; }
+            $h = $this->have[$code];
+            if ((int)$h['criteria_value'] !== (int)$crit || (int)$h['sort_order'] !== (int)$sort) $this->sync->execute([$crit, $sort, $code]);
+        }
+    };
     $i = 0;
     foreach (ACHIEVEMENTS as $code => [$name, $desc, $icon, $color, $rule, $n, $xp]) {
         $ins->execute([$code, $name, $desc, $icon, $color, 'achievement', $rule, $n, $xp, null, null, ++$i]);
@@ -405,7 +457,7 @@ function check_badges(PDO $pdo, int $uid, ?int $courseId = null): array {
         if (!$ok) continue;
         $pdo->prepare("INSERT IGNORE INTO student_badges (student_id, badge_id, awarded_by_role, notes) VALUES (?, ?, 'system', 'Earned automatically')")->execute([$uid, $b['id']]);
         if ($b['xp_reward']) record_event($pdo, $uid, 'badge', 'badge:' . $b['id'], (int)$b['xp_reward'], $b['course_id'] ? (int)$b['course_id'] : null);
-        notify($pdo, $uid, 'New badge: ' . $b['name'], $b['description']);
+        notify($pdo, $uid, 'New badge: ' . $b['name'], $b['description'], 'badge_earned', ['badge' => $b['name']]);
         $earned[] = ['name' => $b['name'], 'description' => $b['description'], 'icon' => $b['icon'], 'color' => $b['color'], 'kind' => $b['kind']];
     }
     return $earned;

@@ -9,6 +9,7 @@ if (isLoggedIn()) {
 
 $error = '';
 $success = '';
+if (!empty($_SESSION['google_error'])) { $error = (string)$_SESSION['google_error']; unset($_SESSION['google_error']); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verifyCsrf()) {
@@ -59,6 +60,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $insert = $pdo->prepare("INSERT INTO users (name, email, password, role, status, email_verified, referral_code, referred_by) VALUES (?, ?, ?, ?, ?, 1, ?, ?)");
                     if ($insert->execute([$name, $email, $hashed, $role, $status, $new_ref_code, $referred_by])) {
                         $new_user_id = $pdo->lastInsertId();
+                        require_once __DIR__ . '/includes/notify.php';
+                        if ($role === 'student') {
+                            sda_notify('welcome', (int)$new_user_id);
+                        } else {
+                            sda_notify('tutor_application_received', (int)$new_user_id, [], ['inapp' => false]);
+                            sda_notify_admins('admin_new_tutor', ['name' => $name, 'email' => $email]);
+                        }
                         
                         if ($role === 'student') {
                             $adm_number = 'SDA/' . date('Y') . '/' . str_pad($new_user_id, 4, '0', STR_PAD_LEFT);
@@ -99,10 +107,11 @@ $ref = $_POST['ref_code'] ?? $_GET['ref'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Account – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Create Your Free Account', 'path' => 'register', 'description' => 'Join Skope Digital Academy free: start coding tutorials, enrol in skills courses, track your progress and earn certificates.']); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=5">
+    <link rel="stylesheet" href="assets/css/auth.css?v=9">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
 </head>
 <body class="auth-compact">
@@ -147,6 +156,8 @@ $ref = $_POST['ref_code'] ?? $_GET['ref'] ?? '';
             <?php elseif ($ref !== ''): ?>
                 <div class="alert info" role="status"><i class="fas fa-gift"></i><span>You were invited by a Skope learner. Welcome!</span></div>
             <?php endif; ?>
+
+            <?php require_once __DIR__ . '/includes/google_auth.php'; sda_google_block('register', $ref); ?>
 
             <form action="register" method="POST" id="regForm" novalidate>
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">

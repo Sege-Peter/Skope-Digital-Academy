@@ -5,7 +5,7 @@ require_once '../includes/ai-handler.php'; // This already includes db.php
 // Auth check
 session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'tutor') {
-    die(json_encode(['error' => 'Faculty Authorization Required']));
+    die(json_encode(['error' => 'Please sign in as a tutor.']));
 }
 
 header('Content-Type: application/json');

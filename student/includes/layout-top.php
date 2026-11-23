@@ -1,166 +1,89 @@
 <?php
 /**
- * layout-top.php
- * Unified layout wrapper for the student portal.
- * Use: require_once 'includes/layout-top.php'; at the top of your page content.
+ * layout-top.php - student portal page shell (design v2).
+ * Use: require_once 'includes/header.php'; ... require_once 'includes/layout-top.php'; <page content> require_once 'includes/layout-bottom.php';
+ * Gives every page the sidebar, a sticky top bar (title, search, notifications, profile) and the content container.
+ * Styles: assets/css/student-ui.css.
  */
-require_once 'includes/sidebar.php';
-require_once 'includes/portal-data.php';
-require_once 'includes/global-styles.php';
+require_once __DIR__ . '/portal-data.php';
+require_once __DIR__ . '/sidebar.php';
 
-// Global Debug Logger Hook (Captures silent failures for a more stable portal)
-function skope_debug_log($msg) {
-    $logFile = __DIR__ . '/../../logs/portal_debug.log';
-    if (!is_dir(dirname($logFile))) mkdir(dirname($logFile), 0777, true);
-    error_log("[" . date("Y-m-d H:i:s") . "] " . $msg . "\n", 3, $logFile);
+// Global debug logger (kept for pages that call it)
+if (!function_exists('skope_debug_log')) {
+    function skope_debug_log($msg) {
+        $logFile = __DIR__ . '/../../logs/portal_debug.log';
+        if (!is_dir(dirname($logFile))) mkdir(dirname($logFile), 0777, true);
+        error_log("[" . date("Y-m-d H:i:s") . "] " . $msg . "\n", 3, $logFile);
+    }
 }
 
-// Prepare variables for the view with security sanitization
-$unread_count     = (int)$portal_unread_count;
-$live_notifications = $portal_notifications;
-$new_assignments   = $portal_assignments;
-$cat_quizzes      = $portal_cats;
-$cal_events        = $portal_cal_events;
+// Variables older pages expect
+$unread_count       = (int)($portal_unread_count ?? 0);
+$live_notifications = $portal_notifications ?? [];
+$new_assignments    = $portal_assignments ?? [];
+$cat_quizzes        = $portal_cats ?? [];
+$cal_events         = $portal_cal_events ?? [];
+$has_panel          = basename($_SERVER['PHP_SELF']) == 'index.php'; // dashboard shows the right-hand panel
+
+$tb_title = $pageTitle ?? 'My learning';
+$tb_name  = trim((string)($student['name'] ?? 'Student'));
+$tb_first = explode(' ', $tb_name)[0];
+$tb_initials = strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', $tb_name), 0, 2))));
 ?>
+<div class="main-content<?= $has_panel ? ' has-panel' : '' ?>">
+    <header class="sp-topbar">
+        <button type="button" class="sp-icon-btn sp-menu-btn" onclick="toggleSidebar()" aria-label="Open menu"><i class="fas fa-bars"></i></button>
+        <div class="sp-topbar-title"><?= htmlspecialchars($tb_title) ?></div>
 
-<style>
-    /* Global Balanced Responsiveness Framework */
-    :root {
-        --max-portal-width: 1540px;
-        --grid-gap: clamp(16px, 3vw, 32px);
-        --container-padding: clamp(12px, 2.5vw, 40px);
-    }
-    
-    .dashboard-wrapper {
-        max-width: var(--max-portal-width);
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        transition: 0.3s ease;
-    }
-
-    .main-content {
-        background: #fcfcfc;
-        min-height: 100vh;
-    }
-
-    @media (min-width: 1200px) {
-        main { padding: var(--container-padding) !important; }
-        .dashboard-main { gap: var(--grid-gap); }
-    }
-
-    @media (max-width: 1024px) {
-        .dashboard-main { grid-template-columns: 1fr !important; }
-        .side-panel { display: none; }
-    }
-    
-    @media (min-width: 1025px) {
-        .mobile-header { display: none !important; }
-    }
-
-    /* Professional Touch-up for Mobile Header */
-    .mobile-header {
-        padding: 12px var(--container-padding);
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        z-index: 999;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    }
-    
-    .mobile-header .search-box {
-        background: #f1f5f9;
-        border-radius: 12px;
-        padding: 8px 16px;
-        flex: 1;
-        max-width: 400px;
-    }
-
-    .hamburger-btn {
-        width: 40px;
-        height: 40px;
-        border-radius: 10px;
-        background: white;
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-main);
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    .hamburger-btn:hover { background: var(--primary); color: white; }
-</style>
-
-<div class="main-content">
-    <!-- Mobile Sticky Header -->
-    <header class="mobile-header">
-        <button class="hamburger-btn" onclick="document.getElementById('dashSidebar').classList.toggle('open')">
-            <i class="fas fa-bars-staggered"></i>
-        </button>
-        
-        <form action="search" method="GET" class="search-box mobile-search" style="display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-search" style="color: var(--text-dim); font-size: 0.8rem;"></i>
-            <input type="text" name="q" placeholder="Quick find..." value="<?= htmlspecialchars($q ?? '') ?>" style="background: none; border: none; outline: none; flex: 1; font-size: 0.85rem; font-weight: 500;">
+        <form action="search" method="GET" class="sp-search" role="search">
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="search" name="q" placeholder="Search courses, lessons, quizzes…" value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
         </form>
 
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <!-- Notifications (Mobile) -->
-            <div style="position: relative;">
-                <div style="width: 38px; height: 38px; border-radius: 10px; background: white; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; color: var(--text-dim); transition: 0.2s;" onclick="const d = document.getElementById('notifDropdownM'); d.style.display = d.style.display === 'none' ? 'flex' : 'none'; event.stopPropagation();">
-                    <i class="far fa-bell" style="font-size: 0.95rem;"></i>
-                    <?php if($unread_count > 0): ?>
-                        <span style="position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; background: #ef4444; border-radius: 50%; border: 2px solid white; font-size: 0.55rem; color: white; font-weight: 900; display: flex; align-items: center; justify-content: center;"><?= $unread_count > 9 ? '9+' : $unread_count ?></span>
-                    <?php endif; ?>
-                </div>
-                <div id="notifDropdownM" style="display: none; flex-direction: column; position: absolute; top: 48px; right: -10px; background: white; border: 1px solid var(--border); border-radius: 16px; padding: 16px; width: 280px; box-shadow: var(--shadow-premium); z-index: 1000;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <h6 style="margin: 0; font-size: 0.85rem; font-weight: 900; color: var(--text-main);">Pulse Alerts</h6>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto;">
-                    <?php if(empty($live_notifications)): ?>
-                        <div style="text-align: center; padding: 20px 0; font-size: 0.8rem; color: var(--text-dim);">No alerts yet.</div>
-                    <?php else: foreach(array_slice($live_notifications, 0, 4) as $n): ?>
-                        <div style="display: flex; gap: 10px; padding: 10px; background: <?= empty($n['read_status']) ? '#F0F9FF' : '#f8fafc' ?>; border-radius: 10px;">
-                            <div style="flex: 1; min-width: 0;">
-                                <strong style="display: block; font-size: 0.75rem; font-weight: 800;"><?= htmlspecialchars($n['title'] ?? 'Notice') ?></strong>
-                                <span style="font-size: 0.68rem; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"><?= htmlspecialchars($n['message']) ?></span>
-                            </div>
-                        </div>
-                    <?php endforeach; endif; ?>
-                    </div>
-                    <a href="notifications" style="display: block; text-align: center; margin-top: 12px; font-size: 0.75rem; font-weight: 800; color: var(--primary); text-decoration: none; padding: 10px; background: var(--primary-light); border-radius: 10px;">View All</a>
-                </div>
+        <!-- Notifications -->
+        <div class="sp-pop" id="spPopNotif">
+            <button type="button" class="sp-icon-btn" onclick="spPop('spPopNotif', event)" aria-label="Notifications">
+                <i class="far fa-bell"></i>
+                <?php if ($unread_count > 0): ?><span class="sp-dot"><?= $unread_count > 9 ? '9+' : $unread_count ?></span><?php endif; ?>
+            </button>
+            <div class="sp-pop-panel">
+                <div class="sp-pop-head"><span>Notifications</span><?php if ($unread_count): ?><span class="sp-badge"><?= $unread_count ?> new</span><?php endif; ?></div>
+                <?php if (empty($live_notifications)): ?>
+                    <div class="sp-muted sp-small" style="text-align: center; padding: 24px 0;">You're all caught up.</div>
+                <?php else: foreach (array_slice($live_notifications, 0, 5) as $n): ?>
+                    <a href="notifications" class="sp-pop-item<?= empty($n['read_status']) ? ' unread' : '' ?>">
+                        <strong><?= htmlspecialchars($n['title'] ?? 'Update') ?></strong>
+                        <span><?= htmlspecialchars($n['message'] ?? '') ?></span>
+                    </a>
+                <?php endforeach; endif; ?>
+                <a href="notifications" class="sp-pop-foot">See all notifications</a>
             </div>
+        </div>
 
-            <!-- Profile (Mobile) -->
-            <div style="position: relative;">
-                <div style="display: flex; align-items: center; cursor: pointer;" onclick="const d = document.getElementById('mobileDropdown'); d.style.display = d.style.display === 'none' ? 'flex' : 'none'; event.stopPropagation();">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: #f1f5f9; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 1rem; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-                        <?php if(!empty($student['avatar'])): ?>
-                            <img src="../uploads/avatars/<?= htmlspecialchars($student['avatar']) ?>" style="width: 100%; height: 100%; object-fit: cover;">
-                        <?php else: ?>
-                            <i class="fas fa-user-circle"></i>
-                        <?php endif; ?>
-                    </div>
+        <!-- Profile -->
+        <div class="sp-pop" id="spPopUser">
+            <button type="button" class="sp-user-btn" onclick="spPop('spPopUser', event)" aria-label="Account menu">
+                <span class="sp-avatar">
+                    <?php if (!empty($student['avatar'])): ?><img src="../uploads/avatars/<?= htmlspecialchars($student['avatar']) ?>" alt="" onerror="this.remove()"><?php endif; ?>
+                    <?= htmlspecialchars($tb_initials ?: 'S') ?>
+                </span>
+                <span class="sp-user-name sp-hide-sm"><strong><?= htmlspecialchars($tb_first) ?></strong><span>Student</span></span>
+                <i class="fas fa-chevron-down sp-hide-sm" style="font-size: .7rem; color: var(--text-muted);"></i>
+            </button>
+            <div class="sp-pop-panel" style="width: 230px;">
+                <div style="padding: 8px 12px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px;">
+                    <strong style="display: block; font-size: .88rem;"><?= htmlspecialchars($tb_name) ?></strong>
+                    <span class="sp-muted" style="font-size: .76rem;"><?= htmlspecialchars($student['email'] ?? '') ?></span>
                 </div>
-
-                <div id="mobileDropdown" style="display: none; flex-direction: column; position: absolute; top: 48px; right: 0; background: white; border: 1px solid var(--border); border-radius: 16px; padding: 8px; width: 200px; box-shadow: var(--shadow-premium); z-index: 1000;">
-                    <a href="profile" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--text-main); text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-user-cog" style="color: var(--primary);"></i> Settings</a>
-                    <div style="height: 1px; background: #f1f5f9; margin: 4px 0;"></div>
-                    <a href="../logout" style="display: flex; align-items: center; gap: 10px; padding: 12px; color: #ef4444; text-decoration: none; font-size: 0.85rem; border-radius: 10px; font-weight: 750;"><i class="fas fa-power-off"></i> Logout</a>
-                </div>
+                <a href="profile" class="sp-menu-link"><i class="fas fa-user-gear"></i> Profile & settings</a>
+                <a href="achievements" class="sp-menu-link"><i class="fas fa-trophy"></i> Achievements</a>
+                <a href="payments" class="sp-menu-link"><i class="fas fa-receipt"></i> Payments</a>
+                <a href="support" class="sp-menu-link"><i class="fas fa-life-ring"></i> Help & support</a>
+                <a href="../logout" class="sp-menu-link danger"><i class="fas fa-arrow-right-from-bracket"></i> Log out</a>
             </div>
         </div>
     </header>
 
-
-    <div class="dashboard-wrapper">
-        <!-- Main Content Area -->
-        <main style="padding: 16px; background: #fff; flex: 1;">
-            <div class="dashboard-main" style="display: grid; gap: 32px;">
+    <div class="dashboard-wrapper<?= $has_panel ? ' has-panel' : '' ?>">
+        <main>
+            <div class="dashboard-main">

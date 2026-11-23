@@ -62,3 +62,45 @@ Import (same command as the tutorials):
   source) instead. Don't promise income amounts; give realistic ranges framed as examples.
 * Warn about scams (fake jobs asking for "registration fees", sharing passwords/M-Pesa PINs) wherever it fits.
 * Original wording only – never copy from other courses or websites.
+
+## project.md – the peer-graded course project
+
+Every course ends with a practical project (`content/courses/<slug>/project.md`). Learners submit their work
+(text and/or a link and/or one PDF, PNG, JPG or Word file up to 5 MB), then review classmates against the rubric.
+A learner's grade is released once they have reviewed `reviews_required` classmates; it is the average of the peer
+scores, and they pass at `pass_pct` or above. Passing the project is required (with the lessons and final quiz) to
+complete the course and generate the certificate. Submissions waiting 7+ days without enough reviews go to staff
+(admin → Peer Projects). The importer upserts the project by course; pass %, reviews and file settings changed by an
+admin in Peer Projects are kept on re-import.
+
+````
+---
+title: Build Your Freelancer Starter Kit
+pass_pct: 70
+reviews_required: 3
+allow_file: 1            (optional, default 1; 0 = text/link only)
+---
+
+## The situation
+…realistic Kenyan context…
+
+> **Note:** Use made-up details wherever privacy matters (phone numbers, ID, M-Pesa, address).
+
+## What you will produce
+1. …concrete parts with sizes (word counts, rows, slides)…
+
+## Steps
+## What to submit
+## Tips
+
+```rubric
+Criterion | what good work looks like (one sentence a classmate can judge) | 5
+Another criterion | … | 5
+```
+````
+
+* The body uses the lesson Markdown (headings, lists, tables, callouts, ```text blocks).
+* The `rubric` block: one criterion per line, `name | description | points`, **4–5 criteria totalling 20 points**.
+  It is removed from the brief and shown as the grading table and review form.
+* Doable in 2–5 hours with a phone or shared computer and free tools; gradable by a beginner from the submission alone.
+* Never ask for personal data, and don't state real prices, rates or fees as fact.

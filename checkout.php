@@ -3,6 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/auth.php';
 require_once 'includes/paystack.php';
 require_once 'includes/learning.php';
+require_once 'includes/coupons.php';
 
 if (!isLoggedIn()) { header('Location: login'); exit; }
 
@@ -46,6 +47,22 @@ if ($type === 'course') {
     die("Invalid payment type");
 }
 
+// Coupon (course enrolments and certificate fees): re-validated here and again when the payment is verified.
+$coupon_code = coupon_normalize($_GET['coupon'] ?? '');
+$coupon = null;
+$full_amount = $amount;
+if ($coupon_code !== '' && in_array($type, ['course', 'certificate'], true) && $amount > 0) {
+    $cc = coupon_check($pdo, $coupon_code, (int)$user['id'], $type,
+                       $type === 'course' ? $id : ($cert['course_id'] ? (int)$cert['course_id'] : null), $amount);
+    $back = $type === 'course'
+        ? "enroll?id=$id&mode=" . urlencode($mode) . "&cohort=$cohort_id&coupon=" . urlencode($coupon_code)
+        : 'certificate-pay?code=' . rawurlencode($cert['verification_code']) . '&coupon=' . urlencode($coupon_code);
+    // Invalid, or the coupon covers everything: confirm on the page that owns the free path (POST + CSRF).
+    if (!$cc['ok'] || $cc['final'] <= 0) { header('Location: ' . $back); exit; }
+    $coupon = $cc;
+    $amount = $cc['final'];
+}
+
 if ($amount <= 0) {
     if ($type === 'certificate') {
         unlock_certificate($pdo, (int)$cert['id'], 0);
@@ -66,6 +83,7 @@ if ($amount <= 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?> – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Checkout', 'path' => 'checkout', 'noindex' => true]); ?>
     <link rel="stylesheet" href="assets/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -91,7 +109,10 @@ if ($amount <= 0) {
         <p class="desc"><?= e($desc) ?></p>
         
         <div class="price"><span><?= e(setting('currency')) ?></span> <?= number_format($amount, 2) ?></div>
-        
+        <?php if ($coupon): ?>
+        <p class="desc" style="margin:-12px 0 28px;color:#065f46;font-weight:600"><i class="fas fa-ticket"></i> Coupon <?= e($coupon['coupon']['code']) ?> applied: <s style="color:#94a3b8"><?= e(money($full_amount)) ?></s> → <?= e(money($amount)) ?> (you save <?= e(money($coupon['discount'])) ?>)</p>
+        <?php endif; ?>
+
         <button id="pay-button" class="btn-pay">
             Pay with Paystack <i class="fas fa-arrow-right"></i>
         </button>
@@ -113,6 +134,7 @@ if ($amount <= 0) {
             'id' => $id,
             'mode' => $mode,
             'cohort' => $cohort_id,
+            'coupon' => $coupon ? $coupon['coupon']['code'] : '',
         ]) ?>;
         payButton.addEventListener('click', function(e) {
             e.preventDefault();
@@ -123,7 +145,7 @@ if ($amount <= 0) {
                 currency: pay.currency,
                 ref: 'SDA-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
                 metadata: {
-                    payment_type: pay.type, item_id: pay.id, learning_mode: pay.mode, cohort_id: pay.cohort,
+                    payment_type: pay.type, item_id: pay.id, learning_mode: pay.mode, cohort_id: pay.cohort, coupon: pay.coupon,
                     custom_fields: [
                         { display_name: "Payment Type", variable_name: "payment_type", value: pay.type },
                         { display_name: "Item ID", variable_name: "item_id", value: String(pay.id) },
@@ -132,6 +154,7 @@ if ($amount <= 0) {
                 },
                 callback: function(response) {
                     const q = new URLSearchParams({ reference: response.reference, type: pay.type, id: pay.id, mode: pay.mode, cohort: pay.cohort });
+                    if (pay.coupon) q.set('coupon', pay.coupon);
                     window.location.href = "verify-payment?" + q.toString();
                 }
             });

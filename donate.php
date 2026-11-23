@@ -10,6 +10,7 @@ $user = isLoggedIn() ? currentUser() : null;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Support Our Learners – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Support Our Learners', 'path' => 'donate', 'description' => 'Donate to Skope Digital Academy and help a young person in Kenya learn digital skills. Every gift funds course access and scholarships.', 'breadcrumbs' => [['Donate', 'donate']]]); ?>
     <link rel="stylesheet" href="assets/css/main.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -22,7 +23,7 @@ $user = isLoggedIn() ? currentUser() : null;
         body { background: #fdfdfd; font-family: 'Inter', sans-serif; color: #1e293b; }
         .donate-hero {
             background: linear-gradient(135deg, var(--royal-indigo) 0%, #0c1f40 100%);
-            padding: 100px 0;
+            padding: 84px 0 100px;
             color: white;
             text-align: center;
             position: relative;
@@ -99,7 +100,6 @@ $user = isLoggedIn() ? currentUser() : null;
 
     <section class="donate-hero">
         <div class="container">
-            <div class="section-tag" style="background: rgba(255,255,255,0.1); color: white;">Impact First</div>
             <h1>Support Our <span style="color: var(--sky-blue);">Learners.</span></h1>
             <p class="hero-sub">Your contribution directly funds tuition, world-class certifications, and high-speed infrastructure for talented students across Africa.</p>
         </div>

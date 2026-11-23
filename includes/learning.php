@@ -22,12 +22,50 @@ function sda_base_href(): string {
     return implode('/', array_map('rawurlencode', explode('/', SDA_BASE))) . '/';
 }
 
-/** Pretty tutorial URL: learn/<course-slug>[/<lesson-slug>], falling back to query form. */
+/**
+ * Programming courses stay in the Tutorials reader (/learn). Every other imported skills course
+ * (source 'course') opens in the Learning Lab (/lab), which has tools for non-coding practice.
+ */
+const SDA_CODING_COURSES = ['python-programming', 'javascript-programming', 'intro-to-coding', 'web-design', 'software-development', 'data-analytics'];
+
+function is_lab_course(array $course): bool {
+    $slug = (string)($course['slug'] ?? '');
+    if ($slug === '' || in_array($slug, SDA_CODING_COURSES, true)) return false;
+    if (array_key_exists('source', $course)) return $course['source'] === 'course';
+    static $src = [];   // partial course arrays (id + slug only): look the source up once
+    if (!array_key_exists($slug, $src)) {
+        global $pdo;
+        try { $s = $pdo->prepare("SELECT source FROM courses WHERE slug = ? LIMIT 1"); $s->execute([$slug]); $src[$slug] = $s->fetchColumn() ?: null; }
+        catch (Throwable $e) { $src[$slug] = null; }
+    }
+    return $src[$slug] === 'course';
+}
+
+/** Learning Lab workbook: per-learner notes and practice-task ticks per lesson (created on first use). */
+function lab_workbook_ensure(PDO $pdo): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lab_workbook (
+        user_id INT NOT NULL,
+        lesson_id INT NOT NULL,
+        course_id INT NOT NULL,
+        note MEDIUMTEXT NULL,
+        task_done TINYINT(1) NOT NULL DEFAULT 0,
+        task_done_at DATETIME NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, lesson_id),
+        KEY idx_course (user_id, course_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+/** Pretty URL: learn/<course-slug>[/<lesson-slug>] (or lab/... for Learning Lab courses), falling back to query form. */
 function learn_url(array $course, ?array $lesson = null, string $extra = ''): string {
     $q = $extra !== '' ? '?' . ltrim($extra, '?&') : '';
     if (!empty($course['slug']) && preg_match('/^[a-z0-9-]+$/', $course['slug'])) {
-        if ($lesson === null) return 'learn/' . $course['slug'] . $q;
-        if (!empty($lesson['slug']) && preg_match('/^[a-z0-9-]+$/', $lesson['slug'])) return 'learn/' . $course['slug'] . '/' . $lesson['slug'] . $q;
+        $root = is_lab_course($course) ? 'lab/' : 'learn/';
+        if ($lesson === null) return $root . $course['slug'] . $q;
+        if (!empty($lesson['slug']) && preg_match('/^[a-z0-9-]+$/', $lesson['slug'])) return $root . $course['slug'] . '/' . $lesson['slug'] . $q;
     }
     $q2 = 'course=' . (int)$course['id'] . ($lesson ? '&lesson=' . (int)$lesson['id'] : '');
     return 'learn?' . $q2 . ($extra !== '' ? '&' . ltrim($extra, '?&') : '');
@@ -55,6 +93,7 @@ const SDA_SETTING_DEFAULTS = [
     'allow_mode_switch'      => '1',     // learners may switch track when already covered by what they paid
     'tutorials_title'        => 'Free Tutorials',
     'certificate_fee'        => '0',     // default certificate fee (KES); courses can override
+    'sequential_lessons'     => '1',     // 1 = a lesson opens only after the previous one is completed (self-paced too)
     'site_url'               => '',      // public address used in emailed links, e.g. https://academy.example.com
 ];
 
@@ -90,7 +129,9 @@ function mode_label(string $mode): string {
 function mode_blurb(string $mode): string {
     return $mode === 'structured'
         ? 'Weekly releases, a schedule with due dates and quiz checkpoints. Learn alongside a cohort.'
-        : 'Everything unlocked from day one. Learn in any order, at your own speed.';
+        : (setting('sequential_lessons') === '1'
+            ? 'No schedule. Learn at your own speed; each lesson opens when you finish the one before it.'
+            : 'Everything unlocked from day one. Learn in any order, at your own speed.');
 }
 
 /** Modes the admin has enabled for a course, in display order. */
@@ -248,7 +289,14 @@ function apply_lesson_schedule(array $lessons, ?array $enrollment): array {
             $l['opens_at'] = strtotime($l['release_date']);
             continue;
         }
-        if ($mode !== 'structured') continue;
+        if ($mode !== 'structured') {
+            // Self-paced: still one lesson at a time when the platform rule is on
+            if ($i > 0 && setting('sequential_lessons') === '1' && ($lessons[$i - 1]['progress_status'] ?? '') !== 'completed') {
+                $l['is_locked'] = true;
+                $l['lock_reason'] = 'Finish "' . ($lessons[$i - 1]['title'] ?? 'the previous lesson') . '" first';
+            }
+            continue;
+        }
 
         $offset = ((int)($l['week_num'] ?: 1) - $first_week) * $week_days;
         $opens = strtotime("+$offset days", $start);
@@ -263,7 +311,7 @@ function apply_lesson_schedule(array $lessons, ?array $enrollment): array {
             $prev = $lessons[$i - 1];
             if (($prev['progress_status'] ?? '') !== 'completed') {
                 $l['is_locked'] = true;
-                $l['lock_reason'] = 'Complete the previous lesson first';
+                $l['lock_reason'] = 'Finish "' . ($prev['title'] ?? 'the previous lesson') . '" first';
             } elseif (!empty($prev['attached_quiz_id']) && (float)($prev['quiz_score'] ?? 0) < $pass) {
                 $l['is_locked'] = true;
                 $l['lock_reason'] = "Score $pass% on the previous quiz first";

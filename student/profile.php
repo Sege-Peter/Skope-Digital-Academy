@@ -1,130 +1,234 @@
 <?php
-$pageTitle = 'My Profile';
+$pageTitle = 'Profile & settings';
 require_once 'includes/header.php';
-require_once 'includes/layout-top.php';
 
-// Handle Form Submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $bio   = trim($_POST['bio'] ?? '');
+$sid = (int)$student['id'];
+$error = '';
 
-    try {
-        $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ?, bio = ? WHERE id = ?");
-        $stmt->execute([$name, $email, $phone, $bio, $student['id']]);
-        header('Location: profile?success=1');
-        exit;
-    } catch(Exception $e) { $error = "Could not update profile."; }
-}
+// Form handling runs before any page output so the redirects work.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrf()) {
+        $error = 'Your session expired. Please try again.';
+    }
 
-// Handle Avatar Upload
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['avatar'])) {
-    $file = $_FILES['avatar'];
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $newName = 'avatar_' . $student['id'] . '_' . time() . '.' . $ext;
-    $target = '../uploads/avatars/' . $newName;
+    // Personal details
+    elseif (isset($_POST['update_profile'])) {
+        $name  = trim((string)($_POST['name'] ?? ''));
+        $email = trim((string)($_POST['email'] ?? ''));
+        $phone = trim((string)($_POST['phone'] ?? ''));
+        $bio   = trim((string)($_POST['bio'] ?? ''));
 
-    if (move_uploaded_file($file['tmp_name'], $target)) {
-        $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-        $stmt->execute([$newName, $student['id']]);
-        header('Location: profile?avatar_success=1');
-        exit;
+        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Enter your name and a valid email address.';
+        } else {
+            try {
+                $dup = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id <> ?");
+                $dup->execute([$email, $sid]);
+                if ($dup->fetch()) {
+                    $error = 'Another account already uses that email address.';
+                } else {
+                    $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, phone = ?, bio = ? WHERE id = ?");
+                    $stmt->execute([mb_substr($name, 0, 150), $email, $phone !== '' ? mb_substr($phone, 0, 20) : null, $bio, $sid]);
+                    // The portal reads name/email from the session first, so keep it in step.
+                    $_SESSION['user_name']  = mb_substr($name, 0, 150);
+                    $_SESSION['user_email'] = $email;
+                    header('Location: profile?success=1');
+                    exit;
+                }
+            } catch (Exception $e) { $error = 'Could not update your profile. Please try again.'; }
+        }
+    }
+
+    // Password change
+    elseif (isset($_POST['change_password'])) {
+        $new = (string)($_POST['new_password'] ?? '');
+        try {
+            $row = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+            $row->execute([$sid]);
+            $hash = (string)$row->fetchColumn();
+            if (!password_verify((string)($_POST['current_password'] ?? ''), $hash)) {
+                $error = 'Your current password is not correct.';
+            } elseif (strlen($new) < 8 || !preg_match('/[A-Za-z]/', $new) || !preg_match('/\d/', $new)) {
+                $error = 'Your new password needs at least 8 characters, with letters and numbers.';
+            } elseif ($new !== (string)($_POST['confirm_password'] ?? '')) {
+                $error = 'The new passwords do not match.';
+            } else {
+                $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([password_hash($new, PASSWORD_DEFAULT), $sid]);
+                header('Location: profile?password_success=1');
+                exit;
+            }
+        } catch (Exception $e) { $error = 'Could not change your password. Please try again.'; }
+    }
+
+    // Avatar upload
+    elseif (isset($_FILES['avatar'])) {
+        $file = $_FILES['avatar'];
+        $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $error = 'The photo could not be uploaded. Please try again.';
+        } elseif (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) || $file['size'] > 2 * 1024 * 1024 || !@getimagesize($file['tmp_name'])) {
+            $error = 'Your photo must be a JPG, PNG, WebP or GIF image under 2 MB.';
+        } else {
+            $dir = __DIR__ . '/../uploads/avatars/';
+            if (!is_dir($dir)) mkdir($dir, 0775, true);
+            $newName = 'avatar_' . $sid . '_' . time() . '.' . $ext;
+            if (move_uploaded_file($file['tmp_name'], $dir . $newName)) {
+                $stmt = $pdo->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                $stmt->execute([$newName, $sid]);
+                $_SESSION['avatar'] = $newName;
+                header('Location: profile?avatar_success=1');
+                exit;
+            }
+            $error = 'The photo could not be saved. Please try again.';
+        }
     }
 }
+
+// The session can hold an empty avatar that hides the saved one; prefer the database value.
+if (!empty($student_info['avatar'])) $student['avatar'] = $student_info['avatar'];
+
+$initials = strtoupper(implode('', array_map(fn($w) => mb_substr($w, 0, 1), array_slice(preg_split('/\s+/', trim((string)$student['name'])), 0, 2))));
+$csrf = htmlspecialchars(csrfToken());
+
+require_once 'includes/layout-top.php';
 ?>
 
-<header class="portal-header" style="margin-bottom: 40px;">
-    <div class="greeting">
-        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">My Profile Studio<span style="color: var(--primary);">.</span></h1>
-        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Manage your digital identity and scholarly records within the SDA ecosystem.</p>
-    </div>
-</header>
+<style>
+.pg-profile .pf-avatar { position: relative; width: 120px; height: 120px; margin: 4px auto 16px; }
+.pg-profile .pf-avatar .sp-avatar { width: 120px; height: 120px; font-size: 2.4rem; }
+.pg-profile .pf-avatar label {
+    position: absolute; right: 0; bottom: 0; width: 38px; height: 38px; border-radius: 50%;
+    background: var(--primary); color: #fff; border: 3px solid var(--surface); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.pg-profile .pf-avatar label:hover { background: var(--primary-dark); }
+.pg-profile .pf-two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 640px) { .pg-profile .pf-two { grid-template-columns: 1fr; } }
+.pg-profile .sp-form input[readonly] { background: var(--surface-2); color: var(--text-dim); cursor: not-allowed; }
+</style>
 
-<div class="profile-grid" style="display: grid; grid-template-columns: 350px 1fr; gap: 40px;">
-    <div class="premium-card" style="display: flex; flex-direction: column; align-items: center; text-align: center; padding: 48px 32px; height: fit-content; border-radius: 30px;">
-        <div class="avatar-studio" style="position: relative; width: 160px; height: 160px; margin-bottom: 32px;">
-            <?php if(!empty($student['avatar'])): ?>
-                <img src="../uploads/avatars/<?= htmlspecialchars($student['avatar']) ?>" style="width: 100%; height: 100%; border-radius: 40px; object-fit: cover; border: 4px solid #fff; box-shadow: 0 20px 40px rgba(0,0,0,0.12);">
-            <?php else: ?>
-                <div style="width: 100%; height: 100%; border-radius: 40px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 4rem; color: #cbd5e1; border: 1px solid var(--border);"><i class="fas fa-user-astronaut"></i></div>
-            <?php endif; ?>
-            <label for="avatarInput" style="position: absolute; bottom: -5px; right: -5px; width: 48px; height: 48px; border-radius: 16px; background: var(--grad-primary); color: white; display: flex; align-items: center; justify-content: center; border: 4px solid #fff; cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,174,239,0.3);"><i class="fas fa-camera"></i></label>
-            <form id="avatarForm" method="POST" enctype="multipart/form-data">
-                <input type="file" name="avatar" id="avatarInput" hidden onchange="document.getElementById('avatarForm').submit()">
-            </form>
-        </div>
-        
-        <h4 style="font-weight: 950; font-size: 1.4rem; margin: 0; color: var(--text-main); letter-spacing: -0.5px;"><?= htmlspecialchars($student['name']) ?></h4>
-        <p style="color: var(--text-dim); font-size: 0.85rem; margin-top: 8px; font-weight: 600;"><?= htmlspecialchars($student['email']) ?></p>
-        
-        <div style="width: 100%; margin-top: 40px; padding-top: 40px; border-top: 1px solid #f1f5f9;">
-            <div style="display: flex; flex-direction: column; gap: 20px; text-align: left;">
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: #FFFBEB; border-radius: 16px; border: 1px solid #FEF3C7;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <i class="fas fa-bolt" style="color: #F59E0B;"></i>
-                        <span style="font-size: 0.75rem; font-weight: 900; color: #92400E; text-transform: uppercase;">Merit Points</span>
-                    </div>
-                    <strong style="font-size: 1rem; font-weight: 950; color: #92400E;"><?= number_format($student['merit_points'] ?? 0) ?></strong>
-                </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: #F0F9FF; border-radius: 16px; border: 1px solid #BAE6FD;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <i class="fas fa-certificate" style="color: var(--primary);"></i>
-                        <span style="font-size: 0.75rem; font-weight: 900; color: #0369A1; text-transform: uppercase;">Credentials</span>
-                    </div>
-                    <strong style="font-size: 1rem; font-weight: 950; color: #0369A1;">Verified</strong>
-                </div>
-            </div>
-        </div>
+<div class="pg-profile">
+    <div class="sp-page-head">
+        <div><h1>Profile & settings</h1><p>Update your photo, your contact details and your password.</p></div>
     </div>
 
-    <div class="premium-card" style="padding: 48px; border-radius: 30px;">
-        <h3 style="font-weight: 950; font-size: 1.5rem; margin-bottom: 40px; letter-spacing: -0.5px; color: var(--text-main);">Global Profile Synchronization</h3>
-        
-        <?php if(isset($_GET['success'])): ?>
-        <div style="padding: 20px 24px; background: #ECFDF5; border: 1px solid #10B981; border-radius: 16px; color: #065F46; font-size: 0.85rem; font-weight: 800; margin-bottom: 32px; display: flex; align-items: center; gap: 12px; animation: slideIn 0.4s ease;">
-            <i class="fas fa-check-circle" style="font-size: 1.2rem;"></i> Profile records successfully updated and synchronized.
+    <?php if (isset($_GET['success'])): ?>
+        <div class="sp-alert success" role="status"><i class="fas fa-circle-check"></i> Your profile has been saved.</div>
+    <?php elseif (isset($_GET['avatar_success'])): ?>
+        <div class="sp-alert success" role="status"><i class="fas fa-circle-check"></i> Your new photo has been saved.</div>
+    <?php elseif (isset($_GET['password_success'])): ?>
+        <div class="sp-alert success" role="status"><i class="fas fa-circle-check"></i> Your password has been changed.</div>
+    <?php endif; ?>
+    <?php if ($error): ?>
+        <div class="sp-alert error" role="alert"><i class="fas fa-circle-exclamation"></i> <?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <div class="sp-split">
+        <div>
+            <!-- Personal details -->
+            <div class="sp-card">
+                <div class="sp-card-head"><h3>Personal details</h3></div>
+                <form method="POST" class="sp-form">
+                    <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                    <div class="pf-two">
+                        <div class="sp-field">
+                            <label for="pf-name">Full name</label>
+                            <input type="text" id="pf-name" name="name" value="<?= htmlspecialchars($student['name'] ?? '') ?>" required maxlength="150" autocomplete="name">
+                        </div>
+                        <div class="sp-field">
+                            <label for="pf-email">Email address</label>
+                            <input type="email" id="pf-email" name="email" value="<?= htmlspecialchars($student['email'] ?? '') ?>" required autocomplete="email">
+                        </div>
+                        <div class="sp-field">
+                            <label for="pf-phone">Phone number</label>
+                            <input type="tel" id="pf-phone" name="phone" value="<?= htmlspecialchars($student['phone'] ?? '') ?>" maxlength="20" placeholder="e.g. 0712 345 678" autocomplete="tel">
+                        </div>
+                        <div class="sp-field">
+                            <label for="pf-track">Programme</label>
+                            <input type="text" id="pf-track" value="Professional certification programme" readonly>
+                        </div>
+                    </div>
+                    <div class="sp-field">
+                        <label for="pf-bio">About you</label>
+                        <textarea id="pf-bio" name="bio" rows="4" placeholder="What are you learning, and what would you like to do next?"><?= htmlspecialchars($student['bio'] ?? '') ?></textarea>
+                        <div class="sp-help">Optional. A few lines is plenty.</div>
+                    </div>
+                    <div class="sp-row" style="justify-content: flex-end;">
+                        <button type="submit" name="update_profile" class="sp-btn"><i class="fas fa-floppy-disk"></i> Save changes</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Password -->
+            <div class="sp-card">
+                <div class="sp-card-head"><h3>Change password</h3></div>
+                <form method="POST" class="sp-form" autocomplete="off">
+                    <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                    <div class="sp-field">
+                        <label for="pw-cur">Current password</label>
+                        <input type="password" id="pw-cur" name="current_password" required autocomplete="current-password">
+                    </div>
+                    <div class="pf-two">
+                        <div class="sp-field">
+                            <label for="pw-new">New password</label>
+                            <input type="password" id="pw-new" name="new_password" required minlength="8" autocomplete="new-password">
+                            <div class="sp-help">At least 8 characters, with letters and numbers.</div>
+                        </div>
+                        <div class="sp-field">
+                            <label for="pw-conf">Confirm new password</label>
+                            <input type="password" id="pw-conf" name="confirm_password" required minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <div class="sp-row" style="justify-content: flex-end;">
+                        <button type="submit" name="change_password" class="sp-btn ghost"><i class="fas fa-lock"></i> Change password</button>
+                    </div>
+                </form>
+            </div>
         </div>
-        <?php endif; ?>
 
-        <form method="POST">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px;">
-                <div class="form-group">
-                    <label style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Legal Full Name</label>
-                    <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($student['name']) ?>" required style="width: 100%; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 0.95rem; font-weight: 600; outline: none; transition: 0.3s;">
+        <!-- Photo + summary -->
+        <div>
+            <div class="sp-card" style="text-align: center;">
+                <div class="pf-avatar">
+                    <span class="sp-avatar">
+                        <?php if (!empty($student['avatar'])): ?>
+                            <img src="../uploads/avatars/<?= htmlspecialchars($student['avatar']) ?>" alt="Your profile photo" onerror="this.remove()">
+                        <?php endif; ?>
+                        <?= htmlspecialchars($initials ?: 'S') ?>
+                    </span>
+                    <label for="avatarInput" title="Change photo" aria-label="Change photo"><i class="fas fa-camera"></i></label>
                 </div>
-                <div class="form-group">
-                    <label style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Primary Email</label>
-                    <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($student['email']) ?>" required style="width: 100%; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 0.95rem; font-weight: 600; outline: none; transition: 0.3s;">
-                </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px;">
-                <div class="form-group">
-                    <label style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Verified Contact</label>
-                    <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($student['phone']) ?>" required style="width: 100%; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 0.95rem; font-weight: 600; outline: none; transition: 0.3s;">
-                </div>
-                <div class="form-group">
-                    <label style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Institutional Track</label>
-                    <input type="text" class="form-control" value="Professional Certification Program" readonly style="width: 100%; padding: 16px 20px; border: 1px solid #f1f5f9; border-radius: 16px; font-size: 0.95rem; font-weight: 700; background: #f8fafc; color: #94a3b8; cursor: not-allowed;">
-                </div>
+                <form id="avatarForm" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                    <input type="file" name="avatar" id="avatarInput" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="document.getElementById('avatarForm').submit()">
+                </form>
+                <h3 style="margin: 0; font-size: 1.1rem;"><?= htmlspecialchars($student['name'] ?? '') ?></h3>
+                <p class="sp-muted sp-small" style="margin: 4px 0 0;"><?= htmlspecialchars($student['email'] ?? '') ?></p>
+                <p class="sp-help" style="margin-top: 12px;">Tap the camera to change your photo (JPG, PNG, WebP or GIF, up to 2 MB).</p>
             </div>
 
-            <div class="form-group" style="margin-bottom: 40px;">
-                <label style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Professional Bio & Aspirations</label>
-                <textarea name="bio" class="form-control" rows="5" placeholder="Define your learning trajectory..." style="width: 100%; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 16px; font-size: 0.95rem; font-weight: 600; outline: none; transition: 0.3s; resize: none;"><?= htmlspecialchars($student['bio'] ?? '') ?></textarea>
+            <div class="sp-card">
+                <div class="sp-list">
+                    <div class="sp-list-item">
+                        <span class="sp-ico yellow"><i class="fas fa-bolt"></i></span>
+                        <div class="sp-grow"><h4>Merit points</h4><p>Earned from lessons and quizzes</p></div>
+                        <strong><?= number_format((int)($student['merit_points'] ?? 0)) ?></strong>
+                    </div>
+                    <div class="sp-list-item">
+                        <span class="sp-ico green"><i class="fas fa-user-check"></i></span>
+                        <div class="sp-grow"><h4>Account</h4><p>Student</p></div>
+                        <?php $st = (string)($student_info['status'] ?? $student['status'] ?? 'active'); ?>
+                        <span class="sp-badge <?= $st === 'active' ? 'green' : 'yellow' ?>"><?= htmlspecialchars(ucfirst($st)) ?></span>
+                    </div>
+                    <a href="certificates" class="sp-list-item" style="text-decoration: none;">
+                        <span class="sp-ico violet"><i class="fas fa-certificate"></i></span>
+                        <div class="sp-grow"><h4>Certificates</h4><p>View and download yours</p></div>
+                        <i class="fas fa-chevron-right sp-muted"></i>
+                    </a>
+                </div>
             </div>
-
-            <div style="display: flex; justify-content: flex-end;">
-                <button type="submit" name="update_profile" class="btn-premium" style="padding: 18px 48px; border-radius: 18px; border: none; font-size: 0.95rem; box-shadow: 0 15px 30px rgba(0,174,239,0.25);"><i class="fas fa-sync" style="margin-right: 10px;"></i> Save Global Profile</button>
-            </div>
-        </form>
+        </div>
     </div>
 </div>
 
-<style>
-@keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.form-control:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1); }
-@media (max-width: 1100px) { .profile-grid { grid-template-columns: 1fr !important; } }
-</style>
 <?php require_once 'includes/layout-bottom.php'; ?>

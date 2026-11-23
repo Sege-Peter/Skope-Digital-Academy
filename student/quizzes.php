@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Academic Challenges';
+$pageTitle = 'Quizzes';
 require_once 'includes/header.php';
 
 try {
@@ -37,84 +37,107 @@ try {
 }
 
 require_once 'includes/layout-top.php';
+
+$qz_todo = $qz_passed = $qz_locked = 0;
+$qz_cards = [];
+foreach ($quizzes as $q) {
+    $progress = ($q['total_lessons'] > 0) ? ($q['completed_lessons'] / $q['total_lessons']) * 100 : 0;
+    $is_locked = ($q['type'] == 'final' && ($progress < 100 || $q['pending_cats'] > 0));
+    $attempted = $q['best_score'] !== null;
+    $passed = $attempted && $q['best_score'] >= $q['pass_score'];
+    if ($is_locked) $qz_locked++; elseif ($passed) $qz_passed++; elseif (!$attempted) $qz_todo++;
+    $qz_cards[] = [$q, $progress, $is_locked, $attempted, $passed];
+}
+$qz_types = [
+    'cat'   => ['Assessment test (CAT)', 'yellow', 'fa-file-pen'],
+    'final' => ['Final exam', 'violet', 'fa-graduation-cap'],
+    'quiz'  => ['Quiz', '', 'fa-circle-question'],
+];
 ?>
+<style>
+    .pg-quizzes .qz-card { display: flex; flex-direction: column; gap: 12px; position: relative; }
+    .pg-quizzes .qz-card h3 { margin: 0; font-size: 1.02rem; font-weight: 800; line-height: 1.35; }
+    .pg-quizzes .qz-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: .78rem; color: var(--text-dim); }
+    .pg-quizzes .qz-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .pg-quizzes .qz-score strong { font-size: 1.3rem; font-weight: 800; }
+    .pg-quizzes .qz-card.locked { background: var(--surface-2); }
+    .pg-quizzes .qz-card.locked h3, .pg-quizzes .qz-card.locked .qz-meta { opacity: .7; }
+</style>
 
-<header class="portal-header" style="margin-bottom: 40px;">
-    <div class="greeting">
-        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Academic Challenges<span style="color: var(--primary);">.</span></h1>
-        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Prove your knowledge and secure institutional certification through high-intensity assessments.</p>
+<div class="pg-quizzes">
+    <div class="sp-page-head">
+        <div><h1>Quizzes</h1><p>Quizzes and tests from the courses you are taking.</p></div>
     </div>
-</header>
 
-<div class="premium-card glass-effect" style="background: linear-gradient(135deg, var(--primary) 0%, #0072FF 100%); color: white; border: none; margin-bottom: 40px; padding: 48px; border-radius: 35px; overflow: hidden; position: relative;">
-    <div style="position: relative; z-index: 2; max-width: 600px;">
-        <span style="display: inline-block; padding: 6px 14px; background: rgba(255,255,255,0.2); border-radius: 50px; font-size: 0.65rem; font-weight: 950; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; backdrop-filter: blur(5px);">Certification Path</span>
-        <h2 style="color: white; margin-top: 0; font-weight: 950; font-size: 2.2rem; letter-spacing: -1px; line-height: 1.1;">Course Milestones & Evaluation</h2>
-        <p style="opacity: 0.9; line-height: 1.6; font-size: 1rem; font-weight: 500; margin-top: 16px;">Complete module lessons to unlock specialized CAT assessments. Successful completion of all modules enables the <strong>Unit Final Examination</strong>.</p>
+    <section class="sp-grid cols-4 sp-section">
+        <div class="sp-stat"><span class="sp-stat-icon"><i class="fas fa-list-check"></i></span><div><strong><?= count($quizzes) ?></strong><span>All quizzes</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon orange"><i class="fas fa-hourglass-half"></i></span><div><strong><?= $qz_todo ?></strong><span>Not started</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-circle-check"></i></span><div><strong><?= $qz_passed ?></strong><span>Passed</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon gray" style="background: #EEF2F6; color: var(--text-dim);"><i class="fas fa-lock"></i></span><div><strong><?= $qz_locked ?></strong><span>Locked</span></div></div>
+    </section>
+
+    <div class="sp-alert">
+        <i class="fas fa-circle-info" style="margin-top: 3px;"></i>
+        <div>Finish a course's lessons and pass its assessment tests (CATs) to unlock the <strong>final exam</strong>. You can retake a quiz to improve your score.</div>
     </div>
-    <div style="font-size: 12rem; opacity: 0.1; position: absolute; right: -20px; bottom: -40px; transform: rotate(-15deg); pointer-events: none;"><i class="fas fa-award"></i></div>
-</div>
 
-<div class="challenges-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 32px; margin-bottom: 60px;">
-    <?php foreach($quizzes as $q): 
-        $progress = ($q['total_lessons'] > 0) ? ($q['completed_lessons'] / $q['total_lessons']) * 100 : 0;
-        $is_locked = ($q['type'] == 'final' && ($progress < 100 || $q['pending_cats'] > 0));
-        $type_label = strtoupper($q['type'] == 'cat' ? 'Practical C.A.T' : ($q['type'] == 'final' ? 'Unit Exam' : 'Knowledge Check'));
-    ?>
-    <div class="premium-card" style="padding: 0; position: relative; border-radius: 30px; display: flex; flex-direction: column; overflow: hidden; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-        <?php if($is_locked): ?>
-        <div style="position: absolute; inset: 0; background: rgba(255,255,255,0.96); backdrop-filter: blur(12px); z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px;">
-            <div style="width: 70px; height: 70px; background: #f8fafc; border-radius: 22px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; color: #cbd5e1; font-size: 1.8rem; box-shadow: inset 0 2px 6px rgba(0,0,0,0.05);"><i class="fas fa-lock"></i></div>
-            <h4 style="margin: 0; font-weight: 950; font-size: 1.2rem; letter-spacing: -0.5px; color: #1e293b;">MODULE LOCKED</h4>
-            <p style="font-size: 0.75rem; color: #64748b; margin-top: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.5;">
-                Requires <?= 100 - round($progress) ?>% more curriculum coverage to initialize.
-            </p>
+    <?php if (empty($quizzes)): ?>
+        <div class="sp-empty">
+            <div class="sp-ico"><i class="fas fa-circle-question"></i></div>
+            <h3>No quizzes yet</h3>
+            <p>Your courses don't have any quizzes open right now. Keep going with your lessons and they will show up here.</p>
+            <a href="courses" class="sp-btn">Go to my courses</a>
         </div>
-        <?php endif; ?>
-
-        <div style="padding: 32px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
-                <span style="display: flex; align-items: center; gap: 8px; font-size: 0.65rem; font-weight: 950; color: <?= $q['type'] == 'cat' ? '#d97706' : ($q['type'] == 'final' ? '#1e293b' : 'var(--primary)') ?>; background: <?= $q['type'] == 'cat' ? '#FFFBEB' : ($q['type'] == 'final' ? '#F1F5F9' : '#F0F9FF') ?>; padding: 6px 12px; border-radius: 50px; letter-spacing: 1px; text-transform: uppercase;">
-                    <i class="fas <?= $q['type'] == 'cat' ? 'fa-fire' : ($q['type'] == 'final' ? 'fa-terminal' : 'fa-brain') ?>"></i> <?= $type_label ?>
-                </span>
-                <div style="font-size: 0.72rem; font-weight: 900; color: var(--text-dim);"><i class="far fa-clock" style="margin-right: 4px;"></i> <?= $q['duration_mins'] ?? '20' ?>m Allocation</div>
-            </div>
-
-            <h4 style="margin: 0 0 12px; font-size: 1.35rem; font-weight: 950; line-height: 1.3; letter-spacing: -0.5px; color: var(--text-main);"><?= htmlspecialchars($q['title']) ?></h4>
-            <span style="font-size: 0.72rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8;"><?= htmlspecialchars($q['course_title'] ?? 'Strategic Path') ?></span>
-
-            <div style="margin-top: 40px; padding-top: 28px; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;">
-                <div>
-                    <?php if($q['best_score'] !== null): ?>
-                        <span style="display: block; font-size: 0.65rem; font-weight: 950; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Peak Score</span>
-                        <div style="display: flex; align-items: baseline; gap: 6px;">
-                            <strong style="font-size: 1.8rem; font-weight: 950; color: <?= $q['best_score'] >= $q['pass_score'] ? '#10b981' : '#ef4444' ?>;"><?= round($q['best_score']) ?>%</strong>
-                            <span style="font-size: 0.8rem; color: #cbd5e1; font-weight: 800;">Target: <?= $q['pass_score'] ?>%</span>
-                        </div>
-                    <?php else: ?>
-                        <span style="display: block; font-size: 0.65rem; font-weight: 950; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Requirement</span>
-                        <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 800;">Score ≥ <?= $q['pass_score'] ?>%</span>
+    <?php else: ?>
+        <div class="sp-grid cols-3">
+            <?php foreach ($qz_cards as [$q, $progress, $is_locked, $attempted, $passed]):
+                [$type_label, $type_col, $type_icon] = $qz_types[$q['type']] ?? $qz_types['quiz'];
+            ?>
+            <div class="sp-card qz-card <?= $is_locked ? 'locked' : 'hover' ?>">
+                <div class="sp-between">
+                    <span class="sp-badge <?= $type_col ?>"><i class="fas <?= $type_icon ?>"></i> <?= $type_label ?></span>
+                    <?php if ($is_locked): ?>
+                        <span class="sp-badge gray"><i class="fas fa-lock"></i> Locked</span>
+                    <?php elseif ($passed): ?>
+                        <span class="sp-badge green"><i class="fas fa-check"></i> Passed</span>
+                    <?php elseif ($attempted): ?>
+                        <span class="sp-badge red">Not passed yet</span>
                     <?php endif; ?>
                 </div>
-                <a href="take-quiz?id=<?= $q['id'] ?>" class="btn-premium" style="padding: 14px 28px; border-radius: 16px; font-size: 0.75rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.5px; border: none; background: <?= $q['best_score'] !== null ? '#f8fafc' : 'var(--grad-primary)' ?>; color: <?= $q['best_score'] !== null ? '#475569' : 'white' ?>; border: <?= $q['best_score'] !== null ? '1px solid #e2e8f0' : 'none' ?>; min-width: 130px; text-align: center;">
-                    <?= $q['best_score'] !== null ? 'Retake Path' : 'Start Challenge' ?>
-                </a>
-            </div>
-        </div>
-    </div>
-    <?php endforeach; ?>
+                <div>
+                    <h3><?= htmlspecialchars($q['title']) ?></h3>
+                    <p class="sp-muted sp-small" style="margin: 4px 0 0;"><?= htmlspecialchars($q['course_title'] ?? 'Course') ?></p>
+                </div>
+                <div class="qz-meta">
+                    <span><i class="far fa-clock"></i> <?= (int)($q['time_limit_mins'] ?? 20) ?> min</span>
+                    <span><i class="fas fa-list-ol"></i> <?= (int)$q['q_count'] ?> question<?= (int)$q['q_count'] === 1 ? '' : 's' ?></span>
+                    <span><i class="fas fa-bullseye"></i> Pass mark <?= (int)$q['pass_score'] ?>%</span>
+                </div>
 
-    <?php if(empty($quizzes)): ?>
-        <div class="premium-card" style="grid-column: 1 / -1; text-align: center; padding: 120px 40px; border-style: dashed; border-width: 2px;">
-            <div style="width: 80px; height: 80px; background: #f8fafc; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: var(--text-dim); font-size: 2.2rem;">
-                <i class="fas fa-meteor"></i>
+                <?php if ($is_locked): ?>
+                    <div class="qz-foot">
+                        <p class="sp-muted sp-small" style="margin: 0;">
+                            <?php if ($progress < 100): ?>Finish the course lessons first (<?= (int)round($progress) ?>% done).<?php endif; ?>
+                            <?php if ($q['pending_cats'] > 0): ?><?= $progress < 100 ? ' Also pass' : 'Pass' ?> <?= (int)$q['pending_cats'] ?> CAT<?= (int)$q['pending_cats'] === 1 ? '' : 's' ?> to unlock.<?php endif; ?>
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div class="qz-foot">
+                        <div class="qz-score">
+                            <?php if ($attempted): ?>
+                                <span class="sp-muted sp-small">Best score</span><br>
+                                <strong style="color: <?= $passed ? 'var(--success)' : 'var(--danger)' ?>;"><?= round($q['best_score']) ?>%</strong>
+                            <?php else: ?>
+                                <span class="sp-muted sp-small">Not attempted yet</span>
+                            <?php endif; ?>
+                        </div>
+                        <a href="take-quiz?id=<?= (int)$q['id'] ?>" class="sp-btn sm <?= $attempted ? 'ghost' : '' ?>"><?= $attempted ? 'Retake quiz' : 'Start quiz' ?></a>
+                    </div>
+                <?php endif; ?>
             </div>
-            <h3 style="font-weight: 950; font-size: 1.8rem; color: var(--text-main); margin-bottom: 16px;">The Path is Empty</h3>
-            <p style="color: var(--text-dim); max-width: 450px; margin: 0 auto 32px; line-height: 1.7; font-weight: 500;">No assessments are currently active for your enrolled modules. Focus on completing your learning curriculum first.</p>
-            <a href="courses" class="btn-premium" style="min-width: 240px;">Explore Course Modules</a>
+            <?php endforeach; ?>
         </div>
     <?php endif; ?>
 </div>
-
 
 <?php require_once 'includes/layout-bottom.php'; ?>

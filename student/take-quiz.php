@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Examination Center';
+$pageTitle = 'Quiz';
 require_once 'includes/header.php';
 
 $qid = (int)($_GET['id'] ?? 0);
@@ -34,247 +34,240 @@ try {
     exit; 
 }
 
-require_once 'includes/sidebar.php'; 
+require_once 'includes/layout-top.php';
+$q_total = count($questions);
 ?>
 
 <style>
-    /* Quiz Specific Overrides & Extensions */
-    .quiz-container { max-width: 1000px; margin: 0 auto; }
-    
-    /* Attempt Table */
-    .attempt-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; margin-top: 24px; }
-    .attempt-table th { text-align: left; padding: 12px 24px; color: var(--text-dim); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
-    .attempt-table td { background: white; padding: 20px 24px; font-size: 0.9rem; font-weight: 600; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-    .attempt-table td:first-child { border-left: 1px solid var(--border); border-radius: 12px 0 0 12px; }
-    .attempt-table td:last-child { border-right: 1px solid var(--border); border-radius: 0 12px 12px 0; }
+    .pg-quiz { max-width: 1040px; margin: 0 auto; }
+    .pg-quiz .tq-crumbs { font-size: .8rem; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+    .pg-quiz .tq-crumbs a { color: var(--text-dim); text-decoration: none; }
+    .pg-quiz .tq-crumbs a:hover { color: var(--primary-dark); }
 
-    /* Player UI */
-    .quiz-player-layout { display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
-    .question-card { background: white; border-radius: var(--radius-md); padding: 40px; border: 1px solid var(--border); box-shadow: var(--shadow-md); min-height: 500px; display: flex; flex-direction: column; }
-    
-    .q-numbering { font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 16px; display: block; }
-    .q-text { font-size: 1.5rem; font-weight: 800; line-height: 1.4; color: var(--text-main); margin-bottom: 32px; }
-
-    .option-item { 
-        display: flex; align-items: center; gap: 16px; padding: 20px 24px; 
-        background: #f8fafc; border: 2px solid transparent; border-radius: 16px; 
-        margin-bottom: 12px; cursor: pointer; transition: 0.2s; 
+    /* Player */
+    .pg-quiz .quiz-player-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+    .pg-quiz .tq-question { padding: 28px; display: flex; flex-direction: column; min-height: 420px; }
+    .pg-quiz .q-numbering { display: inline-block; font-size: .78rem; font-weight: 700; color: var(--primary-dark); margin-bottom: 10px; }
+    .pg-quiz .q-text { font-size: 1.25rem; font-weight: 800; line-height: 1.45; margin: 0 0 22px; overflow-wrap: anywhere; }
+    .pg-quiz .option-item {
+        display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 10px;
+        background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer;
+        transition: border-color .15s, background .15s; font-weight: 600; overflow-wrap: anywhere;
     }
-    .option-item:hover { background: #f1f5f9; border-color: var(--border); }
-    .option-item.selected { background: var(--primary-light); border-color: var(--primary); }
-    
-    .opt-key { width: 32px; height: 32px; border-radius: 8px; background: white; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; color: var(--text-dim); }
-    .selected .opt-key { background: var(--primary); color: white; border-color: var(--primary); }
+    .pg-quiz .option-item:hover { border-color: var(--primary); }
+    .pg-quiz .option-item.selected { background: var(--primary-soft); border-color: var(--primary); }
+    .pg-quiz .opt-key { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; background: var(--surface-2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .8rem; color: var(--text-dim); }
+    .pg-quiz .selected .opt-key { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .pg-quiz .tq-answer { width: 100%; min-height: 180px; padding: 14px; border-radius: 12px; border: 1px solid var(--border-strong); font: inherit; font-size: .95rem; resize: vertical; outline: none; box-sizing: border-box; }
+    .pg-quiz .tq-answer:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+    .pg-quiz .tq-flag { margin-top: 6px; background: none; border: 0; padding: 6px 0; cursor: pointer; font: inherit; font-size: .8rem; font-weight: 700; color: var(--danger); }
+    .pg-quiz .tq-nav { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; }
+    .pg-quiz #prevBtn:disabled { opacity: .5; pointer-events: none; }
 
-    /* Sidebar Navigation */
-    .quiz-nav-panel { background: white; border-radius: var(--radius-md); padding: 24px; border: 1px solid var(--border); position: sticky; top: 40px; }
-    .q-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
-    .q-link { width: 100%; aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 700; background: #f1f5f9; color: var(--text-dim); text-decoration: none; cursor: pointer; border: none; }
-    .q-link.answered { background: #e2e8f0; color: var(--text-main); }
-    .q-link.current { border: 2px solid var(--primary); color: var(--primary); background: var(--primary-light); }
-    .q-link.flagged { position: relative; }
-    .q-link.flagged::after { content: ''; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; border: 2px solid white; }
+    /* Side panel: timer + question grid */
+    .pg-quiz .quiz-nav-panel { position: sticky; top: calc(var(--topbar-h) + 16px); }
+    .pg-quiz .timer-widget { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: var(--danger-soft); color: #9B1C1C; margin-bottom: 18px; font-size: .8rem; font-weight: 700; }
+    .pg-quiz .timer-time { font-family: ui-monospace, Consolas, monospace; font-size: 1.3rem; font-weight: 800; }
+    .pg-quiz .q-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+    .pg-quiz .q-link { position: relative; aspect-ratio: 1; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+    .pg-quiz .q-link.answered { background: var(--primary-soft); color: var(--primary-dark); border-color: transparent; }
+    .pg-quiz .q-link.current { border: 2px solid var(--primary); color: var(--primary-dark); }
+    .pg-quiz .q-link.flagged::after { content: ''; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; background: var(--danger); border-radius: 50%; border: 2px solid #fff; }
+    .pg-quiz .tq-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: .72rem; color: var(--text-dim); }
+    .pg-quiz .tq-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
-    /* Timer Widget */
-    .timer-widget { background: #fff1f2; padding: 12px 20px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border: 1px solid #fecdd3; }
-    .timer-time { font-family: monospace; font-size: 1.25rem; font-weight: 800; color: #be123c; }
+    /* Result */
+    .pg-quiz #view-result { text-align: center; }
+    .pg-quiz #res-icon { font-size: 3.4rem; line-height: 1; margin-bottom: 12px; }
+    .pg-quiz #res-score { font-size: 3.2rem; font-weight: 800; color: var(--primary); line-height: 1.1; margin: 6px 0 10px; }
 
-    /* Summary Table */
-    .summary-table { width: 100%; border-collapse: collapse; margin-top: 24px; }
-    .summary-table th { text-align: left; padding: 12px; border-bottom: 2px solid var(--border); }
-    .summary-table td { padding: 16px 12px; border-bottom: 1px solid var(--border); }
+    @media (max-width: 900px) {
+        .pg-quiz .quiz-player-layout { grid-template-columns: minmax(0, 1fr); }
+        .pg-quiz .player-sidebar { order: -1; }
+        .pg-quiz .quiz-nav-panel { position: static; }
+        .pg-quiz .q-grid { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
+    }
+    @media (max-width: 640px) {
+        .pg-quiz .tq-question { padding: 18px; min-height: 0; }
+        .pg-quiz .q-text { font-size: 1.08rem; }
+    }
 </style>
 
-<main class="main-content">
-    <div class="quiz-container">
-        
-        <!-- --- VIEW: INTRO & HISTORY --- -->
-        <div id="view-intro">
-            <header class="portal-header">
-                <div class="greeting">
-                    <h1><?= htmlspecialchars($quiz['title']) ?></h1>
-                    <p><?= htmlspecialchars($quiz['course_title']) ?> – Assessment</p>
-                </div>
-                <div class="header-tools">
-                    <button class="btn-premium" onclick="startQuiz()">
-                        <i class="fas fa-play"></i> Attempt Quiz Now
-                    </button>
-                </div>
-            </header>
+<div class="pg-quiz">
 
-            <div class="grid-3" style="margin-bottom: 40px;">
-                <div class="card">
-                    <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Time Limit</span>
-                    <h3 style="margin: 8px 0;"><?= $quiz['time_limit_mins'] ?> Minutes</h3>
-                </div>
-                <div class="card">
-                    <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Pass Mark</span>
-                    <h3 style="margin: 8px 0;"><?= $quiz['pass_score'] ?>%</h3>
-                </div>
-                <div class="card">
-                    <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Total Questions</span>
-                    <h3 style="margin: 8px 0;"><?= count($questions) ?> Units</h3>
-                </div>
+    <!-- Intro and past attempts -->
+    <div id="view-intro">
+        <div class="sp-page-head">
+            <div style="min-width: 0;">
+                <div class="tq-crumbs"><a href="quizzes">Quizzes</a> · <?= htmlspecialchars($quiz['course_title']) ?></div>
+                <h1><?= htmlspecialchars($quiz['title']) ?></h1>
+                <p>Read the details below, then start when you're ready. The timer starts as soon as you begin.</p>
             </div>
-
-            <div class="card">
-                <h3 style="margin-top: 0; font-weight: 800;">Your attempts</h3>
-                <?php if($attempts): ?>
-                <table class="attempt-table">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Date / Time</th>
-                            <th>Marks</th>
-                            <th>Grade</th>
-                            <th>Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($attempts as $a): 
-                            $dt = new DateTime($a['completed_at']);
-                        ?>
-                        <tr>
-                            <td><span style="color: var(--success); font-weight: 800;"><i class="fas fa-check-circle"></i> Finished</span></td>
-                            <td><?= $dt->format('l, j F Y, g:i A') ?></td>
-                            <td><?= round($a['score']) ?> / 100</td>
-                            <td style="color: <?= $a['passed'] ? 'var(--success)' : 'var(--danger)' ?>; font-weight: 800;">
-                                <?= $a['passed'] ? 'PASS' : 'RETAKE' ?>
-                            </td>
-                            <td>Review not permitted</td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div class="sp-actions">
+                <?php if ($q_total > 0): ?>
+                    <button type="button" class="sp-btn lg" onclick="startQuiz()"><i class="fas fa-play"></i> <?= $attempts ? 'Start a new attempt' : 'Start quiz' ?></button>
                 <?php else: ?>
-                <p style="color: var(--text-dim); padding: 20px 0;">No attempts have been recorded yet.</p>
+                    <button type="button" class="sp-btn lg" disabled>No questions yet</button>
                 <?php endif; ?>
             </div>
         </div>
 
-        <!-- --- VIEW: PLAYER --- -->
-        <div id="view-player" style="display: none;">
-            <div class="quiz-player-layout">
-                <div class="player-main">
+        <section class="sp-grid cols-3 sp-section">
+            <div class="sp-stat"><span class="sp-stat-icon orange"><i class="far fa-clock"></i></span><div><strong><?= (int)$quiz['time_limit_mins'] ?> min</strong><span>Time limit</span></div></div>
+            <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-bullseye"></i></span><div><strong><?= (int)$quiz['pass_score'] ?>%</strong><span>Pass mark</span></div></div>
+            <div class="sp-stat"><span class="sp-stat-icon"><i class="fas fa-list-ol"></i></span><div><strong><?= $q_total ?></strong><span>Question<?= $q_total === 1 ? '' : 's' ?></span></div></div>
+        </section>
+
+        <?php if ($q_total === 0): ?>
+            <div class="sp-alert warning"><i class="fas fa-triangle-exclamation" style="margin-top: 3px;"></i><div>Your tutor hasn't added questions to this quiz yet. Check back later.</div></div>
+        <?php endif; ?>
+
+        <section class="sp-section">
+            <div class="sp-section-head"><div><h2>Your attempts</h2></div></div>
+            <?php if ($attempts): ?>
+            <div class="sp-table-wrap">
+                <table class="sp-table">
+                    <thead>
+                        <tr><th>Status</th><th>Date</th><th>Score</th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($attempts as $a):
+                            $dt = new DateTime($a['completed_at'] ?? 'now');
+                        ?>
+                        <tr>
+                            <td><span class="sp-badge gray"><i class="fas fa-check"></i> Finished</span></td>
+                            <td style="white-space: nowrap;"><?= $dt->format('D, j M Y, g:i A') ?></td>
+                            <td><strong><?= round($a['score']) ?>%</strong></td>
+                            <td><?= $a['passed'] ? '<span class="sp-badge green">Passed</span>' : '<span class="sp-badge red">Try again</span>' ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+                <div class="sp-card"><p class="sp-muted" style="margin: 0;">You haven't attempted this quiz yet.</p></div>
+            <?php endif; ?>
+        </section>
+    </div>
+
+    <!-- Player -->
+    <div id="view-player" style="display: none;">
+        <div class="sp-page-head">
+            <div style="min-width: 0;"><h1><?= htmlspecialchars($quiz['title']) ?></h1><p>Pick an answer for each question. You can move between questions at any time.</p></div>
+        </div>
+        <div class="quiz-player-layout">
+            <div class="player-main">
+                <div class="sp-card tq-question">
                     <div id="questions-pool">
-                        <?php foreach($questions as $idx => $q): 
+                        <?php foreach ($questions as $idx => $q):
                             $opts = json_decode($q['options_json'], true) ?: [];
                         ?>
                         <div class="question-view" id="qv-<?= $idx ?>" style="display: none;">
-                            <div class="question-card">
-                                <span class="q-numbering">Question <?= $idx + 1 ?> of <?= count($questions) ?></span>
-                                <h2 class="q-text"><?= htmlspecialchars($q['question']) ?></h2>
-                                
-                                <div class="options-container" style="flex: 1;">
-                                    <?php if($q['type'] == 'mcq' || $q['type'] == 'tf'): ?>
-                                        <?php foreach($opts as $k => $o): ?>
-                                        <div class="option-item" onclick="saveAnswer(<?= $idx ?>, '<?= addslashes($o) ?>', this)">
-                                            <div class="opt-key"><?= chr(65 + $k) ?></div>
-                                            <div style="font-weight: 700;"><?= htmlspecialchars($o) ?></div>
-                                        </div>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <textarea class="card" style="width: 100%; min-height: 200px; padding: 24px; font-family: inherit; font-size: 1rem; border-color: var(--border); resize: vertical;" placeholder="Type your response here..." oninput="saveAnswer(<?= $idx ?>, this.value)"></textarea>
-                                    <?php endif; ?>
-                                </div>
+                            <span class="q-numbering">Question <?= $idx + 1 ?> of <?= $q_total ?></span>
+                            <h2 class="q-text"><?= htmlspecialchars($q['question']) ?></h2>
 
-                                <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
-                                    <button class="btn-premium" style="background: #f1f5f9; color: var(--text-main); box-shadow: none;" onclick="prevQ()" id="prevBtn" disabled>
-                                        <i class="fas fa-chevron-left"></i> Previous
-                                    </button>
-                                    <button class="btn-premium" style="background: #fef2f2; color: var(--danger); box-shadow: none; font-size: 0.8rem;" onclick="toggleFlag(<?= $idx ?>)">
-                                        <i class="fas fa-flag"></i> <span id="flag-text-<?= $idx ?>">Flag question</span>
-                                    </button>
-                                    <button class="btn-premium" onclick="nextQ()" id="nextBtn">
-                                        Next <i class="fas fa-chevron-right"></i>
-                                    </button>
-                                </div>
+                            <div class="options-container">
+                                <?php if ($q['type'] == 'mcq' || $q['type'] == 'tf'): ?>
+                                    <?php foreach ($opts as $k => $o): ?>
+                                    <div class="option-item" role="button" tabindex="0" onclick="saveAnswer(<?= $idx ?>, <?= htmlspecialchars(json_encode((string)$o, JSON_INVALID_UTF8_SUBSTITUTE)) ?>, this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }">
+                                        <div class="opt-key"><?= chr(65 + $k) ?></div>
+                                        <div><?= htmlspecialchars($o) ?></div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <textarea class="tq-answer" placeholder="Type your answer here..." oninput="saveAnswer(<?= $idx ?>, this.value)" aria-label="Your answer"></textarea>
+                                <?php endif; ?>
                             </div>
+
+                            <button type="button" class="tq-flag" onclick="toggleFlag(<?= $idx ?>)">
+                                <i class="fas fa-flag"></i> <span id="flag-text-<?= $idx ?>">Flag question</span>
+                            </button>
                         </div>
                         <?php endforeach; ?>
                     </div>
-                </div>
 
-                <div class="player-sidebar">
-                    <div class="quiz-nav-panel">
-                        <div class="timer-widget">
-                            <span style="font-weight: 800; font-size: 0.7rem; color: #be123c;">TIME LEFT</span>
-                            <div id="countdown" class="timer-time">--:--</div>
-                        </div>
-                        
-                        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 800;">Quiz Navigation</h4>
-                        <div class="q-grid">
-                            <?php for($i=0; $i<count($questions); $i++): ?>
-                            <button class="q-link" id="nav-<?= $i ?>" onclick="goToQ(<?= $i ?>)"><?= $i+1 ?></button>
-                            <?php endfor; ?>
-                        </div>
-                        
-                        <button class="btn-premium" style="width: 100%; margin-top: 24px; justify-content: center;" onclick="showSummary()">
-                            Finish attempt...
+                    <div class="tq-nav">
+                        <button type="button" class="sp-btn ghost" onclick="prevQ()" id="prevBtn" disabled>
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </button>
+                        <button type="button" class="sp-btn" onclick="nextQ()" id="nextBtn">
+                            Next <i class="fas fa-chevron-right"></i>
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- --- VIEW: SUMMARY --- -->
-        <div id="view-summary" style="display: none;">
-            <header class="portal-header">
-                <div class="greeting">
-                    <h1>Summary of attempt</h1>
-                    <p><?= htmlspecialchars($quiz['title']) ?></p>
+            <div class="player-sidebar">
+                <div class="sp-card quiz-nav-panel">
+                    <div class="timer-widget">
+                        <span><i class="far fa-clock"></i> Time left</span>
+                        <div id="countdown" class="timer-time">--:--</div>
+                    </div>
+
+                    <h4 style="margin: 0; font-size: .9rem; font-weight: 800;">Questions</h4>
+                    <div class="q-grid">
+                        <?php for ($i = 0; $i < $q_total; $i++): ?>
+                        <button type="button" class="q-link" id="nav-<?= $i ?>" onclick="goToQ(<?= $i ?>)" aria-label="Question <?= $i + 1 ?>"><?= $i + 1 ?></button>
+                        <?php endfor; ?>
+                    </div>
+                    <div class="tq-legend">
+                        <span><i style="background: var(--primary-soft);"></i>Answered</span>
+                        <span><i style="background: var(--danger); border-radius: 50%;"></i>Flagged</span>
+                    </div>
+
+                    <button type="button" class="sp-btn block" style="margin-top: 18px;" onclick="showSummary()">
+                        Finish quiz
+                    </button>
                 </div>
-            </header>
-
-            <div class="card">
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Question</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="summary-body">
-                        <!-- Filled by JS -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="margin-top: 40px; text-align: center;">
-                <button class="btn-premium" style="background: #f1f5f9; color: var(--text-main); margin-right: 20px; box-shadow: none;" onclick="resumeQuiz()">
-                    Return to attempt
-                </button>
-                <button class="btn-premium" style="background: var(--success);" onclick="submitQuiz()">
-                    Submit all and finish
-                </button>
             </div>
         </div>
-
-        <!-- --- VIEW: RESULT --- -->
-        <div id="view-result" style="display: none; text-align: center; padding: 60px 0;">
-            <div id="res-icon" style="font-size: 5rem; margin-bottom: 24px;"></div>
-            <h1 id="res-title" style="margin-bottom: 12px; font-weight: 800;"></h1>
-            <p id="res-desc" style="color: var(--text-dim); max-width: 600px; margin: 0 auto 40px;"></p>
-            
-            <div class="card" style="display: inline-block; padding: 40px 80px; min-width: 300px;">
-                <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">Final Grade</span>
-                <div id="res-score" style="font-size: 4rem; font-weight: 800; color: var(--primary); margin: 10px 0;">0%</div>
-                <div id="res-badge"></div>
-            </div>
-
-            <div style="margin-top: 60px;">
-                <a href="quizzes" class="btn-premium">Done</a>
-                <button class="btn-premium" style="background: #f1f5f9; color: var(--text-main); margin-left:15px;" onclick="location.reload()">Re-attempt</button>
-            </div>
-        </div>
-
     </div>
-</main>
+
+    <!-- Summary before submitting -->
+    <div id="view-summary" style="display: none;">
+        <div class="sp-page-head">
+            <div style="min-width: 0;"><h1>Check your answers</h1><p><?= htmlspecialchars($quiz['title']) ?>: go back to any question you missed, or submit now.</p></div>
+        </div>
+
+        <div class="sp-table-wrap">
+            <table class="sp-table">
+                <thead>
+                    <tr><th>Question</th><th>Status</th></tr>
+                </thead>
+                <tbody id="summary-body">
+                    <!-- Filled by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="sp-row sp-mt" style="justify-content: center; margin-top: 24px;">
+            <button type="button" class="sp-btn ghost" onclick="resumeQuiz()"><i class="fas fa-chevron-left"></i> Back to the quiz</button>
+            <button type="button" class="sp-btn" style="background: var(--success);" onclick="submitQuiz()"><i class="fas fa-paper-plane"></i> Submit answers</button>
+        </div>
+    </div>
+
+    <!-- Result -->
+    <div id="view-result" style="display: none;">
+        <div class="sp-card" style="max-width: 560px; margin: 24px auto 0; padding: 36px 24px;">
+            <div id="res-icon"></div>
+            <h1 id="res-title" style="margin: 0 0 8px; font-size: 1.5rem; font-weight: 800;"></h1>
+            <p id="res-desc" class="sp-muted" style="max-width: 440px; margin: 0 auto 18px;"></p>
+            <span class="sp-muted sp-small" style="font-weight: 700;">Your score</span>
+            <div id="res-score">0%</div>
+            <div id="res-badge"></div>
+            <div class="sp-row" style="justify-content: center; margin-top: 26px;">
+                <a href="quizzes" class="sp-btn">Back to quizzes</a>
+                <button type="button" class="sp-btn ghost" onclick="location.reload()"><i class="fas fa-rotate-right"></i> Try again</button>
+            </div>
+        </div>
+    </div>
+
+</div>
 
 <script>
 let currentIdx = 0;
-const totalQs = <?= count($questions) ?>;
-const limitSecs = <?= $quiz['time_limit_mins'] ?> * 60;
+const totalQs = <?= $q_total ?>;
+const limitSecs = <?= (int)$quiz['time_limit_mins'] ?> * 60;
 let remaining = limitSecs;
 let timerId = null;
 let answers = {};
@@ -285,21 +278,21 @@ function startQuiz() {
     document.getElementById('view-player').style.display = 'block';
     goToQ(0);
     startTimer();
+    window.scrollTo(0, 0);
 }
 
 function goToQ(n) {
     document.querySelectorAll('.question-view').forEach(v => v.style.display = 'none');
     document.getElementById('qv-' + n).style.display = 'block';
-    
+
     document.querySelectorAll('.q-link').forEach(l => l.classList.remove('current'));
     document.getElementById('nav-' + n).classList.add('current');
-    
+
     currentIdx = n;
-    
+
     // Update Buttons
     document.getElementById('prevBtn').disabled = (n === 0);
-    document.getElementById('prevBtn').style.opacity = (n === 0) ? '0.5' : '1';
-    
+
     const nextBtn = document.getElementById('nextBtn');
     if (n === totalQs - 1) {
         nextBtn.innerHTML = 'Finish <i class="fas fa-flag-checkered"></i>';
@@ -316,7 +309,7 @@ function prevQ() { if(currentIdx > 0) goToQ(currentIdx - 1); }
 function saveAnswer(idx, val, el = null) {
     answers[idx] = val;
     document.getElementById('nav-' + idx).classList.add('answered');
-    
+
     if(el) {
         const parent = el.parentElement;
         parent.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
@@ -334,7 +327,7 @@ function toggleFlag(idx) {
     } else {
         flagged.add(idx);
         nav.classList.add('flagged');
-        txt.innerText = 'Unflag';
+        txt.innerText = 'Remove flag';
     }
 }
 
@@ -344,7 +337,7 @@ function startTimer() {
         const m = Math.floor(remaining / 60);
         const s = remaining % 60;
         document.getElementById('countdown').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-        
+
         if(remaining <= 0) {
             clearInterval(timerId);
             submitQuiz();
@@ -355,16 +348,17 @@ function startTimer() {
 function showSummary() {
     document.getElementById('view-player').style.display = 'none';
     document.getElementById('view-summary').style.display = 'block';
-    
+
     const body = document.getElementById('summary-body');
     body.innerHTML = '';
     for(let i=0; i<totalQs; i++) {
-        const status = answers[i] ? 'Answer saved' : 'Not yet answered';
+        const status = answers[i] ? '<span class="sp-badge green">Answered</span>' : '<span class="sp-badge red">Not answered</span>';
         body.innerHTML += `<tr>
-            <td>Question ${i+1}</td>
-            <td style="font-weight:800; color: ${answers[i] ? 'var(--text-main)' : 'var(--danger)'}">${status}</td>
+            <td>Question ${i+1}${flagged.has(i) ? ' <i class="fas fa-flag" style="color: var(--danger); font-size: .75rem;" title="Flagged"></i>' : ''}</td>
+            <td>${status}</td>
         </tr>`;
     }
+    window.scrollTo(0, 0);
 }
 
 function resumeQuiz() {
@@ -374,10 +368,10 @@ function resumeQuiz() {
 
 function submitQuiz() {
     clearInterval(timerId);
-    
+
     // Transform indices back to question IDs for the handler
     const finalAnswers = {};
-    const qIds = [<?php foreach($questions as $q) echo $q['id'].','; ?>];
+    const qIds = [<?php foreach($questions as $q) echo (int)$q['id'].','; ?>];
     for(let idx in answers) {
         finalAnswers[qIds[idx]] = answers[idx];
     }
@@ -392,24 +386,30 @@ function submitQuiz() {
         document.getElementById('view-summary').style.display = 'none';
         document.getElementById('view-player').style.display = 'none';
         document.getElementById('view-result').style.display = 'block';
-        
+        window.scrollTo(0, 0);
+
         document.getElementById('res-score').innerText = data.score + '%';
-        
+
         if (data.passed) {
             document.getElementById('res-icon').innerHTML = '🏆';
-            document.getElementById('res-title').innerText = 'Exceptional Achievement!';
-            document.getElementById('res-desc').innerText = 'You have successfully navigated this academic challenge. Your points have been synchronized with your profile.';
+            document.getElementById('res-title').innerText = 'You passed!';
+            document.getElementById('res-desc').innerText = 'Well done. Your result has been saved to your profile.';
             document.getElementById('res-score').style.color = 'var(--success)';
-            document.getElementById('res-badge').innerHTML = '<span style="background: rgba(16,185,129,0.1); color: var(--success); padding: 8px 24px; border-radius: 99px; font-weight: 800; font-size: 0.8rem;">OFFICIAL PASS</span>';
+            document.getElementById('res-badge').innerHTML = '<span class="sp-badge green">Passed</span>';
         } else {
             document.getElementById('res-icon').innerHTML = '💡';
-            document.getElementById('res-title').innerText = 'Almost There!';
-            document.getElementById('res-desc').innerText = 'You didn\'t reach the pass mark this time. Review the course material and attempt again to strengthen your knowledge.';
+            document.getElementById('res-title').innerText = 'Not quite there yet';
+            document.getElementById('res-desc').innerText = 'You didn\'t reach the pass mark this time. Review the lessons and try again.';
             document.getElementById('res-score').style.color = 'var(--danger)';
-            document.getElementById('res-badge').innerHTML = '<span style="background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 8px 24px; border-radius: 99px; font-weight: 800; font-size: 0.8rem;">RETAKE RECOMMENDED</span>';
+            document.getElementById('res-badge').innerHTML = '<span class="sp-badge red">Try again</span>';
         }
+    })
+    .catch(() => {
+        alert('Sorry, we could not submit your answers. Check your connection and press "Submit answers" again.');
+        document.getElementById('view-player').style.display = 'none';
+        document.getElementById('view-summary').style.display = 'block';
     });
 }
 </script>
-</body>
-</html>
+
+<?php require_once 'includes/layout-bottom.php'; ?>

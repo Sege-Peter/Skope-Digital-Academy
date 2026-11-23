@@ -36,6 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['scholarship_id'])) {
     try {
         $stmt = $pdo->prepare("INSERT INTO scholarship_applications (scholarship_id, user_id, sop, academic_background, document_file) VALUES (?, ?, ?, ?, ?)");
         if ($stmt->execute([$sid, $user['id'], $sop, $background, $filename])) {
+            require_once __DIR__ . '/includes/notify.php';
+            $sch = $pdo->prepare("SELECT title FROM scholarships WHERE id = ?"); $sch->execute([$sid]);
+            $schTitle = (string)($sch->fetchColumn() ?: 'Scholarship');
+            sda_notify('scholarship_received', (int)$user['id'], ['scholarship' => $schTitle]);
+            sda_notify_admins('admin_new_scholarship', ['name' => $user['name'], 'email' => $user['email'], 'scholarship' => $schTitle]);
             header('Location: scholarships?msg=success');
         } else {
             header('Location: scholarships?msg=error');

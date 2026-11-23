@@ -33,9 +33,9 @@ $admin   = ($user['role'] === 'admin') ? $user : null;
 // Unread Notifications Count
 try {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications 
-                           WHERE (user_role = 'all' OR user_role = ? OR target_user_id = ?) 
+                           WHERE (target_user_id = ? OR (target_user_id IS NULL AND user_role IN ('all', ?))) 
                            AND read_status = 0");
-    $stmt->execute([$user['role'], $user['id']]);
+    $stmt->execute([$user['id'], $user['role']]);
     $unread_notif_count = (int)$stmt->fetchColumn();
 } catch (Exception $e) { $unread_notif_count = 0; }
 ?>

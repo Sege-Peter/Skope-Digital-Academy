@@ -8,6 +8,7 @@ require_once 'includes/auth.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Privacy Policy', 'path' => 'privacy', 'description' => 'How Skope Digital Academy collects, uses and protects your personal data.', 'breadcrumbs' => [['Privacy Policy', 'privacy']]]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -168,7 +169,7 @@ require_once 'includes/auth.php';
             
             <div class="contact-box">
                 <div style="font-weight: 800; color: var(--dark-deep); margin-bottom: 10px;">Academy Compliance Desk</div>
-                <div style="color: var(--primary-cyan); font-weight: 800; font-size: 1.2rem;">info@skopedigital.ac.ke</div>
+                <div style="color: var(--primary-cyan); font-weight: 800; font-size: 1.2rem;">info@skopedigital.co.ke</div>
                 <p style="font-size: 0.9rem; color: #64748b; margin-top: 10px;">Kisumu Main Campus, Kenya</p>
             </div>
         </div>

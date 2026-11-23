@@ -9,6 +9,9 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
+// All dates and times on the site are Kenyan time (PHP's default here is Europe/Berlin).
+date_default_timezone_set('Africa/Nairobi');
+
 // 🤖 SDAC AI Engine configuration (Gemini 1.5 Flash - High Speed & Availability)
 define('GEMINI_API_KEY', 'AIzaSyCFTZMZYhdV564f2ybDAjG4_nBI2R01XQo');
 define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . GEMINI_API_KEY);

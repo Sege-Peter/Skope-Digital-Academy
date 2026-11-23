@@ -1,16 +1,37 @@
 <?php
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/ui.php';
 
 // Access control: Admin only
 requireRole('admin');
 
 $admin = currentUser();
 $user  = $admin; // admin pages refer to the signed-in user as $user
+
+// Background jobs (reminders, queued email) when no server cron has run for 15 minutes
+if (time() - (int)setting('cron_last_run') > 900 && is_file(__DIR__ . '/../../includes/notify.php')) {
+    require_once __DIR__ . '/../../includes/notify.php';
+    save_setting($pdo, 'cron_last_run', (string)time());   // claim the slot so parallel page loads don't all start one
+    register_shutdown_function(function () {
+        $php = PHP_OS_FAMILY === 'Windows' ? 'C:\xampp\php\php.exe' : PHP_BINDIR . '/php';
+        $cron = realpath(__DIR__ . '/../../cron.php');
+        if (PHP_OS_FAMILY === 'Windows') { $h = @popen('start "" /B "' . $php . '" "' . $cron . '" all', 'r'); if ($h) pclose($h); }
+        elseif (function_exists('exec')) { @exec(escapeshellarg($php) . ' ' . escapeshellarg($cron) . ' all > /dev/null 2>&1 &'); }
+    });
+}
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ax-admin<?= (($_GET['theme'] ?? '') === 'light') ? ' ax-light' : '' ?>">
 <head>
+    <script>
+    /* Admin theme: dark by default, light when chosen (saved per browser). ?theme=light|dark overrides. */
+    (function () {
+        var q = new URLSearchParams(location.search).get('theme'), t = q;
+        try { if (!t) t = localStorage.getItem('sda_admin_theme'); } catch (e) {}
+        document.documentElement.classList.toggle('ax-light', t === 'light');
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?? 'Admin Dashboard' ?> – Skope Digital Academy</title>
@@ -23,6 +44,7 @@ $user  = $admin; // admin pages refer to the signed-in user as $user
     <!-- Styles -->
     <link rel="stylesheet" href="../assets/css/main.css?v=<?= time() ?>">
     <link rel="stylesheet" href="../assets/css/admin.css?v=<?= time() ?>">
+    <link rel="stylesheet" href="../assets/css/admin-ui.css?v=<?= time() ?>">
     
     <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
     

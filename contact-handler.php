@@ -32,6 +32,9 @@ try {
     $stmt2 = $pdo->prepare("INSERT INTO support_tickets (user_id, subject, message, status) VALUES (?, ?, ?, 'open')");
     $user_id = isLoggedIn() ? $_SESSION['user_id'] : null;
     $stmt2->execute([$user_id, $subject, "From: $name ($email)\nPhone: $phone\n\n" . $message]);
+    require_once __DIR__ . '/includes/notify.php';
+    sda_notify_address('contact_received', $email, ['name' => $name, 'subject' => $subject]);
+    sda_notify_admins('admin_new_contact', ['name' => $name, 'email' => $email, 'subject' => $subject, 'message' => mb_substr($message, 0, 2000)], ['reply_to' => $email]);
     contact_back('sent');
 } catch (Exception $e) {
     error_log($e->getMessage());

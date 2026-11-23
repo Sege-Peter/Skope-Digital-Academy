@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'My Merit Badges';
+$pageTitle = 'Badges';
 require_once 'includes/header.php';
 
 try {
@@ -63,252 +63,114 @@ try {
     $earned_badges = $available_badges = [];
     $progress_data = [];
 }
+
+// Display only: progress numbers for the newer badge rules (lessons, streak, xp...) come from the XP engine.
+$display_stats = $progress_data;
+try {
+    require_once __DIR__ . '/../includes/progress.php';
+    $display_stats += user_stats($pdo, (int)$student['id']);
+} catch (Throwable $e) { error_log('badges stats: ' . $e->getMessage()); }
+
+// Badge icons are either Font Awesome names (fa-star) or an emoji/character.
+function badge_icon_html(?string $icon): string {
+    $icon = trim((string)$icon);
+    if ($icon === '' || trim($icon, '?') === '') return '<i class="fas fa-award"></i>'; // blank or lost emoji
+    if (str_starts_with($icon, 'fa-')) return '<i class="fas ' . htmlspecialchars($icon) . '"></i>';
+    return '<span aria-hidden="true">' . htmlspecialchars($icon) . '</span>';
+}
+$awarded_now = max(0, (int)($_GET['awarded'] ?? 0));
+
+require_once 'includes/layout-top.php';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
 <style>
-    .badges-hero {
-        background: linear-gradient(135deg, var(--studio-dark, #0f172a) 0%, #1e293b 100%);
-        border-radius: 32px;
-        padding: 60px;
-        color: white;
-        margin-bottom: 48px;
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    }
-    .badges-hero::before {
-        content: '\f559';
-        font-family: 'Font Awesome 6 Free';
-        font-weight: 900;
-        position: absolute;
-        font-size: 18rem;
-        opacity: 0.04;
-        top: -40px;
-        right: -40px;
-        transform: rotate(15deg);
-        pointer-events: none;
-    }
-    .badges-hero::after {
-        content: '';
-        position: absolute;
-        bottom: -50px;
-        left: -50px;
-        width: 300px;
-        height: 300px;
-        background: radial-gradient(circle, rgba(0,191,255,0.15), transparent 70%);
-        border-radius: 50%;
-        pointer-events: none;
-    }
-
-    .badge-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 32px;
-        margin-bottom: 60px;
-    }
-
-    .badge-card {
-        background: white;
-        border: 1px solid var(--dark-border);
-        border-radius: 32px;
-        padding: 40px 24px;
-        text-align: center;
-        transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        position: relative;
-        display: flex;
-        flex-direction: column;
-    }
-    .badge-card:hover { transform: translateY(-10px); box-shadow: 0 24px 48px rgba(0,0,0,0.08); border-color: var(--primary); }
-
-    .badge-icon-wrap {
-        width: 104px;
-        height: 104px;
-        border-radius: 35px;
-        margin: 0 auto 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 3.5rem;
-        position: relative;
-        transition: 0.5s;
-        box-shadow: inset 0 0 20px rgba(255,255,255,0.5);
-    }
-    .badge-card:hover .badge-icon-wrap { transform: rotate(8deg) scale(1.1); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-
-    .badge-locked { filter: grayscale(0.8); background: #fafafa; border: 1px dashed var(--dark-border); opacity: 0.85; }
-    .badge-locked:hover { filter: grayscale(0); opacity: 1; border-style: solid; }
-    
-    .locked-overlay {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        width: 36px;
-        height: 36px;
-        background: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.9rem;
-        color: #94a3b8;
-        box-shadow: var(--shadow-sm);
-        z-index: 2;
-        border: 1px solid var(--dark-border);
-    }
-
-    .badge-name { font-family: 'Poppins', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 8px; color: var(--dark); line-height: 1.3; }
-    .badge-desc { font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; margin-bottom: auto; }
-    
-    .criteria-box {
-        background: var(--bg-light);
-        padding: 10px 16px;
-        border-radius: 12px;
-        font-size: 0.72rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        color: var(--text-muted);
-        display: inline-block;
-        margin-top: 20px;
-    }
-
-    .progress-container {
-        margin-top: 24px;
-        text-align: left;
-        background: white;
-        padding: 16px;
-        border-radius: 16px;
-        border: 1px solid var(--dark-border);
-    }
-    .progress-labels {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.75rem;
-        color: var(--text-dim);
-        margin-bottom: 8px;
-        font-weight: 800;
-        text-transform: uppercase;
-    }
-    .progress-bar {
-        height: 8px;
-        background: #e2e8f0;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, var(--primary), var(--secondary));
-        border-radius: 4px;
-        transition: 1s ease-in-out;
-    }
-
-    .section-title {
-        font-family: 'Poppins', sans-serif;
-        font-size: 1.6rem;
-        font-weight: 800;
-        margin-bottom: 32px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        color: var(--dark);
-    }
-    .section-title::after { content: ''; flex: 1; height: 2px; background: linear-gradient(90deg, var(--dark-border), transparent); }
-    .section-title i { color: var(--primary); }
-
-    @media (max-width: 768px) { .badges-hero { padding: 40px 20px; } }
+  .pg-badges .ach-badges { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .pg-badges .bdg { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+      padding: 20px 16px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .pg-badges .bdg.earned { border-color: color-mix(in srgb, var(--bc) 35%, var(--border));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--bc) 9%, #fff), #fff 65%); }
+  .pg-badges .bdg-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #fff;
+      background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--bc) 55%, #fff), var(--bc));
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--bc) 14%, transparent); margin-bottom: 6px; }
+  .pg-badges .bdg.locked .bdg-icon { background: #EEF2F6; color: #A0AEC0; box-shadow: none; filter: grayscale(1); }
+  .pg-badges .bdg.locked h4 { color: var(--text-dim); }
+  .pg-badges .bdg h4 { margin: 0; font-size: .92rem; font-weight: 800; }
+  .pg-badges .bdg p { margin: 0; font-size: .78rem; color: var(--text-dim); line-height: 1.4; }
+  .pg-badges .bdg .sp-progress { width: 100%; height: 6px; margin-top: 4px; }
+  .pg-badges .bdg-lock { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); font-size: .68rem; }
+  .pg-badges .bdg-when { margin-top: auto; padding-top: 6px; }
 </style>
 
-<main class="main-content" style="padding-bottom: 100px;">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-            <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.8rem;">Recognition <span class="text-secondary">Vault</span></h1>
-                <p style="color: var(--text-dim); margin-top: 4px;">Exclusive merits earned through academic excellence and platform engagement.</p>
-            </div>
-        </div>
-    </header>
+<div class="pg-badges">
+  <div class="sp-page-head">
+    <div><h1>Badges</h1><p>Badges you have earned, and the ones you can unlock next.</p></div>
+    <div class="sp-actions"><a href="achievements" class="sp-btn ghost"><i class="fas fa-trophy"></i> Level and learning paths</a></div>
+  </div>
 
-    <div class="badges-hero">
-        <h2 style="font-family: 'Poppins', sans-serif; font-size: 2.22rem; margin-bottom: 16px; font-weight: 900; color: #fff;">The Hallmark of <span style="color:var(--primary);">Excellence</span></h2>
-        <p style="opacity: 0.85; font-size: 1.05rem; max-width: 600px; margin: 0 auto; line-height: 1.6; color: #fff;">Build your professional legacy. Earn premium merit badges by reaching significant milestones natively across the academy.</p>
-        
-        <div style="display: flex; justify-content: center; gap: 60px; margin-top: 48px; position: relative; z-index: 2;">
-            <div style="text-align: center;">
-                <div style="font-size: 3rem; font-weight: 900; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.3);"><?= count($earned_badges) ?></div>
-                <div style="font-size: 0.8rem; font-weight: 800; opacity: 0.7; text-transform: uppercase; letter-spacing: 2px; margin-top: 8px;">Badges Earned</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="font-size: 3rem; font-weight: 900; line-height: 1; opacity: 0.5;"><?= count($available_badges) ?></div>
-                <div style="font-size: 0.8rem; font-weight: 800; opacity: 0.4; text-transform: uppercase; letter-spacing: 2px; margin-top: 8px;">Unlocked Next</div>
-            </div>
-        </div>
-    </div>
+  <?php if ($awarded_now > 0): ?>
+    <div class="sp-alert success"><i class="fas fa-medal"></i> <div>Congratulations! You just unlocked <?= $awarded_now ?> new badge<?= $awarded_now == 1 ? '' : 's' ?>.</div></div>
+  <?php endif; ?>
 
-    <!-- Earned Badges -->
-    <?php if(!empty($earned_badges)): ?>
-    <h3 class="section-title"><i class="fas fa-trophy"></i> Earned Accomplishments</h3>
-    <div class="badge-grid">
-        <?php foreach($earned_badges as $b): ?>
-        <div class="badge-card">
-            <div style="position:absolute; top: -15px; left: 50%; transform: translateX(-50%); background: linear-gradient(90deg, #F59E0B, #FCD34D); color: #78350F; padding: 4px 16px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);">Achieved</div>
-            
-            <div class="badge-icon-wrap" style="background: <?= $b['color'] ?>15; color: <?= $b['color'] ?>;">
-                <?= $b['icon'] ?>
-            </div>
-            <h4 class="badge-name"><?= htmlspecialchars($b['name']) ?></h4>
-            <p class="badge-desc"><?= htmlspecialchars($b['description']) ?></p>
-            <div class="criteria-box" style="color: <?= $b['color'] ?>; background: <?= $b['color'] ?>10;">
-                Awarded on <?= date('M j, Y', strtotime($b['awarded_at'])) ?>
-            </div>
-        </div>
-        <?php endforeach; ?>
+  <section class="sp-grid cols-3 sp-section">
+    <div class="sp-stat"><span class="sp-stat-icon violet"><i class="fas fa-medal"></i></span><div><strong><?= count($earned_badges) ?></strong><span>Badges earned</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon" style="background: #EEF2F6; color: var(--text-dim);"><i class="fas fa-lock"></i></span><div><strong><?= count($available_badges) ?></strong><span>Still to unlock</span></div></div>
+    <?php $all_badges = count($earned_badges) + count($available_badges); ?>
+    <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-chart-simple"></i></span><div><strong><?= $all_badges ? (int)round(count($earned_badges) / $all_badges * 100) : 0 ?>%</strong><span>Collection complete</span></div></div>
+  </section>
+
+  <!-- Earned -->
+  <section class="sp-section">
+    <div class="sp-section-head"><div><h2>Earned</h2><p>Newest first</p></div></div>
+    <?php if (empty($earned_badges)): ?>
+      <div class="sp-empty" style="padding: 28px;">
+        <div class="sp-ico violet"><i class="fas fa-medal"></i></div>
+        <h3>No badges yet</h3>
+        <p>Finish your first lesson to earn your first badge.</p>
+        <a href="courses" class="sp-btn">Go to my courses</a>
+      </div>
+    <?php else: ?>
+    <div class="ach-badges">
+      <?php foreach ($earned_badges as $b): ?>
+      <div class="bdg earned" style="--bc: <?= htmlspecialchars($b['color'] ?: '#0080ff') ?>">
+        <div class="bdg-icon"><?= badge_icon_html($b['icon']) ?></div>
+        <h4><?= htmlspecialchars($b['name']) ?></h4>
+        <p><?= htmlspecialchars((string)$b['description']) ?></p>
+        <span class="sp-badge green bdg-when"><i class="fas fa-check"></i> Earned <?= date('j M Y', strtotime($b['awarded_at'])) ?></span>
+      </div>
+      <?php endforeach; ?>
     </div>
     <?php endif; ?>
+  </section>
 
-    <!-- Available Badges -->
-    <h3 class="section-title" style="margin-top: 20px;"><i class="fas fa-lock-open"></i> Hall of Challenges</h3>
-    <div class="badge-grid">
-        <?php foreach($available_badges as $b): 
-            $current_val = $progress_data[$b['criteria_type']] ?? 0;
-            $target = $b['criteria_value'];
-            $percent = min(100, ($target > 0 ? ($current_val / $target) * 100 : 0));
-        ?>
-        <div class="badge-card badge-locked">
-            <div class="locked-overlay"><i class="fas fa-lock"></i></div>
-            <div class="badge-icon-wrap" style="background: #f1f5f9; color: #64748b;">
-                <?= $b['icon'] ?>
-            </div>
-            <h4 class="badge-name"><?= htmlspecialchars($b['name']) ?></h4>
-            <p class="badge-desc"><?= htmlspecialchars($b['description']) ?></p>
-            
-            <div class="progress-container">
-                <div class="progress-labels">
-                    <span><?= str_replace('_', ' ', $b['criteria_type']) ?></span>
-                    <span><?= $current_val ?> / <?= $target ?></span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: <?= $percent ?>%; <?= $percent == 0 ? 'background: transparent;' : '' ?>"></div>
-                </div>
-            </div>
-        </div>
-        <?php endforeach; ?>
+  <!-- Locked -->
+  <?php if (!empty($available_badges)): ?>
+  <section class="sp-section">
+    <div class="sp-section-head"><div><h2>Up next</h2><p>Keep learning to unlock these</p></div></div>
+    <div class="ach-badges">
+      <?php foreach ($available_badges as $b):
+          $target = (int)$b['criteria_value'];
+          $has_rule = $b['criteria_type'] !== '' && $b['criteria_type'] !== null && isset($display_stats[$b['criteria_type']]);
+          $current_val = $has_rule ? (int)$display_stats[$b['criteria_type']] : 0;
+          $percent = $target > 0 ? (int)min(100, floor($current_val / $target * 100)) : 0;
+      ?>
+      <div class="bdg locked" style="--bc: <?= htmlspecialchars($b['color'] ?: '#0080ff') ?>">
+        <span class="bdg-lock" title="Locked"><i class="fas fa-lock"></i></span>
+        <div class="bdg-icon"><?= badge_icon_html($b['icon']) ?></div>
+        <h4><?= htmlspecialchars($b['name']) ?></h4>
+        <p><?= htmlspecialchars((string)$b['description']) ?></p>
+        <?php if ($has_rule && $target > 1): ?>
+          <div class="sp-progress" title="<?= $percent ?>%"><span style="width: <?= max(2, $percent) ?>%;"></span></div>
+          <span class="sp-small sp-muted"><?= number_format(min($current_val, $target)) ?> / <?= number_format($target) ?></span>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
     </div>
-</main>
+  </section>
+  <?php endif; ?>
+</div>
 
-<script src="../assets/js/main.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const awarded = urlParams.get('awarded');
-        if(awarded && parseInt(awarded) > 0) {
-            SDA.showToast(`Congratulations! You just unlocked ${awarded} new merit badge(s)!`, 'success');
-            // Clean URL
-            window.history.replaceState({}, document.title, "badges.php");
-        }
-    });
+if (new URLSearchParams(location.search).get('awarded')) history.replaceState({}, document.title, 'badges');
 </script>
-</body>
-</html>
+
+<?php require_once 'includes/layout-bottom.php'; ?>

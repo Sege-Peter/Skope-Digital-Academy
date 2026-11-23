@@ -1,295 +1,428 @@
 <?php
-$pageTitle = 'Revenue Audit & Verifications';
+/**
+ * Admin: Payment Approvals.
+ *   Queue of pending payments (manual M-Pesa / bank proofs and under-paid Paystack payments) and
+ *   the history of approved / rejected ones. This page owns the approve/reject logic; the Master
+ *   Ledger posts its approve/reject buttons here (with a `return` address).
+ *
+ *   Approve rules:
+ *     - only a pending payment can be approved, and only once;
+ *     - a reference (Paystack reference or M-Pesa code in the message) already used on an approved
+ *       payment is refused (reject the duplicate instead);
+ *     - an amount below what is due right now stays pending;
+ *     - course payment  → enroll_student() on the paid track/cohort (credits the amount), referral reward, notify;
+ *     - certificate fee → unlock_certificate() only, never an enrolment;
+ *     - registration    → activates the account.
+ */
+$pageTitle = 'Payment Approvals';
 require_once 'includes/header.php';
 
-// Auth check
-if ($user['role'] !== 'admin') {
-    header('Location: ../login');
-    exit;
+/** References a payment carries: its Paystack reference and any M-Pesa-style code in the message. */
+function pay_refs(array $p): array {
+    $refs = [];
+    if (trim((string)$p['paystack_reference']) !== '') $refs['ref'] = trim($p['paystack_reference']);
+    if (preg_match_all('/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{10}\b/', strtoupper((string)$p['transaction_message']), $m)) {
+        $refs['codes'] = array_values(array_unique($m[0]));
+    }
+    return $refs;
 }
 
-// Handle Verification Actions
-$message = '';
-if (isset($_GET['action']) && isset($_GET['id'])) {
-    $payment_id = (int)$_GET['id'];
-    $action = $_GET['action']; // 'verify' or 'reject'
-    
-    try {
-        if ($action === 'verify') {
-            $pdo->beginTransaction();
-            
-            // 1. Update Payment Status
-            $stmt = $pdo->prepare("UPDATE payments SET status = 'verified', verified_by = ?, verified_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'");
-            $stmt->execute([$user['id'], $payment_id]);
-            $newly_verified = $stmt->rowCount() > 0;
+/** Another payment using the same reference/code (approved only, or any not rejected). Returns its id or null. */
+function pay_duplicate(PDO $pdo, array $p, bool $approvedOnly): ?int {
+    $refs = pay_refs($p);
+    $statuses = $approvedOnly ? "('verified')" : "('verified','pending')";
+    if (!empty($refs['ref'])) {
+        $s = $pdo->prepare("SELECT id FROM payments WHERE id <> ? AND paystack_reference = ? AND status IN $statuses LIMIT 1");
+        $s->execute([$p['id'], $refs['ref']]);
+        if ($id = $s->fetchColumn()) return (int)$id;
+    }
+    foreach ($refs['codes'] ?? [] as $code) {
+        $s = $pdo->prepare("SELECT id FROM payments WHERE id <> ? AND status IN $statuses AND (UPPER(transaction_message) LIKE ? OR paystack_reference = ?) LIMIT 1");
+        $s->execute([$p['id'], '%' . $code . '%', $code]);
+        if ($id = $s->fetchColumn()) return (int)$id;
+    }
+    return null;
+}
 
-            // 2. Fetch Payment Details for Enrollment
-            $stmt = $pdo->prepare("SELECT student_id, course_id, amount, learning_mode, cohort_id, payment_type, certificate_id FROM payments WHERE id = ?");
-            $stmt->execute([$payment_id]);
-            $pay = $newly_verified ? $stmt->fetch() : null;
-
-            if ($pay && $pay['payment_type'] === 'certificate' && $pay['certificate_id']) {
-                // Certificate fee: unlock the learner's certificate (no enrollment change).
-                require_once __DIR__ . '/../includes/progress.php';
-                unlock_certificate($pdo, (int)$pay['certificate_id'], (float)$pay['amount']);
-            } elseif ($pay && $pay['course_id']) {
-                // 3-4. Activate on the track the learner paid for (credits amount, counts the seat once)
-                require_once __DIR__ . '/../includes/learning.php';
-                $cstmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
-                $cstmt->execute([$pay['course_id']]);
-                $pcourse = $cstmt->fetch();
-                $pmode = in_array($pay['learning_mode'], SDA_MODES, true) ? $pay['learning_mode'] : course_modes($pcourse)[0];
-                enroll_student($pdo, (int)$pay['student_id'], $pcourse, $pmode, $pay['cohort_id'] ? (int)$pay['cohort_id'] : null, (float)$pay['amount']);
-            }
-
-            $pdo->commit();
-            $message = "Institutional clearance granted for Payment ID #$payment_id. Stakeholder access synchronized.";
-        } 
-        elseif ($action === 'reject') {
-            $stmt = $pdo->prepare("UPDATE payments SET status = 'failed' WHERE id = ?");
-            $stmt->execute([$payment_id]);
-            $message = "Fiscal validation failed for Payment ID #$payment_id. Transaction archived as rejected.";
+/** What this payment has to cover right now: ['due' => float|null, 'note' => string, 'course' => ?array, 'cert' => ?array]. */
+function pay_due(PDO $pdo, array $p): array {
+    $out = ['due' => null, 'note' => '', 'course' => null, 'cert' => null];
+    if ($p['payment_type'] === 'certificate') {
+        if ($p['certificate_id']) {
+            $s = $pdo->prepare("SELECT * FROM certificates WHERE id = ?");
+            $s->execute([$p['certificate_id']]);
+            $out['cert'] = $s->fetch() ?: null;
         }
-    } catch (Exception $e) {
+        if (!$out['cert']) { $out['note'] = 'Certificate not found'; return $out; }
+        if ($out['cert']['status'] === 'pending') { $out['due'] = (float)$out['cert']['fee']; $out['note'] = 'Certificate fee'; }
+        else { $out['due'] = 0.0; $out['note'] = 'Certificate already ' . ($out['cert']['status'] === 'approved' ? 'unlocked' : $out['cert']['status']); }
+        return $out;
+    }
+    if ($p['payment_type'] === 'course' && $p['course_id']) {
+        $s = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+        $s->execute([$p['course_id']]);
+        $c = $s->fetch();
+        if (!$c) { $out['note'] = 'Course no longer exists'; return $out; }
+        $out['course'] = $c;
+        $mode = in_array($p['learning_mode'], SDA_MODES, true) ? $p['learning_mode'] : course_modes($c)[0];
+        $out['due'] = amount_due($c, $mode, get_enrollment($pdo, (int)$p['student_id'], (int)$c['id']));
+        $out['note'] = mode_label($mode);
+        return $out;
+    }
+    if ($p['payment_type'] === 'registration') { $out['due'] = (float)setting('registration_fee'); $out['note'] = 'Registration fee'; }
+    return $out;
+}
+
+function pay_audit(PDO $pdo, int $adminId, string $action, string $desc): void {
+    try {
+        $pdo->prepare("INSERT INTO audit_log (user_id, action, description, ip_address) VALUES (?, ?, ?, ?)")
+            ->execute([$adminId, $action, $desc, $_SERVER['REMOTE_ADDR'] ?? '']);
+    } catch (Throwable $e) { error_log($e->getMessage()); }
+}
+
+/** Approve a pending payment. Returns [ok, message]. */
+function pay_approve(PDO $pdo, int $id, int $adminId): array {
+    $s = $pdo->prepare("SELECT * FROM payments WHERE id = ?");
+    $s->execute([$id]);
+    $p = $s->fetch();
+    if (!$p) return [false, 'That payment no longer exists.'];
+    if ($p['status'] !== 'pending') return [false, "Payment #$id was already " . ($p['status'] === 'verified' ? 'approved' : 'rejected') . '.'];
+    if ($dup = pay_duplicate($pdo, $p, true)) {
+        return [false, "Payment #$id uses a reference that was already used on approved payment #$dup. It stays pending — reject it as a duplicate."];
+    }
+    $d = pay_due($pdo, $p);
+    if ($p['payment_type'] === 'course' && !$d['course']) return [false, "Payment #$id is for a course that no longer exists. Reject it instead."];
+    // A coupon discount counts towards what is due (payments.discount, set when the learner applied a coupon).
+    $covered = (float)$p['amount'] + (float)($p['discount'] ?? 0);
+    if ($d['due'] !== null && $covered + 0.001 < $d['due']) {
+        return [false, 'Payment #' . $id . ' covers ' . money($covered) . ' but ' . money($d['due']) . ' is due. It stays pending until the learner pays the rest (or reject it).'];
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $u = $pdo->prepare("UPDATE payments SET status = 'verified', verified_by = ?, verified_at = NOW() WHERE id = ? AND status = 'pending'");
+        $u->execute([$adminId, $id]);
+        if ($u->rowCount() === 0) { $pdo->rollBack(); return [false, "Payment #$id was already handled."]; }
+        $sid = (int)$p['student_id'];
+        $msg = "Payment #$id approved.";
+        if ($p['payment_type'] === 'certificate') {
+            // Certificate fee: unlock the certificate. Never touches enrolments.
+            if ($p['certificate_id'] && unlock_certificate($pdo, (int)$p['certificate_id'], $covered)) {
+                $msg = "Payment #$id approved and the certificate is unlocked.";
+            } else {
+                notify($pdo, $sid, 'Payment approved', 'Your certificate payment of ' . money((float)$p['amount']) . ' was approved.',
+                       'payment_approved', ['item' => 'Certificate fee', 'amount' => money((float)$p['amount']), 'reference' => $p['paystack_reference'] ?: "#$id"]);
+            }
+        } elseif ($p['payment_type'] === 'course' && $d['course']) {
+            $c = $d['course'];
+            $mode = in_array($p['learning_mode'], SDA_MODES, true) ? $p['learning_mode'] : course_modes($c)[0];
+            enroll_student($pdo, $sid, $c, $mode, $p['cohort_id'] ? (int)$p['cohort_id'] : null, (float)$p['amount']);
+            require_once __DIR__ . '/../includes/gamified_logic.php';
+            rewardReferrer($sid, (float)$p['amount'], $pdo);
+            notify($pdo, $sid, 'Payment approved', 'Your payment of ' . money((float)$p['amount']) . ' for "' . $c['title'] . '" was approved. Your ' . mode_label($mode) . ' access is open now.');
+            require_once __DIR__ . '/../includes/notify.php';
+            sda_notify_enrolled($pdo, $sid, $c, $mode, $p['cohort_id'] ? (int)$p['cohort_id'] : null, (float)$p['amount'], $p['paystack_reference'] ?: "#$id");
+            $msg = "Payment #$id approved — the learner is enrolled in \"{$c['title']}\" (" . mode_label($mode) . ').';
+        } elseif ($p['payment_type'] === 'registration') {
+            $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ?")->execute([$sid]);
+            notify($pdo, $sid, 'Account activated', 'Your registration payment was approved. Welcome to Skope Digital Academy!');
+            require_once __DIR__ . '/../includes/notify.php';
+            sda_notify_activated($sid, (float)$p['amount'], $p['paystack_reference'] ?: "#$id");
+            $msg = "Payment #$id approved and the account is active.";
+        }
+        if (!empty($p['coupon_id'])) {
+            require_once __DIR__ . '/../includes/coupons.php';
+            coupon_redeem_payment($pdo, $id);   // records the coupon as used now that the payment is verified
+        }
+        pay_audit($pdo, $adminId, 'payment_approved', "Payment #$id ({$p['payment_type']}, " . money((float)$p['amount']) . ") approved");
+        $pdo->commit();
+        return [true, $msg];
+    } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        $message = "Audit Error: " . $e->getMessage();
+        error_log('Approve payment #' . $id . ': ' . $e->getMessage());
+        return [false, 'Could not approve payment #' . $id . ': ' . $e->getMessage()];
     }
 }
 
-try {
-    // 1. Pending Payments (Priority)
-    $stmt = $pdo->query("SELECT p.*, u.name as student_name, u.email as student_email, c.title as course_title 
-                         FROM payments p 
-                         JOIN users u ON p.student_id = u.id 
-                         JOIN courses c ON p.course_id = c.id 
-                         WHERE p.status = 'pending' 
-                         ORDER BY p.created_at DESC");
-    $pending = $stmt->fetchAll();
-
-    // 2. Verified History (Recent 10)
-    $stmt = $pdo->query("SELECT p.*, u.name as student_name, c.title as course_title, admin.name as admin_name
-                         FROM payments p 
-                         JOIN users u ON p.student_id = u.id 
-                         JOIN courses c ON p.course_id = c.id 
-                         LEFT JOIN users admin ON p.verified_by = admin.id
-                         WHERE p.status = 'verified' 
-                         ORDER BY p.verified_at DESC LIMIT 10");
-    $history = $stmt->fetchAll();
-
-    // 3. Stats
-    $total_verified = $pdo->query("SELECT COUNT(*) FROM payments WHERE status = 'verified'")->fetchColumn();
-    $total_revenue = $pdo->query("SELECT SUM(amount) FROM payments WHERE status = 'verified'")->fetchColumn() ?: 0;
-
-} catch (Exception $e) {
-    error_log($e->getMessage());
-    $pending = $history = [];
+/** Reject a pending payment and tell the learner why. */
+function pay_reject(PDO $pdo, int $id, int $adminId, string $reason): array {
+    $s = $pdo->prepare("SELECT p.*, c.title AS course_title FROM payments p LEFT JOIN courses c ON c.id = p.course_id WHERE p.id = ?");
+    $s->execute([$id]);
+    $p = $s->fetch();
+    if (!$p) return [false, 'That payment no longer exists.'];
+    if ($p['status'] !== 'pending') return [false, "Payment #$id was already " . ($p['status'] === 'verified' ? 'approved' : 'rejected') . '.'];
+    $u = $pdo->prepare("UPDATE payments SET status = 'failed', verified_by = ?, verified_at = NOW() WHERE id = ? AND status = 'pending'");
+    $u->execute([$adminId, $id]);
+    if ($u->rowCount() === 0) return [false, "Payment #$id was already handled."];
+    $what = $p['payment_type'] === 'certificate' ? 'certificate fee' . ($p['course_title'] ? ' for "' . $p['course_title'] . '"' : '')
+          : ($p['course_title'] ? '"' . $p['course_title'] . '"' : $p['payment_type'] . ' payment');
+    notify($pdo, (int)$p['student_id'], 'Payment not approved',
+        'We could not approve your payment of ' . money((float)$p['amount']) . ' for ' . $what . '.'
+        . ($reason !== '' ? ' Reason: ' . $reason : '') . ' Please check the details and send it again, or contact support.',
+        'payment_rejected', ['item' => trim($what, '"'), 'amount' => money((float)$p['amount']), 'reason' => $reason !== '' ? $reason : 'The payment could not be matched.']);
+    pay_audit($pdo, $adminId, 'payment_rejected', "Payment #$id rejected" . ($reason !== '' ? ': ' . $reason : ''));
+    return [true, "Payment #$id rejected and the learner was told" . ($reason !== '' ? ' why' : '') . '.'];
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $ret = (string)($_POST['return'] ?? '');
+    $ret = preg_match('/^(verifications|payments)(\?[A-Za-z0-9_=&%.+\-]*)?$/', $ret) ? $ret : null;
+    ax_post_guard();
+    $id = (int)($_POST['id'] ?? 0);
+    $act = $_POST['action'] ?? '';
+    if ($act === 'approve') {
+        [$ok, $msg] = pay_approve($pdo, $id, (int)$user['id']);
+        ax_flash($ok ? 'ok' : 'err', $msg);
+    } elseif ($act === 'reject') {
+        [$ok, $msg] = pay_reject($pdo, $id, (int)$user['id'], mb_substr(trim((string)($_POST['reason'] ?? '')), 0, 300));
+        ax_flash($ok ? 'ok' : 'err', $msg);
+    }
+    ax_back($ret);
+}
+
+/* ── Data ─────────────────────────────────────────────────────────────── */
+$tab = ($_GET['tab'] ?? '') === 'history' ? 'history' : 'queue';
+$hist = in_array($_GET['h'] ?? '', ['verified', 'failed'], true) ? $_GET['h'] : 'all';
+
+$base = "SELECT p.*, u.name AS student_name, u.email AS student_email, u.avatar, u.phone AS student_phone,
+                c.title AS course_title, co.name AS cohort_name, co.start_date AS cohort_start,
+                ce.verification_code, ce.status AS cert_status, ce.fee AS cert_fee,
+                a.name AS admin_name
+         FROM payments p
+         LEFT JOIN users u ON u.id = p.student_id
+         LEFT JOIN courses c ON c.id = p.course_id
+         LEFT JOIN course_cohorts co ON co.id = p.cohort_id
+         LEFT JOIN certificates ce ON ce.id = p.certificate_id
+         LEFT JOIN users a ON a.id = p.verified_by";
+$pending = $pdo->query("$base WHERE p.status = 'pending' ORDER BY p.created_at ASC")->fetchAll();
+foreach ($pending as &$p) {
+    $p['_due'] = pay_due($pdo, $p);
+    $p['_dup'] = pay_duplicate($pdo, $p, false);
+    $p['_enr'] = $p['course_id'] && $p['payment_type'] === 'course' ? get_enrollment($pdo, (int)$p['student_id'], (int)$p['course_id']) : null;
+}
+unset($p);
+
+$history = [];
+$reasons = [];
+if ($tab === 'history') {
+    $w = $hist === 'all' ? "p.status IN ('verified','failed')" : 'p.status = ' . $pdo->quote($hist);
+    $history = $pdo->query("$base WHERE $w ORDER BY COALESCE(p.verified_at, p.created_at) DESC LIMIT 200")->fetchAll();
+    foreach ($pdo->query("SELECT description FROM audit_log WHERE action = 'payment_rejected' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN) as $d) {
+        if (preg_match('/^Payment #(\d+) rejected: (.+)$/s', $d, $m)) $reasons[(int)$m[1]] = $m[2];
+    }
+}
+
+$stats = [
+    'pending_n'   => count($pending),
+    'pending_amt' => array_sum(array_map(fn($p) => (float)$p['amount'], $pending)),
+    'month_amt'   => (float)ax_scalar($pdo, "SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'verified' AND verified_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+    'month_n'     => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments WHERE status = 'verified' AND verified_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+    'rejected_30' => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments WHERE status = 'failed' AND COALESCE(verified_at, created_at) >= DATE_SUB(NOW(), INTERVAL 30 DAY)"),
+    'avg_hours'   => ax_scalar($pdo, "SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, verified_at)) / 60 FROM payments WHERE status = 'verified' AND verified_at IS NOT NULL AND proof_file IS NOT NULL"),
+    'verified_n'  => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments WHERE status = 'verified'"),
+    'failed_n'    => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments WHERE status = 'failed'"),
+];
+
+function pay_proof_url(?string $f): ?string {
+    if (!$f) return null;
+    $f = basename($f);
+    return is_file(__DIR__ . '/../uploads/proofs/' . $f) ? '../uploads/proofs/' . rawurlencode($f) : null;
+}
+function pay_is_image(string $f): bool { return in_array(strtolower(pathinfo($f, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp', 'gif'], true); }
+
+/** "What it's for" cell. */
+function pay_for_html(array $p): string {
+    if ($p['payment_type'] === 'certificate') {
+        return '<span class="ax-pill violet"><i class="fas fa-award"></i> Certificate fee</span><div class="pv-for">' . e($p['course_title'] ?? 'Course removed') . '</div>'
+             . ($p['verification_code'] ? '<div class="muted">Code ' . e($p['verification_code']) . '</div>' : '');
+    }
+    if ($p['payment_type'] === 'course') {
+        $m = in_array($p['learning_mode'], SDA_MODES, true) ? mode_label($p['learning_mode']) : 'Track not set';
+        return '<span class="ax-pill info"><i class="fas fa-book"></i> Course</span><div class="pv-for">' . e($p['course_title'] ?? 'Course removed') . '</div>'
+             . '<div class="muted">' . e($m) . ($p['cohort_name'] ? ' · ' . e($p['cohort_name']) . ' (starts ' . ax_date($p['cohort_start']) . ')' : '') . '</div>';
+    }
+    return '<span class="ax-pill">' . e(ucfirst((string)$p['payment_type'])) . '</span>';
+}
+
+function pay_ref_html(array $p): string {
+    $out = '';
+    if ($p['paystack_reference']) $out .= '<span class="ax-code">' . e($p['paystack_reference']) . '</span>';
+    $msg = trim((string)$p['transaction_message']);
+    if ($msg !== '') $out .= '<div class="pv-msg" title="' . e($msg) . '">' . e(mb_strimwidth($msg, 0, 90, '…')) . '</div>';
+    return $out !== '' ? $out : '<span class="muted">No reference given</span>';
+}
+
+$queueUrl = 'verifications';
+require_once 'includes/sidebar.php';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
+<style>
+  .pv-for { font-weight: 700; color: var(--text-main); margin-top: 6px; }
+  .pv-msg { font-size: .78rem; color: var(--text-dim); margin-top: 4px; max-width: 260px; overflow-wrap: anywhere; line-height: 1.4; }
+  .pv-thumb { width: 54px; height: 54px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); padding: 0; overflow: hidden; cursor: zoom-in; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .pv-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pv-due { font-size: .74rem; margin-top: 4px; }
+  .pv-amt { font: 800 1rem 'Poppins', sans-serif; color: var(--text-main); }
+  .pv-flag { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  #proof-dlg { width: min(900px, calc(100vw - 32px)); }
+  #proof-dlg .pv-stage { background: var(--surface-2); border-radius: 14px; display: flex; align-items: center; justify-content: center; min-height: 240px; padding: 10px; }
+  #proof-dlg .pv-stage img { max-width: 100%; max-height: 68vh; border-radius: 8px; }
+  #proof-dlg .pv-stage iframe { width: 100%; height: 68vh; border: 0; border-radius: 8px; background: var(--surface); }
+  .ax-table .actions .ax-btn + .ax-btn { margin-left: 6px; }
+  @media (max-width: 760px) { .pv-msg { max-width: none; text-align: right; } .ax-table.cards td .pv-for { text-align: right; } }
+</style>
 <main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div>
-                <h1 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px;">Fiscal <span>Verification</span></h1>
-                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Revenue Audit Hub • Skope Digital Academy</p>
-            </div>
-        </div>
-        
-        <div style="display: flex; gap: 16px;">
-            <button class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none;" onclick="window.location.reload()">
-                <i class="fas fa-sync-alt"></i> Synchronize Pool
-            </button>
-        </div>
-    </header>
-
-    <div class="admin-body">
-        <div class="dash-stats-grid">
-            <div class="premium-card">
-                <div class="stat-icon" style="background: var(--warning-glow); color: var(--warning);"><i class="fas fa-clock"></i></div>
-                <div class="stat-value"><?= count($pending) ?></div>
-                <div class="stat-label">AWAITING CLEARANCE</div>
-            </div>
-            <div class="premium-card">
-                <div class="stat-icon" style="background: var(--success-glow); color: var(--success);"><i class="fas fa-user-check"></i></div>
-                <div class="stat-value"><?= number_format($total_verified) ?></div>
-                <div class="stat-label">TOTAL VERIFIED ENROLLS</div>
-            </div>
-            <div class="premium-card">
-                <div class="stat-icon" style="background: var(--primary-glow); color: var(--primary);"><i class="fas fa-wallet"></i></div>
-                <div class="stat-value">KES <?= number_format($total_revenue) ?></div>
-                <div class="stat-label">INSTITUTIONAL NET REVENUE</div>
-            </div>
+    <?php ax_header('Payment', 'Approvals', 'Check proofs, approve or reject',
+        '<a class="ax-btn ghost" href="payments"><i class="fas fa-receipt"></i> Master ledger</a>'); ?>
+    <div class="ax-body">
+        <?php ax_alerts(); ?>
+        <div class="ax-stats">
+            <?= ax_stat('hourglass-half', number_format($stats['pending_n']), 'Waiting for approval', $stats['pending_n'] ? ax_money($stats['pending_amt']) . ' in total' : 'Queue is clear', 'amber') ?>
+            <?= ax_stat('circle-check', ax_money($stats['month_amt']), 'Approved this month', number_format($stats['month_n']) . ' payment' . ($stats['month_n'] == 1 ? '' : 's'), 'green') ?>
+            <?= ax_stat('circle-xmark', number_format($stats['rejected_30']), 'Rejected (30 days)', number_format($stats['failed_n']) . ' all time', 'red') ?>
+            <?= ax_stat('stopwatch', $stats['avg_hours'] ? (round((float)$stats['avg_hours'], 1) . ' h') : '—', 'Average approval time', 'For payments sent with a proof', 'violet') ?>
         </div>
 
-        <?php if($message): ?>
-            <div class="premium-card glass-effect" style="border-color: var(--primary); margin-bottom: 32px; padding: 20px 24px; color: var(--primary); font-weight: 700; display: flex; align-items: center; gap: 12px;">
-                <i class="fas fa-shield-alt"></i> <?= $message ?>
-            </div>
-        <?php endif; ?>
+        <div class="ax-toolbar">
+            <nav class="ax-tabs" aria-label="View">
+                <a href="verifications" class="<?= $tab === 'queue' ? 'on' : '' ?>"><i class="fas fa-inbox"></i> Waiting <span class="n"><?= $stats['pending_n'] ?></span></a>
+                <a href="verifications?tab=history" class="<?= $tab === 'history' && $hist === 'all' ? 'on' : '' ?>"><i class="fas fa-clock-rotate-left"></i> History <span class="n"><?= $stats['verified_n'] + $stats['failed_n'] ?></span></a>
+                <a href="verifications?tab=history&amp;h=verified" class="<?= $tab === 'history' && $hist === 'verified' ? 'on' : '' ?>">Approved <span class="n"><?= $stats['verified_n'] ?></span></a>
+                <a href="verifications?tab=history&amp;h=failed" class="<?= $tab === 'history' && $hist === 'failed' ? 'on' : '' ?>">Rejected <span class="n"><?= $stats['failed_n'] ?></span></a>
+            </nav>
+            <label class="ax-search"><i class="fas fa-search"></i><input type="search" placeholder="Search learner, course, reference…" data-filter-table="pv-table" aria-label="Search payments"></label>
+        </div>
 
-        <!-- Pending Verification Pool -->
-        <div class="premium-card" style="padding: 0; overflow: hidden; margin-bottom: 48px;">
-            <div style="padding: 24px 32px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h3 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.3px;">Priority Verification Pool</h3>
-                    <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-top: 4px;">Incoming fiscal declarations requiring administrative validation.</p>
-                </div>
-                <div class="badge-premium" style="background: var(--warning-glow); color: var(--warning); border: none;">
-                    <?= count($pending) ?> ACTIONABLE ITEMS
-                </div>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="premium-table">
-                    <thead>
-                        <tr>
-                            <th>STAKEHOLDER</th>
-                            <th>TARGET SCHEME</th>
-                            <th>INVESTMENT</th>
-                            <th>PROOF ARTIFACT</th>
-                            <th style="text-align: right;">GOVERNANCE</th>
-                        </tr>
-                    </thead>
+        <?php if ($tab === 'queue'): ?>
+        <section class="ax-panel">
+            <div class="ax-panel-h"><div><h2><i class="fas fa-inbox"></i> Waiting for approval</h2><p>Oldest first. Approving a course payment enrols the learner on the track they paid for; a certificate payment only unlocks the certificate.</p></div></div>
+            <?php if (!$pending): ?>
+                <div class="ax-empty"><i class="fas fa-check-double"></i><b>Nothing to approve</b>New payment proofs from learners will appear here.</div>
+            <?php else: ?>
+            <div class="ax-table-wrap">
+                <table class="ax-table cards" id="pv-table">
+                    <thead><tr><th>Learner</th><th>For</th><th>Amount</th><th>Reference / M-Pesa message</th><th>Proof</th><th>Sent</th><th></th></tr></thead>
                     <tbody>
-                        <?php if(!empty($pending)): ?>
-                            <?php foreach($pending as $p): ?>
-                            <tr>
-                                <td>
-                                    <div style="font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($p['student_name']) ?></div>
-                                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;"><?= htmlspecialchars($p['student_email']) ?></div>
-                                </td>
-                                <td>
-                                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);"><?= htmlspecialchars($p['course_title']) ?><?= ($p['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></div>
-                                    <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">TxID: #<?= $p['id'] ?></div>
-                                </td>
-                                <td style="font-weight: 900; color: var(--primary);">KES <?= number_format($p['amount']) ?></td>
-                                <td>
-                                    <button class="badge-premium" style="background: var(--bg-main); color: var(--primary); border: 1.5px solid var(--primary-glow); cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='var(--primary-glow)'" onmouseout="this.style.background='var(--bg-main)'" onclick="viewProof('<?= $p['proof_file'] ?>', 'KES <?= number_format($p['amount']) ?> from <?= htmlspecialchars($p['student_name']) ?>')">
-                                        <i class="fas fa-eye" style="margin-right: 6px;"></i> VALIDATE PROOF
+                    <?php foreach ($pending as $p):
+                        $due = $p['_due']['due'];
+                        $covered = (float)$p['amount'] + (float)($p['discount'] ?? 0);
+                        $short = $due !== null && $covered + 0.001 < $due;
+                        $proof = pay_proof_url($p['proof_file']); ?>
+                        <tr>
+                            <td data-label="Learner"><div class="ax-who"><?= ax_avatar($p['student_name'] ?? '?', $p['avatar'] ?? null) ?><div><b><?= e($p['student_name'] ?? 'Deleted account') ?></b><small><?= e($p['student_email'] ?? '#' . $p['student_id']) ?></small></div></div></td>
+                            <td data-label="For"><div><?= pay_for_html($p) ?>
+                                <?php if ($p['_enr'] && in_array($p['_enr']['status'], ['active', 'completed'], true)): ?><div class="muted">Already enrolled (<?= e(mode_label($p['_enr']['learning_mode'])) ?>, paid <?= e(money((float)$p['_enr']['amount_paid'])) ?>)</div><?php endif; ?></div></td>
+                            <td data-label="Amount" class="num"><div><div class="pv-amt"><?= e(money((float)$p['amount'])) ?></div>
+                                <?php if ($due !== null): ?>
+                                    <div class="pv-due"><?= (float)($p['discount'] ?? 0) > 0 ? '<span class="ax-pill orange"><i class="fas fa-ticket"></i> Coupon −' . e(money((float)$p['discount'])) . '</span> ' : '' ?><?= $short ? '<span class="ax-pill bad">Short by ' . e(money($due - $covered)) . '</span>' : '<span class="ax-pill ok">Covers ' . e(money($due)) . ' due</span>' ?></div>
+                                <?php elseif ($p['_due']['note']): ?><div class="pv-due"><span class="ax-pill warn"><?= e($p['_due']['note']) ?></span></div><?php endif; ?></div></td>
+                            <td data-label="Reference"><div><?= pay_ref_html($p) ?>
+                                <?php if ($p['_dup']): ?><div class="pv-flag"><span class="ax-pill bad"><i class="fas fa-clone"></i> Same reference as #<?= (int)$p['_dup'] ?></span></div><?php endif; ?></div></td>
+                            <td data-label="Proof">
+                                <?php if ($proof): ?>
+                                    <button type="button" class="pv-thumb" data-proof="<?= e($proof) ?>" data-pdf="<?= pay_is_image($p['proof_file']) ? '' : '1' ?>" data-title="<?= e(money((float)$p['amount']) . ' from ' . ($p['student_name'] ?? 'learner') . ' · payment #' . $p['id']) ?>" aria-label="View proof for payment #<?= (int)$p['id'] ?>">
+                                        <?= pay_is_image($p['proof_file']) ? '<img src="' . e($proof) . '" alt="" loading="lazy">' : '<i class="fas fa-file-pdf fa-lg"></i>' ?>
                                     </button>
-                                </td>
-                                <td style="text-align: right;">
-                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                        <a href="verifications?action=verify&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--success-glow); color: var(--success); border: none; cursor: pointer;" title="Authorize Access">
-                                            <i class="fas fa-check" style="font-size: 0.8rem;"></i>
-                                        </a>
-                                        <a href="verifications?action=reject&id=<?= $p['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: var(--danger-glow); color: var(--danger); border: none; cursor: pointer;" title="Invalidate Transaction">
-                                            <i class="fas fa-times" style="font-size: 0.8rem;"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="5" style="text-align: center; padding: 80px 40px;">
-                                    <div style="width: 64px; height: 64px; background: var(--bg-main); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); margin: 0 auto 20px; font-size: 1.5rem; border: 1.5px solid var(--border-light);">
-                                        <i class="fas fa-check-double"></i>
-                                    </div>
-                                    <h4 style="font-size: 1.1rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.3px;">Audit Queue Empty</h4>
-                                    <p style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-top: 4px;">Institutional revenue stream is fully synchronized.</p>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Audit History -->
-        <div class="premium-card" style="padding: 0; overflow: hidden;">
-            <div style="padding: 24px 32px; border-bottom: 1px solid var(--border-light);">
-                <h3 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.3px;">Recent Audit Decisions</h3>
-                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-top: 4px;">Historical record of administrative fiscal clearances.</p>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="premium-table">
-                    <thead>
-                        <tr>
-                            <th>TRANS. ID</th>
-                            <th>STAKEHOLDER</th>
-                            <th>SCHEME</th>
-                            <th>INVESTMENT</th>
-                            <th>AUTHORIZING AGENT</th>
-                            <th>TIMESTAMP</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($history as $h): ?>
-                        <tr>
-                            <td><span style="font-weight: 900; color: var(--text-muted); font-size: 0.7rem;">#<?= $h['id'] ?></span></td>
-                            <td style="font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($h['student_name']) ?></td>
-                            <td style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);"><?= htmlspecialchars($h['course_title']) ?><?= ($h['payment_type'] ?? '') === 'certificate' ? ' <span style="display:inline-block;padding:1px 8px;border-radius:99px;background:#fef3c7;color:#92400e;font-size:.72rem;font-weight:800;">Certificate fee</span>' : '' ?></td>
-                            <td style="font-weight: 900; color: var(--success);">KES <?= number_format($h['amount']) ?></td>
-                            <td>
-                                <div class="badge-premium" style="background: var(--bg-main); color: var(--primary); border: 1.5px solid var(--border-light); font-size: 0.65rem;">
-                                    <i class="fas fa-user-shield" style="margin-right: 6px;"></i> <?= htmlspecialchars($h['admin_name'] ?: 'SYSTEM_CORE') ?>
-                                </div>
+                                <?php else: ?><span class="muted"><?= $p['proof_file'] ? 'File missing' : 'No proof' ?></span><?php endif; ?>
                             </td>
-                            <td style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;"><?= date('M j, g:i a', strtotime($h['verified_at'])) ?></td>
+                            <td data-label="Sent"><span title="<?= e(ax_date($p['created_at'], 'M j, Y g:i a')) ?>"><?= e(ax_ago($p['created_at'])) ?></span><div class="muted">#<?= (int)$p['id'] ?></div></td>
+                            <td class="actions" data-label="">
+                                <form method="post" data-confirm="<?= e($p['payment_type'] === 'certificate' ? 'Approve this certificate payment and unlock the certificate?' : ($p['payment_type'] === 'course' ? 'Approve this payment and enrol ' . ($p['student_name'] ?? 'the learner') . ' in "' . ($p['course_title'] ?? '') . '"?' : 'Approve this payment?')) ?>">
+                                    <?= ax_csrf() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                                    <button class="ax-btn ok sm"<?= $short || $p['_dup'] ? ' title="Amount is short or the reference is a duplicate – approval will be refused"' : '' ?>><i class="fas fa-check"></i> Approve</button>
+                                </form>
+                                <button type="button" class="ax-btn danger sm" data-reject="<?= (int)$p['id'] ?>" data-who="<?= e(($p['student_name'] ?? 'learner') . ' · ' . money((float)$p['amount'])) ?>" data-dup="<?= $p['_dup'] ? (int)$p['_dup'] : '' ?>" data-short="<?= $short ? e(money($due)) : '' ?>"><i class="fas fa-xmark"></i> Reject</button>
+                            </td>
                         </tr>
-                        <?php endforeach; ?>
+                    <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-        </div>
+            <?php endif; ?>
+        </section>
+
+        <?php else: ?>
+        <section class="ax-panel">
+            <div class="ax-panel-h"><div><h2><i class="fas fa-clock-rotate-left"></i> Decisions</h2><p>Latest 200 approved and rejected payments, with who decided and why.</p></div></div>
+            <?php if (!$history): ?>
+                <div class="ax-empty"><i class="fas fa-folder-open"></i><b>No decisions yet</b>Approved and rejected payments will be listed here.</div>
+            <?php else: ?>
+            <div class="ax-table-wrap">
+                <table class="ax-table cards" id="pv-table">
+                    <thead><tr><th>Learner</th><th>For</th><th>Amount</th><th>Reference</th><th>Result</th><th>Decided by</th><th>When</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($history as $h): $proof = pay_proof_url($h['proof_file']); ?>
+                        <tr>
+                            <td data-label="Learner"><div class="ax-who"><?= ax_avatar($h['student_name'] ?? '?', $h['avatar'] ?? null) ?><div><b><?= e($h['student_name'] ?? 'Deleted account') ?></b><small>Payment #<?= (int)$h['id'] ?></small></div></div></td>
+                            <td data-label="For"><div><?= pay_for_html($h) ?></div></td>
+                            <td data-label="Amount" class="num strong"><?= e(money((float)$h['amount'])) ?></td>
+                            <td data-label="Reference"><div><?= pay_ref_html($h) ?>
+                                <?php if ($proof): ?><div style="margin-top:6px"><button type="button" class="ax-btn ghost sm" data-proof="<?= e($proof) ?>" data-pdf="<?= pay_is_image($h['proof_file']) ? '' : '1' ?>" data-title="<?= e(money((float)$h['amount']) . ' from ' . ($h['student_name'] ?? 'learner') . ' · payment #' . $h['id']) ?>"><i class="fas fa-image"></i> Proof</button></div><?php endif; ?></div></td>
+                            <td data-label="Result"><div>
+                                <?= $h['status'] === 'verified' ? '<span class="ax-pill ok"><i class="fas fa-check"></i> Approved</span>' : '<span class="ax-pill bad"><i class="fas fa-xmark"></i> Rejected</span>' ?>
+                                <?php if (isset($reasons[(int)$h['id']])): ?><div class="pv-msg"><?= e($reasons[(int)$h['id']]) ?></div><?php endif; ?></div></td>
+                            <td data-label="Decided by"><?= e($h['admin_name'] ?? ($h['paystack_reference'] ? 'Paystack (automatic)' : '—')) ?></td>
+                            <td data-label="When" class="num"><?= e(ax_date($h['verified_at'] ?: $h['created_at'], 'M j, Y g:i a')) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
     </div>
 </main>
 
-<!-- High-Fidelity Proof Viewer -->
-<div id="proofModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-    <div class="premium-card" style="width: 100%; max-width: 800px; padding: 40px; animation: modal-pop 0.4s cubic-bezier(0.4, 0, 0.2, 1); max-height: 95vh; display: flex; flex-direction: column;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-light);">
-            <div>
-                <h2 id="proofTitle" style="font-size: 1.4rem; font-weight: 900; letter-spacing: -0.5px; margin: 0;">Fiscal Validation</h2>
-                <p id="proofMeta" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; font-weight: 600;"></p>
-            </div>
-            <button onclick="closeProof()" class="avatar-sm" style="width: 40px; height: 40px; background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fas fa-times"></i></button>
-        </div>
-        
-        <div style="flex: 1; overflow: auto; background: var(--bg-main); border-radius: 20px; border: 1.5px solid var(--border); margin-bottom: 30px; display: flex; align-items: center; justify-content: center; padding: 20px;">
-            <img id="proofImg" src="" alt="Proof Artifact" style="max-width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-        </div>
+<dialog class="ax-modal" id="proof-dlg" aria-labelledby="proof-title">
+    <div class="ax-panel-h"><div><h3 id="proof-title"><i class="fas fa-image"></i> Proof of payment</h3><p data-proof-meta></p></div>
+        <div style="display:flex;gap:8px"><a class="ax-btn ghost sm" data-proof-open target="_blank" rel="noopener"><i class="fas fa-up-right-from-square"></i> Open full size</a><button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div></div>
+    <div class="ax-panel-b"><div class="pv-stage" data-proof-stage></div></div>
+</dialog>
 
-        <div style="display: flex; gap: 16px;">
-            <button class="btn-premium" style="flex: 1; justify-content: center; height: 52px;" onclick="window.print()"><i class="fas fa-print"></i> Generate Hardcopy</button>
-            <button class="btn-premium" onclick="closeProof()" style="flex: 1; background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; height: 52px; justify-content: center;">Close Audit View</button>
+<dialog class="ax-modal" id="reject-dlg" aria-labelledby="reject-title" style="width:min(520px,calc(100vw - 32px))">
+    <form method="post" class="ax-form" data-confirm="Reject this payment? The learner will be notified with your reason." data-danger>
+        <div class="ax-panel-h"><div><h3 id="reject-title"><i class="fas fa-xmark"></i> Reject payment</h3><p data-reject-who></p></div><button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+        <div class="ax-panel-b">
+            <?= ax_csrf() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="" data-reject-id>
+            <div class="ax-field"><label for="rj-reason">Reason (sent to the learner)</label>
+                <textarea id="rj-reason" name="reason" maxlength="300" placeholder="e.g. We couldn't find this M-Pesa code in our statement."></textarea>
+                <div class="hint">Quick picks:
+                    <a href="#" data-reason="We couldn't find this payment in our M-Pesa / bank statement.">not found</a> ·
+                    <a href="#" data-reason="The amount paid is less than the amount due.">amount short</a> ·
+                    <a href="#" data-reason="This reference was already used on another payment.">duplicate reference</a> ·
+                    <a href="#" data-reason="The proof image is unreadable. Please upload a clear screenshot.">unreadable proof</a></div></div>
+            <div class="ax-form-actions"><button type="button" class="ax-btn ghost" data-close>Cancel</button><button class="ax-btn warn"><i class="fas fa-xmark"></i> Reject and notify</button></div>
         </div>
-    </div>
-</div>
-
-<style>
-@keyframes modal-pop { 0% { transform: scale(0.9) translateY(20px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
-</style>
+    </form>
+</dialog>
 
 <script src="../assets/js/main.js"></script>
+<?php ax_footer_js(); ?>
 <script>
-    function viewProof(file, meta) {
-        const modal = document.getElementById('proofModal');
-        const img = document.getElementById('proofImg');
-        const metaDiv = document.getElementById('proofMeta');
-        
-        img.src = '../uploads/proofs/' + file;
-        metaDiv.innerText = meta;
-        modal.style.display = 'flex';
-    }
-
-    function closeProof() {
-        document.getElementById('proofModal').style.display = 'none';
-    }
-
-    window.onclick = function(e) {
-        const modal = document.getElementById('proofModal');
-        if(e.target == modal) closeProof();
-    }
-
-    function toggleSidebar() {
-        document.getElementById('dashSidebar').classList.toggle('open');
-        document.getElementById('sidebarOverlay').classList.toggle('open');
-    }
+(function(){
+  var pd = document.getElementById('proof-dlg'), stage = pd.querySelector('[data-proof-stage]');
+  document.querySelectorAll('[data-proof]').forEach(function(b){
+    b.addEventListener('click', function(){
+      stage.innerHTML = '';
+      var el = document.createElement(b.dataset.pdf ? 'iframe' : 'img');
+      el.src = b.dataset.proof; if (!b.dataset.pdf) el.alt = 'Proof of payment'; else el.title = 'Proof of payment';
+      stage.appendChild(el);
+      pd.querySelector('[data-proof-meta]').textContent = b.dataset.title || '';
+      pd.querySelector('[data-proof-open]').href = b.dataset.proof;
+      pd.showModal();
+    });
+  });
+  pd.addEventListener('click', function(e){ if (e.target === pd) pd.close(); });
+  var rd = document.getElementById('reject-dlg'), ta = rd.querySelector('textarea');
+  document.querySelectorAll('[data-reject]').forEach(function(b){
+    b.addEventListener('click', function(){
+      rd.querySelector('[data-reject-id]').value = b.dataset.reject;
+      rd.querySelector('[data-reject-who]').textContent = 'Payment #' + b.dataset.reject + ' · ' + b.dataset.who;
+      ta.value = b.dataset.dup ? 'This reference was already used on another payment (#' + b.dataset.dup + ').' : (b.dataset.short ? 'The amount paid is less than the ' + b.dataset.short + ' due.' : '');
+      rd.showModal(); ta.focus();
+    });
+  });
+  rd.querySelectorAll('[data-reason]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); ta.value = a.dataset.reason; ta.focus(); }); });
+})();
 </script>
 </body></html>

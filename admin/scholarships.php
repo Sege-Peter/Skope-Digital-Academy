@@ -1,325 +1,258 @@
 <?php
-$pageTitle = 'Manage Scholarships';
+/**
+ * Admin: Scholarships – funding schemes and the applications learners send.
+ * An approved application lets the learner enrol free in up to 5 courses (see enroll.php).
+ */
+$pageTitle = 'Scholarships';
 require_once 'includes/header.php';
 
-$success_msg = '';
-$error_msg = '';
-
-// 1. Handle Application Decision (Approve/Reject)
-if (isset($_GET['action']) && isset($_GET['aid'])) {
-    $aid = (int)$_GET['aid'];
-    $action = $_GET['action'];
-    $status = ($action === 'approve') ? 'approved' : 'rejected';
-    
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    ax_post_guard();
+    $act = $_POST['action'] ?? '';
     try {
-        $stmt = $pdo->prepare("UPDATE scholarship_applications SET status = ? WHERE id = ?");
-        $stmt->execute([$status, $aid]);
-        
-        // Notify student
-        $stmt = $pdo->prepare("SELECT user_id, scholarship_id FROM scholarship_applications WHERE id = ?");
-        $stmt->execute([$aid]);
-        $app = $stmt->fetch();
-        if ($app) {
-            $stmt = $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, 'student', ?)");
-            $stmt->execute(["Scholarship Decision", "Your application for the scholarship has been ".strtoupper($status).". Check your dashboard for details.", $app['user_id']]);
+        if ($act === 'save_scheme') {
+            $sid = (int)($_POST['scholarship_id'] ?? 0);
+            $title = mb_substr(trim($_POST['title'] ?? ''), 0, 255);
+            $desc = trim($_POST['description'] ?? '');
+            $amount = max(0, (float)($_POST['amount'] ?? 0));
+            $expiry = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['expiry_date'] ?? '') ? $_POST['expiry_date'] : null;
+            $status = ($_POST['status'] ?? 'active') === 'closed' ? 'closed' : 'active';
+            if ($title === '' || $desc === '') { ax_flash('err', 'Give the scheme a name and a description.'); ax_back(); }
+            if ($sid) {
+                $pdo->prepare("UPDATE scholarships SET title = ?, description = ?, amount = ?, expiry_date = ?, status = ? WHERE id = ?")
+                    ->execute([$title, $desc, $amount, $expiry, $status, $sid]);
+                ax_flash('ok', 'Scheme updated.');
+            } else {
+                $pdo->prepare("INSERT INTO scholarships (title, description, amount, expiry_date, status) VALUES (?, ?, ?, ?, ?)")
+                    ->execute([$title, $desc, $amount, $expiry, $status]);
+                ax_flash('ok', 'New scheme posted. Learners can apply from the Scholarships page.');
+            }
+        } elseif ($act === 'scheme_status') {
+            $status = ($_POST['status'] ?? '') === 'closed' ? 'closed' : 'active';
+            $pdo->prepare("UPDATE scholarships SET status = ? WHERE id = ?")->execute([$status, (int)$_POST['scholarship_id']]);
+            ax_flash('ok', $status === 'closed' ? 'Scheme closed to new applications.' : 'Scheme reopened.');
+        } elseif ($act === 'delete_scheme') {
+            $sid = (int)$_POST['scholarship_id'];
+            $n = (int)ax_scalar($pdo, "SELECT COUNT(*) FROM scholarship_applications WHERE scholarship_id = ?", [$sid]);
+            if ($n) { ax_flash('err', "This scheme has $n application(s), so it can't be deleted. Close it instead."); ax_back(); }
+            $pdo->prepare("DELETE FROM scholarships WHERE id = ?")->execute([$sid]);
+            ax_flash('ok', 'Scheme deleted.');
+        } elseif ($act === 'decide') {
+            $aid = (int)($_POST['aid'] ?? 0);
+            $status = ($_POST['decision'] ?? '') === 'approve' ? 'approved' : 'rejected';
+            $note = mb_substr(trim($_POST['note'] ?? ''), 0, 400);
+            $a = $pdo->prepare("SELECT sa.*, s.title FROM scholarship_applications sa LEFT JOIN scholarships s ON s.id = sa.scholarship_id WHERE sa.id = ?");
+            $a->execute([$aid]);
+            $app = $a->fetch();
+            if (!$app) { ax_flash('err', 'That application no longer exists.'); ax_back(); }
+            $pdo->prepare("UPDATE scholarship_applications SET status = ? WHERE id = ?")->execute([$status, $aid]);
+            $scheme = $app['title'] ? '"' . $app['title'] . '"' : 'the scholarship';
+            notify($pdo, (int)$app['user_id'],
+                $status === 'approved' ? 'Scholarship approved 🎉' : 'Scholarship decision',
+                $status === 'approved'
+                    ? "Your application for $scheme was approved. You can now enrol free in up to 5 courses from the course pages." . ($note !== '' ? " Note: $note" : '')
+                    : "Your application for $scheme was not approved this time." . ($note !== '' ? " Reason: $note" : '') . ' You are welcome to apply again for future schemes.',
+                'scholarship_decision', ['scholarship' => $app['title'] ?: 'the scholarship', 'status' => $status === 'approved' ? 'approved 🎉' : 'not approved this time',
+                    'note' => $status === 'approved' ? 'You can now enrol free in up to 5 courses from the course pages.' . ($note !== '' ? " $note" : '') : ($note !== '' ? "Reason: $note. " : '') . 'You are welcome to apply again for future schemes.']);
+            try {
+                $pdo->prepare("INSERT INTO audit_log (user_id, action, description, ip_address) VALUES (?, 'scholarship_decision', ?, ?)")
+                    ->execute([$user['id'], "Application #$aid $status" . ($note !== '' ? ": $note" : ''), $_SERVER['REMOTE_ADDR'] ?? '']);
+            } catch (Throwable $e) { error_log($e->getMessage()); }
+            ax_flash('ok', 'Application ' . $status . ' and the learner was notified.');
         }
-        
-        $success_msg = "Application ".ucfirst($status)." successfully.";
-    } catch (Exception $e) { $error_msg = "Error: " . $e->getMessage(); }
+    } catch (Throwable $e) {
+        error_log($e->getMessage());
+        ax_flash('err', 'Could not save: ' . $e->getMessage());
+    }
+    ax_back();
 }
 
-// 2. Handle Add/Edit Scholarship
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_scholarship'])) {
-    $sid = $_POST['scholarship_id'] ?? null;
-    $title = trim($_POST['title']);
-    $desc = trim($_POST['description']);
-    $amount = (float)$_POST['amount'];
-    $expiry = $_POST['expiry_date'] ?: null;
+$schemes = $pdo->query("SELECT s.*, (SELECT COUNT(*) FROM scholarship_applications a WHERE a.scholarship_id = s.id) AS apps,
+                               (SELECT COUNT(*) FROM scholarship_applications a WHERE a.scholarship_id = s.id AND a.status = 'pending') AS pending,
+                               (SELECT COUNT(*) FROM scholarship_applications a WHERE a.scholarship_id = s.id AND a.status = 'approved') AS approved
+                        FROM scholarships s ORDER BY s.status = 'closed', s.created_at DESC")->fetchAll();
 
-    try {
-        if ($sid) {
-            $stmt = $pdo->prepare("UPDATE scholarships SET title = ?, description = ?, amount = ?, expiry_date = ? WHERE id = ?");
-            $stmt->execute([$title, $desc, $amount, $expiry, $sid]);
-            $success_msg = "Scholarship updated successfully.";
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO scholarships (title, description, amount, expiry_date) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$title, $desc, $amount, $expiry]);
-            $success_msg = "New scholarship posted.";
-        }
-    } catch (Exception $e) { $error_msg = $e->getMessage(); }
+$counts = ['all' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0];
+foreach ($pdo->query("SELECT status, COUNT(*) FROM scholarship_applications GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR) as $k => $n) {
+    if (isset($counts[$k])) $counts[$k] = (int)$n;
+    $counts['all'] += (int)$n;
+}
+$status = in_array($_GET['status'] ?? '', ['pending', 'approved', 'rejected', 'all'], true) ? $_GET['status'] : ($counts['pending'] ? 'pending' : 'all');
+$st = $pdo->prepare("SELECT sa.*, u.name AS student_name, u.email AS student_email, u.phone AS student_phone, u.avatar, u.created_at AS member_since,
+                            s.title AS scheme_title, s.amount AS scheme_amount,
+                            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = sa.user_id AND e.status IN ('active','completed')) AS enrolments,
+                            (SELECT COUNT(*) FROM enrollments e WHERE e.student_id = sa.user_id AND e.status = 'completed') AS completed,
+                            (SELECT COUNT(*) FROM scholarship_applications o WHERE o.user_id = sa.user_id AND o.id <> sa.id) AS other_apps
+                     FROM scholarship_applications sa
+                     LEFT JOIN users u ON u.id = sa.user_id
+                     LEFT JOIN scholarships s ON s.id = sa.scholarship_id
+                     " . ($status !== 'all' ? 'WHERE sa.status = ?' : '') . "
+                     ORDER BY sa.status = 'pending' DESC, sa.created_at DESC");
+$st->execute($status !== 'all' ? [$status] : []);
+$apps = $st->fetchAll();
+
+$activeSchemes = count(array_filter($schemes, fn($s) => $s['status'] === 'active' && (!$s['expiry_date'] || $s['expiry_date'] >= date('Y-m-d'))));
+$awardValue = array_sum(array_map(fn($s) => (float)$s['amount'] * (int)$s['approved'], $schemes));
+
+function sch_pill(string $s): string {
+    return ['pending' => '<span class="ax-pill warn">Pending</span>', 'approved' => '<span class="ax-pill ok">Approved</span>', 'rejected' => '<span class="ax-pill bad">Rejected</span>'][$s] ?? '<span class="ax-pill">' . e($s) . '</span>';
+}
+function sch_doc(?string $f): ?string {
+    if (!$f) return null;
+    $f = basename($f);
+    return is_file(__DIR__ . '/../uploads/scholarships/' . $f) ? '../uploads/scholarships/' . rawurlencode($f) : null;
 }
 
-// 3. Handle Delete Scholarship
-if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['sid'])) {
-    $sid = (int)$_GET['sid'];
-    try {
-        $stmt = $pdo->prepare("DELETE FROM scholarships WHERE id = ?");
-        $stmt->execute([$sid]);
-        $success_msg = "Scholarship program deleted.";
-    } catch (Exception $e) { $error_msg = "Cannot delete: This scholarship may have active applications."; }
-}
-
-// 4. Fetch Data with Filtering
-try {
-    $scholarships_list = $pdo->query("SELECT * FROM scholarships ORDER BY created_at DESC")->fetchAll();
-    
-    $status_filter = $_GET['status'] ?? 'all';
-    $where = $status_filter !== 'all' ? "WHERE sa.status = ?" : "WHERE 1=1";
-    $params = $status_filter !== 'all' ? [$status_filter] : [];
-
-    $stmt = $pdo->prepare("SELECT sa.*, u.name as student_name, u.email as student_email, s.title as scholarship_title 
-                         FROM scholarship_applications sa 
-                         JOIN users u ON sa.user_id = u.id 
-                         JOIN scholarships s ON sa.scholarship_id = s.id 
-                         $where
-                         ORDER BY sa.created_at DESC");
-    $stmt->execute($params);
-    $applications = $stmt->fetchAll();
-} catch (Exception $e) { $scholarships_list = []; $applications = []; }
+require_once 'includes/sidebar.php';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
+<style>
+  .sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+  .sc-card { border: 1px solid var(--border); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: var(--surface); }
+  .sc-card.closed { background: var(--surface-2); }
+  .sc-card h3 { font: 800 .98rem 'Poppins', sans-serif; color: var(--text-main); line-height: 1.35; }
+  .sc-card p { font-size: .84rem; color: var(--text-dim); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .sc-meta { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border-light); padding-top: 12px; margin-top: auto; font-size: .8rem; color: var(--text-dim); flex-wrap: wrap; }
+  .sc-meta b { display: block; color: var(--text-main); font-size: .95rem; }
+  .sc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sc-actions form { display: inline; }
+  .sc-text { white-space: pre-wrap; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: .88rem; color: var(--text-main); line-height: 1.6; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; }
+  .sc-doc img { max-width: 100%; max-height: 300px; border-radius: 12px; border: 1px solid var(--border); }
+  .sc-decide { display: grid; gap: 10px; border-top: 1px solid var(--border-light); padding-top: 16px; margin-top: 6px; }
+</style>
 <main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div>
-                <h1 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px;">Scholarship <span>Management</span></h1>
-                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Institutional Funding Hub • Skope Digital Academy</p>
-            </div>
+    <?php ax_header('Scholarships', '', 'Schemes and applications',
+        '<button type="button" class="ax-btn" data-open="scheme-new"><i class="fas fa-plus"></i> New scheme</button>'); ?>
+    <div class="ax-body">
+        <?php ax_alerts(); ?>
+        <div class="ax-stats">
+            <?= ax_stat('inbox', number_format($counts['pending']), 'Applications to review', $counts['all'] . ' received in total', 'amber') ?>
+            <?= ax_stat('user-graduate', number_format($counts['approved']), 'Approved', 'Each covers up to 5 free enrolments', 'green') ?>
+            <?= ax_stat('graduation-cap', number_format($activeSchemes), 'Open schemes', count($schemes) . ' scheme' . (count($schemes) == 1 ? '' : 's') . ' in total') ?>
+            <?= ax_stat('coins', ax_money($awardValue), 'Awarded value', 'Scheme value × approved applications', 'violet') ?>
         </div>
-        <button class="btn-premium" onclick="openAddModal()">
-            <i class="fas fa-plus"></i> Post New Scheme
-        </button>
-    </header>
 
-    <div class="admin-body">
-        <!-- Active Schemes Grid -->
-        <div style="margin-bottom: 48px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
-                <h2 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.5px;">Active Funding Tracks</h2>
-                <span class="badge-premium" style="background: var(--primary-glow); color: var(--primary);"><?= count($scholarships_list) ?> Live Programs</span>
-            </div>
-            
-            <div class="dash-stats-grid">
-                <?php foreach($scholarships_list as $s): ?>
-                <div class="premium-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-                        <h3 style="font-size: 1rem; font-weight: 800; color: var(--text-main); margin: 0; line-height: 1.4;"><?= htmlspecialchars($s['title']) ?></h3>
-                        <div style="display: flex; gap: 10px;">
-                            <button onclick='openEditModal(<?= json_encode($s) ?>)' class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--primary); cursor: pointer;">
-                                <i class="fas fa-edit" style="font-size: 0.8rem;"></i>
-                            </button>
-                            <button onclick="confirmDelete(<?= $s['id'] ?>)" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--danger); cursor: pointer;">
-                                <i class="fas fa-trash-alt" style="font-size: 0.8rem;"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <p style="font-size: 0.85rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 20px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        <?= htmlspecialchars($s['description']) ?>
-                    </p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-light); padding-top: 16px;">
-                        <div>
-                            <div style="font-size: 1.1rem; font-weight: 900; color: var(--text-main);">KES <?= number_format($s['amount']) ?></div>
-                            <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Award Value</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim);"><i class="far fa-calendar-alt" style="margin-right: 4px;"></i> <?= $s['expiry_date'] ? date('M j', strtotime($s['expiry_date'])) : 'Perpetual' ?></div>
-                            <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Deadline</div>
-                        </div>
-                    </div>
+        <section class="ax-panel">
+            <div class="ax-panel-h"><div><h2><i class="fas fa-graduation-cap"></i> Applications</h2><p>Review each application, then approve or reject — the learner gets a notification either way.</p></div></div>
+            <div class="ax-panel-b" style="padding-bottom:0">
+                <div class="ax-toolbar">
+                    <nav class="ax-tabs" aria-label="Application status">
+                        <?php foreach (['pending' => 'To review', 'approved' => 'Approved', 'rejected' => 'Rejected', 'all' => 'All'] as $k => $l): ?>
+                            <a href="scholarships?status=<?= $k ?>" class="<?= $status === $k ? 'on' : '' ?>"><?= $l ?> <span class="n"><?= $counts[$k] ?></span></a>
+                        <?php endforeach; ?>
+                    </nav>
+                    <label class="ax-search"><i class="fas fa-search"></i><input type="search" placeholder="Search applicant or scheme…" data-filter-table="sc-table" aria-label="Search applications"></label>
                 </div>
+            </div>
+            <?php if (!$apps): ?>
+                <div class="ax-empty"><i class="fas fa-inbox"></i><b><?= $status === 'pending' ? 'No applications waiting' : 'No applications here' ?></b>Learners apply from the public Scholarships page.</div>
+            <?php else: ?>
+            <div class="ax-table-wrap"><table class="ax-table cards" id="sc-table">
+                <thead><tr><th>Applicant</th><th>Scheme</th><th>Status</th><th>Sent</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($apps as $a): ?>
+                    <tr>
+                        <td data-label="Applicant"><div class="ax-who"><?= ax_avatar($a['student_name'] ?? '?', $a['avatar'] ?? null) ?><div><b><?= e($a['student_name'] ?? 'Deleted account') ?></b><small><?= e($a['student_email'] ?? 'User #' . $a['user_id']) ?></small></div></div></td>
+                        <td data-label="Scheme"><span class="strong"><?= e($a['scheme_title'] ?? 'Removed scheme') ?></span></td>
+                        <td data-label="Status"><?= sch_pill((string)$a['status']) ?></td>
+                        <td data-label="Sent" class="num"><?= e(ax_date($a['created_at'])) ?></td>
+                        <td class="actions" data-label=""><button type="button" class="ax-btn <?= $a['status'] === 'pending' ? '' : 'ghost' ?> sm" data-open="app-<?= (int)$a['id'] ?>"><i class="fas fa-eye"></i> <?= $a['status'] === 'pending' ? 'Review' : 'View' ?></button></td>
+                    </tr>
                 <?php endforeach; ?>
-                <?php if(empty($scholarships_list)): ?>
-                <div class="premium-card" style="grid-column: 1/-1; text-align: center; border: 2px dashed var(--border); background: transparent; box-shadow: none;">
-                    <i class="fas fa-graduation-cap" style="font-size: 2rem; color: var(--text-muted); opacity: 0.3; margin-bottom: 16px; display: block;"></i>
-                    <p style="color: var(--text-dim); font-weight: 600;">No institutional funding schemes registered.</p>
-                    <button class="btn-premium" style="margin-top: 20px;" onclick="openAddModal()">Create First Scheme</button>
+                </tbody>
+            </table></div>
+            <?php endif; ?>
+        </section>
+
+        <section class="ax-panel">
+            <div class="ax-panel-h"><div><h2><i class="fas fa-hand-holding-heart"></i> Schemes</h2><p>Open schemes are listed on the public Scholarships page. Close a scheme to stop new applications.</p></div>
+                <button type="button" class="ax-btn ghost sm" data-open="scheme-new"><i class="fas fa-plus"></i> New scheme</button></div>
+            <div class="ax-panel-b">
+                <?php if (!$schemes): ?>
+                    <div class="ax-empty"><i class="fas fa-graduation-cap"></i><b>No schemes yet</b><button type="button" class="ax-btn sm" data-open="scheme-new" style="margin-top:12px">Create the first scheme</button></div>
+                <?php else: ?>
+                <div class="sc-grid">
+                    <?php foreach ($schemes as $s): $expired = $s['expiry_date'] && $s['expiry_date'] < date('Y-m-d'); ?>
+                    <article class="sc-card <?= $s['status'] === 'closed' ? 'closed' : '' ?>">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+                            <h3><?= e($s['title']) ?></h3>
+                            <?= $s['status'] === 'closed' ? '<span class="ax-pill">Closed</span>' : ($expired ? '<span class="ax-pill warn">Deadline passed</span>' : '<span class="ax-pill ok">Open</span>') ?>
+                        </div>
+                        <p><?= e($s['description']) ?></p>
+                        <div class="sc-meta">
+                            <div><b><?= e(ax_money($s['amount'])) ?></b>Value</div>
+                            <div><b><?= $s['expiry_date'] ? e(ax_date($s['expiry_date'])) : 'No deadline' ?></b>Deadline</div>
+                            <div><b><?= (int)$s['apps'] ?></b><?= (int)$s['pending'] ?> pending · <?= (int)$s['approved'] ?> approved</div>
+                        </div>
+                        <div class="sc-actions">
+                            <button type="button" class="ax-btn ghost sm" data-open="scheme-<?= (int)$s['id'] ?>"><i class="fas fa-pen"></i> Edit</button>
+                            <form method="post"><?= ax_csrf() ?><input type="hidden" name="action" value="scheme_status"><input type="hidden" name="scholarship_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="status" value="<?= $s['status'] === 'closed' ? 'active' : 'closed' ?>">
+                                <button class="ax-btn ghost sm"><i class="fas fa-<?= $s['status'] === 'closed' ? 'lock-open' : 'lock' ?>"></i> <?= $s['status'] === 'closed' ? 'Reopen' : 'Close' ?></button></form>
+                            <?php if (!$s['apps']): ?>
+                            <form method="post" data-confirm="Delete the scheme &quot;<?= e($s['title']) ?>&quot;? This can't be undone." data-danger><?= ax_csrf() ?><input type="hidden" name="action" value="delete_scheme"><input type="hidden" name="scholarship_id" value="<?= (int)$s['id'] ?>">
+                                <button class="ax-btn danger sm"><i class="fas fa-trash"></i> Delete</button></form>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                    <?php endforeach; ?>
                 </div>
                 <?php endif; ?>
             </div>
-        </div>
-
-        <!-- Applications Registry -->
-        <div class="table-card">
-            <div class="table-header">
-                <h2>Application <span>Registry</span></h2>
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Status Filter:</span>
-                    <select onchange="location.href='?status=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
-                        <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>All Reviews</option>
-                        <option value="pending" <?= $status_filter == 'pending' ? 'selected' : '' ?>>Pending Review</option>
-                        <option value="approved" <?= $status_filter == 'approved' ? 'selected' : '' ?>>Approved Awards</option>
-                        <option value="rejected" <?= $status_filter == 'rejected' ? 'selected' : '' ?>>Rejected Applications</option>
-                    </select>
-                </div>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Applicant</th>
-                            <th>Target Scheme</th>
-                            <th>Status</th>
-                            <th>Submitted</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach($applications as $a): ?>
-                        <tr>
-                            <td>
-                                <div class="user-identity">
-                                    <div class="avatar-sm"><?= strtoupper(substr($a['student_name'], 0, 1)) ?></div>
-                                    <div>
-                                        <div style="font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($a['student_name']) ?></div>
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($a['student_email']) ?></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td style="font-weight: 700; color: var(--text-main);"><?= htmlspecialchars($a['scholarship_title']) ?></td>
-                            <td>
-                                <span class="badge-premium" style="background: <?= $a['status'] === 'approved' ? 'rgba(16, 185, 129, 0.1)' : ($a['status'] === 'pending' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)') ?>; color: <?= $a['status'] === 'approved' ? 'var(--success)' : ($a['status'] === 'pending' ? 'var(--warning)' : 'var(--danger)') ?>;">
-                                    <?= ucfirst($a['status']) ?>
-                                </span>
-                            </td>
-                            <td><?= date('M j, Y', strtotime($a['created_at'])) ?></td>
-                            <td>
-                                <div style="display: flex; gap: 8px;">
-                                    <button class="btn-premium" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; padding: 8px 16px; font-size: 0.75rem;" onclick="viewApp('<?= $a['id'] ?>', '<?= addslashes($a['sop']) ?>', '<?= $a['document_file'] ?>')">
-                                        <i class="fas fa-eye"></i> Review
-                                    </button>
-                                    <?php if($a['status'] == 'pending'): ?>
-                                        <a href="?action=approve&aid=<?= $a['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(16, 185, 129, 0.1); color: var(--success); border: none; text-decoration: none;" title="Approve">
-                                            <i class="fas fa-check" style="font-size: 0.8rem;"></i>
-                                        </a>
-                                        <a href="?action=reject&aid=<?= $a['id'] ?>" class="avatar-sm" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none; text-decoration: none;" title="Reject">
-                                            <i class="fas fa-times" style="font-size: 0.8rem;"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                        <?php if(empty($applications)): ?>
-                        <tr>
-                            <td colspan="5" style="text-align: center; padding: 60px; color: var(--text-muted);">
-                                <i class="fas fa-inbox" style="font-size: 2rem; opacity: 0.2; margin-bottom: 12px; display: block;"></i>
-                                No applicant registry found for the current selection.
-                            </td>
-                        </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        </section>
     </div>
 </main>
 
-<!-- Add/Edit Modal -->
-<div id="schForm" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.8); backdrop-filter:blur(12px); z-index:2000; align-items:center; justify-content:center; padding: 20px;">
-    <div class="premium-card" style="width:100%; max-width:540px; padding:40px; animation: modal-pop 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--border-light);">
-            <h3 id="modalTitle" style="font-size:1.3rem;font-weight:900;letter-spacing:-0.5px;margin:0;">Post New Scheme</h3>
-            <button onclick="document.getElementById('schForm').style.display='none'" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border: none; color: var(--text-muted); cursor: pointer;"><i class="fas fa-times"></i></button>
+<?php foreach (array_merge([['id' => 0, 'title' => '', 'description' => '', 'amount' => 0, 'expiry_date' => null, 'status' => 'active']], $schemes) as $s): $sid = (int)$s['id']; ?>
+<dialog class="ax-modal" id="scheme-<?= $sid ?: 'new' ?>" aria-label="<?= $sid ? 'Edit scheme' : 'New scheme' ?>">
+    <form method="post" class="ax-form">
+        <div class="ax-panel-h"><div><h3><i class="fas fa-<?= $sid ? 'pen' : 'plus' ?>"></i> <?= $sid ? 'Edit scheme' : 'New scheme' ?></h3><p>Shown to learners on the Scholarships page.</p></div><button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+        <div class="ax-panel-b">
+            <?= ax_csrf() ?><input type="hidden" name="action" value="save_scheme"><input type="hidden" name="scholarship_id" value="<?= $sid ?>">
+            <div class="ax-field"><label for="s-t-<?= $sid ?>">Name</label><input id="s-t-<?= $sid ?>" type="text" name="title" value="<?= e($s['title']) ?>" required maxlength="255" placeholder="e.g. Women in Tech Grant 2027"></div>
+            <div class="ax-field"><label for="s-d-<?= $sid ?>">Description</label><textarea id="s-d-<?= $sid ?>" name="description" required rows="5" placeholder="Who can apply, what it covers and how you choose."><?= e($s['description']) ?></textarea></div>
+            <div class="ax-row">
+                <div class="ax-field"><label for="s-a-<?= $sid ?>">Value (<?= e(setting('currency')) ?>)</label><input id="s-a-<?= $sid ?>" type="number" name="amount" min="0" step="1" value="<?= e((string)(float)$s['amount']) ?>"><div class="hint">For your records; approval gives up to 5 free course enrolments.</div></div>
+                <div class="ax-field"><label for="s-e-<?= $sid ?>">Application deadline</label><input id="s-e-<?= $sid ?>" type="date" name="expiry_date" value="<?= e($s['expiry_date'] ?? '') ?>"><div class="hint">Leave blank for no deadline.</div></div>
+                <div class="ax-field"><label for="s-s-<?= $sid ?>">Status</label><select id="s-s-<?= $sid ?>" name="status"><option value="active" <?= $s['status'] !== 'closed' ? 'selected' : '' ?>>Open for applications</option><option value="closed" <?= $s['status'] === 'closed' ? 'selected' : '' ?>>Closed</option></select></div>
+            </div>
+            <div class="ax-form-actions"><button type="button" class="ax-btn ghost" data-close>Cancel</button><button class="ax-btn"><i class="fas fa-floppy-disk"></i> <?= $sid ? 'Save changes' : 'Post scheme' ?></button></div>
         </div>
-        <form method="POST" action="scholarships">
-            <input type="hidden" name="scholarship_id" id="sch_id">
-            <div style="margin-bottom:24px;">
-                <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Scheme Identity</label>
-                <input type="text" name="title" id="sch_title" placeholder="e.g. Merit-Based Tech Grant 2026" style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;box-sizing:border-box;" required>
+    </form>
+</dialog>
+<?php endforeach; ?>
+
+<?php foreach ($apps as $a): $doc = sch_doc($a['document_file']); $isImg = $doc && in_array(strtolower(pathinfo($a['document_file'], PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp', 'gif'], true); ?>
+<dialog class="ax-modal" id="app-<?= (int)$a['id'] ?>" aria-label="Application #<?= (int)$a['id'] ?>" style="width:min(720px,calc(100vw - 32px))">
+    <div class="ax-panel-h"><div><h3><i class="fas fa-user-graduate"></i> <?= e($a['student_name'] ?? 'Deleted account') ?></h3><p><?= e($a['scheme_title'] ?? 'Removed scheme') ?> · <?= sch_pill((string)$a['status']) ?></p></div><button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+    <div class="ax-panel-b">
+        <dl class="ax-kv" style="margin-bottom:18px">
+            <dt>Email</dt><dd><?= e($a['student_email'] ?? '—') ?></dd>
+            <dt>Phone</dt><dd><?= e($a['student_phone'] ?: '—') ?></dd>
+            <dt>Member since</dt><dd><?= e(ax_date($a['member_since'])) ?></dd>
+            <dt>Learning so far</dt><dd><?= (int)$a['enrolments'] ?> course<?= $a['enrolments'] == 1 ? '' : 's' ?> enrolled, <?= (int)$a['completed'] ?> completed</dd>
+            <dt>Other applications</dt><dd><?= (int)$a['other_apps'] ?></dd>
+            <dt>Applied</dt><dd><?= e(ax_date($a['created_at'], 'M j, Y g:i a')) ?></dd>
+            <?php if ($a['student_name']): ?><dt>Profile</dt><dd><a href="user-profile?id=<?= (int)$a['user_id'] ?>">Open learner profile</a></dd><?php endif; ?>
+        </dl>
+        <div class="ax-field"><label>Why they are applying</label><div class="sc-text"><?= e($a['sop']) ?></div></div>
+        <div class="ax-field"><label>Education background</label><div class="sc-text"><?= e($a['academic_background']) ?></div></div>
+        <?php if ($doc): ?><div class="ax-field sc-doc"><label>Supporting document</label>
+            <?= $isImg ? '<a href="' . e($doc) . '" target="_blank" rel="noopener"><img src="' . e($doc) . '" alt="Supporting document" loading="lazy"></a>' : '<a class="ax-btn ghost sm" href="' . e($doc) . '" target="_blank" rel="noopener"><i class="fas fa-file-lines"></i> Open document</a>' ?></div>
+        <?php elseif ($a['document_file']): ?><p class="muted" style="font-size:.8rem;color:var(--text-muted)">Document file missing (<?= e($a['document_file']) ?>).</p><?php endif; ?>
+
+        <form method="post" class="ax-form sc-decide">
+            <?= ax_csrf() ?><input type="hidden" name="action" value="decide"><input type="hidden" name="aid" value="<?= (int)$a['id'] ?>">
+            <div class="ax-field" style="margin:0"><label for="n-<?= (int)$a['id'] ?>">Message to the learner (optional)</label><input id="n-<?= (int)$a['id'] ?>" type="text" name="note" maxlength="400" placeholder="Added to the notification"></div>
+            <div class="ax-form-actions">
+                <?php if ($a['status'] !== 'rejected'): ?><button class="ax-btn danger" name="decision" value="reject" data-confirm="Reject this application? The learner is notified." data-danger><i class="fas fa-xmark"></i> Reject</button><?php endif; ?>
+                <?php if ($a['status'] !== 'approved'): ?><button class="ax-btn ok" name="decision" value="approve" data-confirm="Approve this application? The learner can then enrol free in up to 5 courses."><i class="fas fa-check"></i> Approve</button><?php endif; ?>
             </div>
-            <div style="margin-bottom:24px;">
-                <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Brief Intelligence</label>
-                <textarea name="description" id="sch_desc" rows="4" placeholder="Describe the eligibility and focus of this funding scheme..." style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;resize:none;box-sizing:border-box;" required></textarea>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px;">
-                <div>
-                    <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Award Value (KES)</label>
-                    <input type="number" name="amount" id="sch_amount" value="0" style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;box-sizing:border-box;">
-                </div>
-                <div>
-                    <label style="display:block;font-size:0.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Grant Deadline</label>
-                    <input type="date" name="expiry_date" id="sch_date" style="width:100%;padding:14px 20px;border-radius:14px;border:1.5px solid var(--border);font-family:inherit;font-size:0.95rem;font-weight:600;outline:none;box-sizing:border-box;">
-                </div>
-            </div>
-            <div style="display:flex;gap:16px;">
-                <button type="submit" name="save_scholarship" id="modalSubmit" class="btn-premium" style="flex:1; justify-content: center; height: 52px;">Broadcast Scheme</button>
-                <button type="button" class="btn-premium" onclick="document.getElementById('schForm').style.display='none'" style="background: var(--bg-main); color: var(--text-main); border: 1.5px solid var(--border); box-shadow: none; height: 52px; justify-content: center;">Abort</button>
-            </div>
+            <?php if ($a['status'] !== 'pending'): ?><div class="hint" style="font-size:.76rem;color:var(--text-muted);text-align:right">Already <?= e($a['status']) ?> — you can change the decision.</div><?php endif; ?>
         </form>
     </div>
-</div>
-
-<style>
-@keyframes modal-pop { 0% { transform: scale(0.9) translateY(20px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
-</style>
+</dialog>
+<?php endforeach; ?>
 
 <script src="../assets/js/main.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        <?php if($success_msg): ?>
-            SDA.showToast("<?= $success_msg ?>", "success");
-        <?php endif; ?>
-        <?php if($error_msg): ?>
-            SDA.showToast("<?= $error_msg ?>", "danger");
-        <?php endif; ?>
-    });
-
-    function viewApp(id, sop, file) {
-        const content = `
-            <div style="text-align:left; line-height:1.8; color:var(--text-main);">
-                <h4 style="font-weight:800; margin-bottom:10px; text-transform:uppercase; font-size:0.7rem; letter-spacing:1px; color:var(--text-muted);">Statement of Purpose</h4>
-                <div style="background:#f8fafc; padding:24px; border-radius:16px; border:1px solid var(--border); white-space:pre-wrap;">${sop}</div>
-                ${file ? `
-                <div style="margin-top:20px; padding:16px; background:var(--primary-glow); border-radius:12px; display:flex; align-items:center; gap:12px;">
-                    <i class="fas fa-file-pdf" style="font-size:1.5rem; color:var(--primary);"></i>
-                    <div>
-                        <div style="font-weight:800; font-size:0.85rem;">SUPPORTING_DOCUMENT.PDF</div>
-                        <a href="../uploads/scholarships/${file}" target="_blank" style="font-size:0.75rem; font-weight:700; color:var(--primary); text-decoration:none;">View Attachment Registry</a>
-                    </div>
-                </div>` : ''}
-            </div>
-        `;
-        SDA.confirmAction(content, null, "Grant Application Review", "Close Registry");
-    }
-
-    function openAddModal() {
-        document.getElementById('modalTitle').innerHTML = 'Post New Scheme';
-        document.getElementById('modalSubmit').innerText = 'Broadcast Scheme';
-        document.getElementById('sch_id').value = '';
-        document.getElementById('sch_title').value = '';
-        document.getElementById('sch_desc').value = '';
-        document.getElementById('sch_amount').value = '0';
-        document.getElementById('sch_date').value = '';
-        document.getElementById('schForm').style.display = 'flex';
-    }
-
-    function openEditModal(data) {
-        document.getElementById('modalTitle').innerHTML = 'Update Intelligence';
-        document.getElementById('modalSubmit').innerText = 'Save Changes';
-        document.getElementById('sch_id').value = data.id;
-        document.getElementById('sch_title').value = data.title;
-        document.getElementById('sch_desc').value = data.description;
-        document.getElementById('sch_amount').value = data.amount;
-        document.getElementById('sch_date').value = data.expiry_date || '';
-        document.getElementById('schForm').style.display = 'flex';
-    }
-
-    function confirmDelete(sid) {
-        SDA.confirmAction("Are you sure you want to decommission this institutional grant? All associated registry data will be archived.", () => {
-            window.location.href = `scholarships?action=delete&sid=${sid}`;
-        }, "Security Clearance", "Confirm Purge");
-    }
-
-    function toggleSidebar() {
-        document.getElementById('dashSidebar').classList.toggle('open');
-        document.getElementById('sidebarOverlay').classList.toggle('open');
-    }
-</script>
-</body></html>    }
-</script>
+<?php ax_footer_js(); ?>
+<script>document.querySelectorAll('dialog.ax-modal').forEach(function(d){d.addEventListener('click',function(e){if(e.target===d)d.close();});});</script>
 </body></html>

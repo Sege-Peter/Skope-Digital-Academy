@@ -1,146 +1,201 @@
 <?php
-$pageTitle = 'Strategic Assignments';
+$pageTitle = 'Assignments';
 require_once 'includes/header.php';
 
 try {
-    // Fetch assignments for enrolled courses
-    $stmt = $pdo->prepare("SELECT a.*, c.title as course_title, 
-                           (SELECT status FROM assignment_submissions WHERE assignment_id = a.id AND student_id = :sid) as sub_status,
-                           (SELECT score FROM assignment_submissions WHERE assignment_id = a.id AND student_id = :sid) as sub_score,
-                           (SELECT notes FROM assignment_submissions WHERE assignment_id = a.id AND student_id = :sid) as sub_notes
+    // Assignments for enrolled courses, with this student's submission (if any)
+    $stmt = $pdo->prepare("SELECT a.*, c.title as course_title,
+                           (SELECT status FROM assignment_submissions WHERE assignment_id = a.id AND student_id = ?) as sub_status,
+                           (SELECT score FROM assignment_submissions WHERE assignment_id = a.id AND student_id = ?) as sub_score,
+                           (SELECT notes FROM assignment_submissions WHERE assignment_id = a.id AND student_id = ?) as sub_notes,
+                           (SELECT feedback FROM assignment_submissions WHERE assignment_id = a.id AND student_id = ?) as sub_feedback,
+                           (SELECT submitted_at FROM assignment_submissions WHERE assignment_id = a.id AND student_id = ?) as sub_date
                            FROM assignments a
                            JOIN courses c ON a.course_id = c.id
                            JOIN enrollments e ON e.course_id = c.id
-                           WHERE e.student_id = :sid AND e.status = 'active'
+                           WHERE e.student_id = ? AND e.status = 'active'
                            ORDER BY a.due_date ASC");
-    $stmt->execute(['sid' => $student['id']]);
+    $stmt->execute(array_fill(0, 6, $student['id']));
     $assignments = $stmt->fetchAll();
-} catch (Exception $e) { $assignments = []; }
+} catch (Exception $e) { error_log('student assignments: ' . $e->getMessage()); $assignments = []; }
+
+// Sort into pending / submitted (waiting for a grade) / graded
+$groups = ['pending' => [], 'submitted' => [], 'graded' => []];
+foreach ($assignments as $a) {
+    if ($a['sub_status'] === null) $groups['pending'][] = $a;
+    elseif ($a['sub_status'] === 'graded' || $a['sub_score'] !== null) $groups['graded'][] = $a;
+    else $groups['submitted'][] = $a;
+}
 
 require_once 'includes/layout-top.php';
 
-$msg = $_GET['msg'] ?? '';
+$msg = (string)($_GET['msg'] ?? '');
+$msg_text = [
+    'upload_error'      => 'The file did not upload. Please choose it again and retry.',
+    'invalid_file_type' => 'That file type is not allowed. Use PDF, Word (DOC/DOCX), ZIP, RAR, JPG or PNG.',
+    'upload_failed'     => 'We could not save your file. Please try again.',
+    'db_error'          => 'Something went wrong while saving your submission. Please try again.',
+][$msg] ?? 'Something went wrong (' . str_replace('_', ' ', $msg) . '). Please try again.';
+
+$fmt_score = fn($s) => rtrim(rtrim(number_format((float)$s, 2, '.', ''), '0'), '.');
 ?>
 
-<header class="portal-header" style="margin-bottom: 40px;">
-    <div class="greeting">
-        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Project Milestones<span style="color: var(--primary);">.</span></h1>
-        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Translate your theoretical knowledge into high-performance practical results.</p>
+<div class="sp-page-head pg-assign">
+    <div>
+        <h1>Assignments</h1>
+        <p>Hand in your work before the due date and see your grades and feedback here.</p>
     </div>
-</header>
-
-<?php if($msg === 'success'): ?>
-    <div style="margin-bottom: 32px; padding: 20px 24px; background: #ECFDF5; border: 1px solid #10b981; border-radius: 20px; color: #065f46; display: flex; align-items: center; gap: 16px; font-weight: 700; animation: slideIn 0.4s ease;">
-        <i class="fas fa-check-circle" style="font-size: 1.4rem;"></i>
-        <span>Mission Accomplished! Your project has been synchronized for evaluation.</span>
-    </div>
-<?php elseif($msg): ?>
-    <div style="margin-bottom: 32px; padding: 20px 24px; background: #FEF2F2; border: 1px solid #ef4444; border-radius: 20px; color: #991b1b; display: flex; align-items: center; gap: 16px; font-weight: 700; animation: slideIn 0.4s ease;">
-        <i class="fas fa-exclamation-circle" style="font-size: 1.4rem;"></i>
-        <span>System Alert: <?= htmlspecialchars(str_replace('_', ' ', $msg)) ?>. Please verify and retry.</span>
-    </div>
-<?php endif; ?>
-
-<div class="assignments-stack" style="display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 60px;">
-    <?php foreach($assignments as $a): 
-        $is_submitted = ($a['sub_status'] !== null);
-        $is_overdue = (strtotime($a['due_date']) < time() && !$is_submitted);
-    ?>
-    <div class="premium-card" style="padding: 0; overflow: hidden; border-radius: 30px; border-left: 8px solid <?= $is_submitted ? '#10b981' : ($is_overdue ? '#ef4444' : 'var(--primary)') ?>;">
-        <div style="padding: 40px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 24px; margin-bottom: 32px;">
-                <div style="flex: 1; min-width: 300px;">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                        <span style="font-size: 0.72rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;"><?= htmlspecialchars($a['course_title']) ?></span>
-                        <span style="width: 4px; height: 4px; background: #cbd5e1; border-radius: 50%;"></span>
-                        <span style="font-size: 0.72rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">Project ID: #<?= $a['id'] ?></span>
-                    </div>
-                    <h3 style="margin: 0 0 16px; font-size: 1.6rem; font-weight: 950; color: var(--text-main); letter-spacing: -0.5px;"><?= htmlspecialchars($a['title']) ?></h3>
-                    <div style="background: #f8fafc; padding: 24px; border-radius: 20px; border: 1px solid #f1f5f9;">
-                        <p style="color: var(--text-dim); font-size: 0.95rem; line-height: 1.7; margin: 0; font-weight: 500;"><?= nl2br(htmlspecialchars($a['description'])) ?></p>
-                    </div>
-                </div>
-                <div style="text-align: right; min-width: 180px;">
-                    <?php if($is_submitted): ?>
-                        <div style="background: #ECFDF5; color: #059669; padding: 10px 20px; border-radius: 50px; font-size: 0.8rem; font-weight: 900; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 5px 15px rgba(16, 185, 129, 0.15);">
-                            <i class="fas fa-check-double"></i> SUBMITTED
-                        </div>
-                    <?php else: ?>
-                        <div style="background: <?= $is_overdue ? '#FEF2F2' : '#FFFBEB' ?>; color: <?= $is_overdue ? '#ef4444' : '#D97706' ?>; padding: 10px 20px; border-radius: 50px; font-size: 0.8rem; font-weight: 900; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                            <i class="<?= $is_overdue ? 'fas fa-calendar-times' : 'far fa-calendar-alt' ?>"></i> <?= $is_overdue ? 'OVERDUE' : 'DUE ' . date('M j, Y', strtotime($a['due_date'])) ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <?php if($is_submitted): ?>
-                <div style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border: 1px solid #e2e8f0; border-radius: 24px; padding: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px;">
-                    <div>
-                        <span style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Academic Grade</span>
-                        <div style="display: flex; align-items: baseline; gap: 8px;">
-                            <strong style="font-size: 2.2rem; font-weight: 950; color: var(--text-main);"><?= $a['sub_score'] !== null ? $a['sub_score'] : '--' ?></strong>
-                            <span style="font-size: 1.1rem; color: #cbd5e1; font-weight: 800;">/ <?= $a['max_score'] ?: 100 ?></span>
-                        </div>
-                    </div>
-                    <div style="border-left: 1px solid #f1f5f9; padding-left: 32px;">
-                        <span style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Status Report</span>
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="width: 10px; height: 10px; border-radius: 50%; background: <?= $a['sub_score'] !== null ? '#10b981' : '#f59e0b' ?>;"></div>
-                            <span style="font-size: 0.9rem; font-weight: 800; color: var(--text-main);"><?= $a['sub_score'] !== null ? "Competency Verified" : "Evaluation in Progress" ?></span>
-                        </div>
-                    </div>
-                    <?php if($a['sub_notes']): ?>
-                    <div style="grid-column: 1 / -1; border-top: 1px solid #f1f5f9; padding-top: 24px;">
-                        <span style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Your Submission Notes</span>
-                        <p style="margin: 0; font-size: 0.85rem; font-weight: 600; color: #64748b; background: white; padding: 16px; border-radius: 12px; border: 1px dashed #e2e8f0;"><?= htmlspecialchars($a['sub_notes']) ?></p>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            <?php else: ?>
-                <form action="submit-assignment" method="POST" enctype="multipart/form-data" class="assignment-form">
-                    <input type="hidden" name="assignment_id" value="<?= $a['id'] ?>">
-                    <div style="background: #f1f5f9; border-radius: 24px; padding: 32px; border: 2px dashed #cbd5e1;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; align-items: flex-end;">
-                            <div class="form-group">
-                                <label style="display: block; font-size: 0.75rem; font-weight: 900; color: var(--text-main); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">Deploy Source Files</label>
-                                <div style="position: relative;">
-                                    <input type="file" name="submission_file" required style="opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; z-index: 2;">
-                                    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 0.85rem; font-weight: 700; transition: 0.3s;">
-                                        <i class="fas fa-cloud-upload-alt" style="font-size: 1.2rem; color: var(--primary);"></i>
-                                        <span>Select PDF, ZIP, or DOCX...</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label style="display: block; font-size: 0.75rem; font-weight: 900; color: var(--text-main); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;">Strategic Notes (Optional)</label>
-                                <input type="text" name="notes" placeholder="e.g. Focus on Chapter 3 implementation..." style="width: 100%; font-size: 0.85rem; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 16px; outline: none; background: white; font-weight: 600; transition: 0.3s;">
-                            </div>
-                            <button type="submit" class="btn-premium" style="height: 56px; border-radius: 16px; justify-content: center; width: 100%; border: none;">SUBMIT FOR REVIEW <i class="fas fa-paper-plane" style="margin-left: 10px;"></i></button>
-                        </div>
-                    </div>
-                </form>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php endforeach; ?>
-
-    <?php if(empty($assignments)): ?>
-        <div class="premium-card" style="text-align: center; padding: 100px 40px; border-style: dashed; border-width: 2px;">
-            <div style="width: 80px; height: 80px; background: #f8fafc; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: var(--text-dim); font-size: 2rem;">
-                <i class="fas fa-clipboard-check"></i>
-            </div>
-            <h3 style="font-weight: 950; font-size: 1.6rem; color: var(--text-main); margin-bottom: 12px; letter-spacing: -0.5px;">All Objectives Secured</h3>
-            <p style="color: var(--text-dim); max-width: 400px; margin: 0 auto 32px; line-height: 1.6; font-weight: 500;">Your academic workspace is clean. No pending assignments require your immediate attention.</p>
-            <a href="./" class="btn-premium" style="min-width: 220px;">Return to Command Center</a>
-        </div>
-    <?php endif; ?>
 </div>
 
+<?php if ($msg === 'success'): ?>
+    <div class="sp-alert success"><i class="fas fa-circle-check" style="margin-top: 3px;"></i><span>Your work has been submitted. Your tutor will grade it soon.</span></div>
+<?php elseif ($msg !== ''): ?>
+    <div class="sp-alert error"><i class="fas fa-circle-exclamation" style="margin-top: 3px;"></i><span><?= htmlspecialchars($msg_text) ?></span></div>
+<?php endif; ?>
+
+<?php if (empty($assignments)): ?>
+    <div class="sp-empty">
+        <div class="sp-ico green"><i class="fas fa-clipboard-check"></i></div>
+        <h3>No assignments yet</h3>
+        <p>When a tutor sets an assignment in one of your courses, it will show up here.</p>
+        <a href="./" class="sp-btn">Back to dashboard</a>
+    </div>
+<?php else: ?>
+
+<section class="sp-grid cols-3 sp-section">
+    <div class="sp-stat"><span class="sp-stat-icon orange"><i class="fas fa-file-pen"></i></span><div><strong><?= count($groups['pending']) ?></strong><span>To submit</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon yellow"><i class="fas fa-hourglass-half"></i></span><div><strong><?= count($groups['submitted']) ?></strong><span>Waiting for a grade</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-circle-check"></i></span><div><strong><?= count($groups['graded']) ?></strong><span>Graded</span></div></div>
+</section>
+
+<div class="sp-section-head">
+    <div class="sp-tabs" role="tablist">
+        <button type="button" class="sp-tab active" onclick="assignTab(this, 'pending')">To submit (<?= count($groups['pending']) ?>)</button>
+        <button type="button" class="sp-tab" onclick="assignTab(this, 'submitted')">Submitted (<?= count($groups['submitted']) ?>)</button>
+        <button type="button" class="sp-tab" onclick="assignTab(this, 'graded')">Graded (<?= count($groups['graded']) ?>)</button>
+    </div>
+</div>
+
+<?php foreach ($groups as $key => $list): ?>
+<div class="pg-assign-tab" id="tab-<?= $key ?>" <?= $key !== 'pending' ? 'style="display: none;"' : '' ?>>
+    <?php if (empty($list)): ?>
+        <div class="sp-empty" style="padding: 32px 24px;">
+            <?php if ($key === 'pending'): ?>
+                <div class="sp-ico green"><i class="fas fa-check"></i></div><h3>All caught up</h3><p>You have nothing left to hand in right now.</p>
+            <?php elseif ($key === 'submitted'): ?>
+                <div class="sp-ico"><i class="fas fa-paper-plane"></i></div><h3>Nothing waiting for a grade</h3><p>Work you submit stays here until your tutor grades it.</p>
+            <?php else: ?>
+                <div class="sp-ico"><i class="fas fa-star"></i></div><h3>No grades yet</h3><p>Graded work and your tutor's feedback will show up here.</p>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php foreach ($list as $a):
+        $has_due = !empty($a['due_date']);
+        $due_ts = $has_due ? strtotime($a['due_date']) : null;
+        $is_overdue = $key === 'pending' && $has_due && $due_ts < time();
+        $days_left = $has_due ? (int)floor(($due_ts - time()) / 86400) : null;
+        $max = (int)($a['max_score'] ?: 100);
+    ?>
+    <article class="sp-card pg-assign-card <?= $is_overdue ? 'is-overdue' : '' ?>">
+        <div class="sp-between" style="align-items: flex-start; flex-wrap: wrap;">
+            <div style="min-width: 0; flex: 1;">
+                <span class="sp-small" style="color: var(--primary-dark); font-weight: 700;"><?= htmlspecialchars($a['course_title']) ?></span>
+                <h3 style="margin: 4px 0 0; font-size: 1.08rem; font-weight: 800;"><?= htmlspecialchars($a['title']) ?></h3>
+            </div>
+            <?php if ($key === 'pending'): ?>
+                <?php if (!$has_due): ?>
+                    <span class="sp-badge gray"><i class="far fa-calendar"></i> No due date</span>
+                <?php elseif ($is_overdue): ?>
+                    <span class="sp-badge red"><i class="fas fa-calendar-xmark"></i> Overdue · was due <?= date('j M Y', $due_ts) ?></span>
+                <?php else: ?>
+                    <span class="sp-badge <?= $days_left <= 2 ? 'orange' : 'yellow' ?>"><i class="far fa-calendar"></i> Due <?= date('j M Y, g:ia', $due_ts) ?></span>
+                <?php endif; ?>
+            <?php elseif ($key === 'submitted'): ?>
+                <span class="sp-badge yellow"><i class="fas fa-hourglass-half"></i> Waiting for a grade</span>
+            <?php else: ?>
+                <span class="sp-badge green"><i class="fas fa-circle-check"></i> Graded</span>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!empty($a['description'])): ?>
+            <p class="pg-assign-desc"><?= nl2br(htmlspecialchars($a['description'])) ?></p>
+        <?php endif; ?>
+
+        <?php if ($key === 'pending'): ?>
+            <form action="submit-assignment" method="POST" enctype="multipart/form-data" class="sp-form pg-assign-form">
+                <input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>">
+                <div class="sp-field">
+                    <label for="file-<?= (int)$a['id'] ?>">Your file</label>
+                    <label class="pg-file" for="file-<?= (int)$a['id'] ?>">
+                        <i class="fas fa-cloud-arrow-up"></i>
+                        <span class="pg-file-name">Choose a file</span>
+                        <input type="file" id="file-<?= (int)$a['id'] ?>" name="submission_file" required accept=".pdf,.doc,.docx,.zip,.rar,.jpg,.png" onchange="showFileName(this)">
+                    </label>
+                    <div class="sp-help">PDF, Word, ZIP, RAR, JPG or PNG.</div>
+                </div>
+                <div class="sp-field">
+                    <label for="notes-<?= (int)$a['id'] ?>">Note to your tutor (optional)</label>
+                    <input type="text" id="notes-<?= (int)$a['id'] ?>" name="notes" placeholder="e.g. I focused on question 3">
+                </div>
+                <button type="submit" class="sp-btn <?= $is_overdue ? 'orange' : '' ?>"><i class="fas fa-paper-plane"></i> Submit work</button>
+            </form>
+        <?php else: ?>
+            <div class="pg-assign-result">
+                <div>
+                    <span class="sp-muted sp-small">Grade</span>
+                    <div><strong class="pg-score"><?= $a['sub_score'] !== null ? $fmt_score($a['sub_score']) : '–' ?></strong> <span class="sp-muted">/ <?= $max ?></span></div>
+                </div>
+                <div>
+                    <span class="sp-muted sp-small">Submitted</span>
+                    <div style="font-weight: 700;"><?= !empty($a['sub_date']) ? date('j M Y', strtotime($a['sub_date'])) : '–' ?></div>
+                </div>
+                <?php if ($has_due): ?>
+                <div>
+                    <span class="sp-muted sp-small">Due date</span>
+                    <div style="font-weight: 700;"><?= date('j M Y', $due_ts) ?></div>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php if (!empty($a['sub_feedback'])): ?>
+                <div class="sp-alert success" style="margin: 14px 0 0;"><i class="fas fa-comment-dots" style="margin-top: 3px;"></i><div><strong>Tutor feedback</strong><br><?= nl2br(htmlspecialchars($a['sub_feedback'])) ?></div></div>
+            <?php endif; ?>
+            <?php if (!empty($a['sub_notes'])): ?>
+                <p class="sp-small sp-muted" style="margin: 12px 0 0;"><strong>Your note:</strong> <?= htmlspecialchars($a['sub_notes']) ?></p>
+            <?php endif; ?>
+        <?php endif; ?>
+    </article>
+    <?php endforeach; ?>
+</div>
+<?php endforeach; ?>
+
+<?php endif; ?>
+
 <style>
-@keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.assignment-form input:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1); }
-.assignment-form .form-group div:has(input:focus) { border-color: var(--primary) !important; }
+.pg-assign-card { border-left: 4px solid var(--primary); }
+.pg-assign-card.is-overdue { border-left-color: var(--danger); }
+.pg-assign-desc { margin: 12px 0 0; color: var(--text-dim); font-size: .9rem; line-height: 1.65; }
+.pg-assign-form { margin-top: 16px; padding: 16px; border-radius: var(--radius-md); background: var(--surface-2); border: 1px dashed var(--border-strong); }
+.pg-assign-form .pg-file { position: relative; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; margin: 0; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface); cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--text-dim); min-width: 0; }
+.pg-assign-form .pg-file i { color: var(--primary); }
+.pg-assign-form .pg-file .pg-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pg-assign-form .pg-file.has-file { color: var(--text-main); border-color: var(--primary); }
+.pg-assign-form .pg-file input[type=file] { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.pg-assign-form .pg-file:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+.pg-assign-result { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px 32px; padding: 14px 16px; border-radius: var(--radius-md); background: var(--surface-2); }
+.pg-score { font-size: 1.5rem; font-weight: 800; }
 </style>
 
-<?php require_once 'includes/layout-bottom.php'; ?>
+<script>
+function assignTab(btn, key) {
+    btn.parentElement.querySelectorAll('.sp-tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.pg-assign-tab').forEach(t => t.style.display = t.id === 'tab-' + key ? '' : 'none');
+}
+function showFileName(input) {
+    const box = input.closest('.pg-file');
+    box.querySelector('.pg-file-name').textContent = input.files.length ? input.files[0].name : 'Choose a file';
+    box.classList.toggle('has-file', input.files.length > 0);
+}
+</script>
 
+<?php require_once 'includes/layout-bottom.php'; ?>

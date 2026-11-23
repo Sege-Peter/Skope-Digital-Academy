@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Destroy this temporary auth session and make them log in fresh with the new password
                 unset($_SESSION['force_password_change_uid']);
+                require_once __DIR__ . '/includes/notify.php';
+                sda_notify('password_changed', (int)$uid, [], ['inapp' => false]);
                 
                 // Store a temp session message 
                 $_SESSION['login_success'] = "Password updated successfully. Please log in.";

@@ -1,294 +1,245 @@
 <?php
-$pageTitle = 'Revenue Intelligence Analysis';
+/**
+ * Admin: Revenue – real numbers from approved payments only.
+ * Revenue date = when the payment was approved (verified_at), falling back to when it was made.
+ */
+$pageTitle = 'Revenue';
 require_once 'includes/header.php';
-require_once __DIR__ . '/../includes/ai-handler.php';
 
-// Auth check
-if ($user['role'] !== 'admin') {
-    header('Location: ../login');
-    exit;
+$D = "COALESCE(p.verified_at, p.created_at)";
+$periods = ['all' => 'All time', '12m' => 'Last 12 months', 'year' => 'This year (' . date('Y') . ')', 'lastyear' => 'Last year (' . (date('Y') - 1) . ')'];
+$period = isset($periods[$_GET['period'] ?? '']) ? $_GET['period'] : 'all';
+$pw = ['all' => '1=1',
+       '12m' => "$D >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)",
+       'year' => "YEAR($D) = YEAR(CURDATE())",
+       'lastyear' => "YEAR($D) = YEAR(CURDATE()) - 1"][$period];
+
+$sum = fn(string $where) => (float)ax_scalar($pdo, "SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.status = 'verified' AND $where");
+$cnt = fn(string $where) => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments p WHERE p.status = 'verified' AND $where");
+
+$k = [
+    'all'        => $sum('1=1'),
+    'all_n'      => $cnt('1=1'),
+    'month'      => $sum("$D >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+    'month_n'    => $cnt("$D >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+    'prev_month' => $sum("$D >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND $D < DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+    'd30'        => $sum("$D >= DATE_SUB(NOW(), INTERVAL 30 DAY)"),
+    'd30_n'      => $cnt("$D >= DATE_SUB(NOW(), INTERVAL 30 DAY)"),
+    'pending'    => (float)ax_scalar($pdo, "SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'pending'"),
+    'pending_n'  => (int)ax_scalar($pdo, "SELECT COUNT(*) FROM payments WHERE status = 'pending'"),
+    'payers'     => (int)ax_scalar($pdo, "SELECT COUNT(DISTINCT p.student_id) FROM payments p WHERE p.status = 'verified' AND $pw"),
+];
+
+// Split by type for the chosen period
+$byType = $pdo->query("SELECT p.payment_type, COUNT(*) n, SUM(p.amount) total FROM payments p WHERE p.status = 'verified' AND $pw GROUP BY p.payment_type ORDER BY total DESC")->fetchAll();
+$periodTotal = array_sum(array_map(fn($r) => (float)$r['total'], $byType));
+$typeLabels = ['course' => 'Course fees', 'certificate' => 'Certificate fees', 'registration' => 'Registration fees', 'donation' => 'Donations'];
+
+// Last 12 months, course vs certificate vs other
+$months = [];
+for ($i = 11; $i >= 0; $i--) {
+    $m = date('Y-m', strtotime(date('Y-m-01') . " -$i month"));
+    $months[$m] = ['course' => 0.0, 'certificate' => 0.0, 'other' => 0.0, 'total' => 0.0, 'n' => 0];
+}
+foreach ($pdo->query("SELECT DATE_FORMAT($D, '%Y-%m') ym, p.payment_type t, COUNT(*) n, SUM(p.amount) s FROM payments p
+                      WHERE p.status = 'verified' AND $D >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
+                      GROUP BY ym, t")->fetchAll() as $r) {
+    if (!isset($months[$r['ym']])) continue;
+    $key = in_array($r['t'], ['course', 'certificate'], true) ? $r['t'] : 'other';
+    $months[$r['ym']][$key] += (float)$r['s'];
+    $months[$r['ym']]['total'] += (float)$r['s'];
+    $months[$r['ym']]['n'] += (int)$r['n'];
+}
+$maxMonth = max(1, max(array_column($months, 'total')));
+$sum12 = array_sum(array_column($months, 'total'));
+
+// Top courses (course fees and certificate fees per course)
+$top = $pdo->query("SELECT p.course_id, c.title, c.source, u.name AS tutor_name,
+                           SUM(CASE WHEN p.payment_type = 'course' THEN p.amount ELSE 0 END) AS course_rev,
+                           SUM(CASE WHEN p.payment_type = 'certificate' THEN p.amount ELSE 0 END) AS cert_rev,
+                           SUM(p.amount) AS total, COUNT(DISTINCT CASE WHEN p.payment_type = 'course' THEN p.student_id END) AS buyers,
+                           SUM(p.payment_type = 'certificate') AS certs
+                    FROM payments p
+                    LEFT JOIN courses c ON c.id = p.course_id
+                    LEFT JOIN users u ON u.id = c.tutor_id
+                    WHERE p.status = 'verified' AND p.payment_type IN ('course','certificate') AND $pw
+                    GROUP BY p.course_id ORDER BY total DESC LIMIT 10")->fetchAll();
+$topMax = $top ? max(1, (float)$top[0]['total']) : 1;
+
+// By learning mode (course fees only)
+$byMode = $pdo->query("SELECT COALESCE(p.learning_mode, '') m, COUNT(*) n, SUM(p.amount) total FROM payments p
+                       WHERE p.status = 'verified' AND p.payment_type = 'course' AND $pw GROUP BY m ORDER BY total DESC")->fetchAll();
+$modeTotal = array_sum(array_map(fn($r) => (float)$r['total'], $byMode));
+
+// Approval speed (manual proofs only – Paystack ones are instant)
+$avgHours = ax_scalar($pdo, "SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, verified_at)) / 60 FROM payments WHERE status = 'verified' AND proof_file IS NOT NULL AND verified_at IS NOT NULL");
+
+// Optional AI commentary (on request only – it calls an external API)
+$insight = null;
+if (isset($_GET['insights'])) {
+    try {
+        require_once __DIR__ . '/../includes/ai-handler.php';
+        $insight = (string)SDAC_AI::revenueInsight([
+            'currency' => setting('currency'), 'all_time' => $k['all'], 'this_month' => $k['month'], 'last_30_days' => $k['d30'],
+            'monthly_last_12' => array_map(fn($m) => $m['total'], $months), 'by_type' => $byType,
+            'top_courses' => array_map(fn($t) => ['title' => $t['title'], 'revenue' => $t['total']], $top), 'pending' => $k['pending'],
+        ]);
+    } catch (Throwable $e) { $insight = ''; error_log($e->getMessage()); }
 }
 
-try {
-    $sel_year = $_GET['year'] ?? date('Y');
-    
-    // 1. Total Revenue (Filtered by Year)
-    $stmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE status = 'verified' AND YEAR(verified_at) = ?");
-    $stmt->execute([$sel_year]);
-    $total_revenue = $stmt->fetchColumn() ?: 0;
-    
-    // 2. Revenue by Month (Dynamic Year)
-    $stmt = $pdo->prepare("SELECT MONTHNAME(verified_at) as month, SUM(amount) as total 
-                         FROM payments 
-                         WHERE status = 'verified' AND YEAR(verified_at) = ?
-                         GROUP BY MONTH(verified_at) 
-                         ORDER BY MONTH(verified_at)");
-    $stmt->execute([$sel_year]);
-    $monthly_revenue = $stmt->fetchAll();
+$pct = fn($part, $whole) => $whole > 0 ? round($part / $whole * 100) : 0;
+$monthDelta = $k['prev_month'] > 0 ? round(($k['month'] - $k['prev_month']) / $k['prev_month'] * 100) : null;
 
-    // 3. Top Selling Courses
-    $stmt = $pdo->prepare("SELECT c.title, SUM(p.amount) as revenue, COUNT(p.id) as enrolls
-                         FROM payments p
-                         JOIN courses c ON p.course_id = c.id
-                         WHERE p.status = 'verified' AND YEAR(p.verified_at) = ?
-                         GROUP BY c.id
-                         ORDER BY revenue DESC LIMIT 5");
-    $stmt->execute([$sel_year]);
-    $top_courses = $stmt->fetchAll();
-
-    // 4. Verification Efficiency
-    $avg_verification_time = $pdo->query("SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, verified_at)) 
-                                          FROM payments 
-                                          WHERE status = 'verified'")->fetchColumn() ?: 0;
-
-    // 5. Revenue by Tutor (80/20 Split)
-    $stmt = $pdo->prepare("SELECT u.name as tutor_name, u.email as tutor_email, 
-                                u.id as tutor_id,
-                                SUM(p.amount) as total_generated,
-                                SUM(p.amount * 0.8) as tutor_share,
-                                SUM(p.amount * 0.2) as academy_share,
-                                COUNT(p.id) as sales_count
-                         FROM payments p
-                         JOIN courses c ON p.course_id = c.id
-                         JOIN users u ON c.tutor_id = u.id
-                         WHERE p.status = 'verified' AND YEAR(p.verified_at) = ?
-                         GROUP BY u.id
-                         ORDER BY total_generated DESC");
-    $stmt->execute([$sel_year]);
-    $tutor_revenue = $stmt->fetchAll();
-
-} catch (Exception $e) {
-    $total_revenue = $avg_verification_time = 0;
-    $monthly_revenue = $top_courses = $tutor_revenue = [];
-}
-
-// 🤖 SDAC AI: Generate Strategic Revenue Insights
-$ai_insight = SDAC_AI::revenueInsight([
-    'total_revenue' => $total_revenue,
-    'monthly_revenue' => $monthly_revenue,
-    'top_courses' => $top_courses,
-    'tutor_performance' => $tutor_revenue,
-    'fiscal_year' => $sel_year
-]);
+require_once 'includes/sidebar.php';
+$periodSel = '<form method="get" style="display:flex;gap:8px"><select name="period" class="ax-input" onchange="this.form.submit()" aria-label="Period" style="width:auto">';
+foreach ($periods as $pk => $pl) $periodSel .= '<option value="' . $pk . '"' . ($pk === $period ? ' selected' : '') . '>' . e($pl) . '</option>';
+$periodSel .= '</select><noscript><button class="ax-btn sm">Go</button></noscript></form>';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
+<style>
+  .rv-chart { height: 200px; }
+  .rv-chart .col i { position: relative; }
+  .rv-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .76rem; color: var(--text-dim); font-weight: 600; }
+  .rv-split { display: grid; gap: 14px; }
+  .rv-split .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+  .rv-split .row .ax-bar { grid-column: 1 / -1; }
+  .rv-split b { color: var(--text-main); font-size: .88rem; }
+  .rv-split small { color: var(--text-muted); font-size: .76rem; }
+  .rv-split .amt { font-weight: 800; color: var(--text-main); font-variant-numeric: tabular-nums; }
+  .rv-rank { width: 28px; height: 28px; border-radius: 9px; background: var(--surface-2); color: var(--text-dim); font-weight: 800; font-size: .78rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rv-rank.first { background: var(--grad-primary); color: #fff; }
+  .rv-insight { white-space: pre-wrap; line-height: 1.65; color: var(--text-main); font-size: .92rem; }
+  details.rv-more summary { cursor: pointer; font-weight: 700; font-size: .84rem; color: var(--primary); padding: 14px 22px; }
+  @media (max-width: 640px) { .rv-chart .col em { display: none; } .rv-chart .col span { font-size: .58rem; } .rv-chart { gap: 4px; } }
+</style>
 <main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div>
-                <h1 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px;">Revenue <span>Intelligence</span></h1>
-                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Fiscal Governance • Skope Digital Academy</p>
-            </div>
-        </div>
-        
-        <div style="display: flex; gap: 16px; align-items: center;">
-            <select onchange="location.href='revenue?year=' + this.value" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid var(--border); font-size: 0.85rem; font-weight: 700; outline: none; background: #fff; cursor: pointer;">
-                <?php for($i = date('Y'); $i >= 2023; $i--): ?>
-                    <option value="<?= $i ?>" <?= $sel_year == $i ? 'selected' : '' ?>>Fiscal Year <?= $i ?></option>
-                <?php endfor; ?>
-            </select>
-            <button class="btn-premium" onclick="window.print()">
-                <i class="fas fa-file-pdf"></i> Generate Quarterly Report
-            </button>
-        </div>
-    </header>
-
-    <div class="admin-body">
-        <!-- Fiscal Stats -->
-        <div class="dash-stats-grid">
-            <div class="premium-card">
-                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">Academy Net Worth</div>
-                <div style="font-size: 2.2rem; font-weight: 900; letter-spacing: -1px; color: var(--primary);">KES <?= number_format($total_revenue) ?></div>
-                <div class="badge-premium" style="background: rgba(16, 185, 129, 0.1); color: var(--success); margin-top: 12px; display: inline-flex;">
-                    <i class="fas fa-arrow-trend-up" style="margin-right: 6px;"></i> +12.5% vs Last Period
-                </div>
-            </div>
-            <div class="premium-card" style="border-left: 4px solid var(--secondary);">
-                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">Avg. Audit Latency</div>
-                <div style="font-size: 2.2rem; font-weight: 900; letter-spacing: -1px; color: var(--secondary);"><?= round($avg_verification_time, 1) ?>h</div>
-                <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 8px; font-weight: 700;">Optimization target: < 4h</div>
-            </div>
-            <div class="premium-card">
-                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px;">Course Liquidity</div>
-                <div style="font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;"><?= count($top_courses) > 0 ? 'High' : 'N/A' ?></div>
-                <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 8px; font-weight: 700;">Based on enrollment frequency</div>
-            </div>
+    <?php ax_header('Revenue', '', 'From approved payments', $periodSel
+        . '<a class="ax-btn ghost" href="payments?status=verified"><i class="fas fa-receipt"></i> Ledger</a>'
+        . '<button type="button" class="ax-btn ghost" onclick="window.print()"><i class="fas fa-print"></i> Print</button>'); ?>
+    <div class="ax-body">
+        <?php ax_alerts(); ?>
+        <div class="ax-stats">
+            <?= ax_stat('vault', ax_money($k['all']), 'All-time revenue', number_format($k['all_n']) . ' approved payments', 'green') ?>
+            <?= ax_stat('calendar-day', ax_money($k['month']), 'This month (' . date('M') . ')',
+                $monthDelta === null ? 'Last month: ' . ax_money($k['prev_month']) : ($monthDelta >= 0 ? '+' : '') . $monthDelta . '% vs ' . date('M', strtotime('first day of last month')) . ' (' . ax_money($k['prev_month']) . ')') ?>
+            <?= ax_stat('calendar-week', ax_money($k['d30']), 'Last 30 days', number_format($k['d30_n']) . ' payment' . ($k['d30_n'] == 1 ? '' : 's'), 'violet') ?>
+            <?= ax_stat('hourglass-half', ax_money($k['pending']), 'Waiting for approval', number_format($k['pending_n']) . ' pending · not counted above', 'amber') ?>
         </div>
 
-        <!-- AI Intelligence Panel -->
-        <div class="premium-card screen-only" style="background: var(--surface-glass); backdrop-filter: blur(20px); border: 1.5px solid var(--primary-glow); padding: 32px; margin-bottom: 32px; display: flex; gap: 28px; align-items: flex-start; overflow: hidden; position: relative;">
-            <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: var(--grad-primary); filter: blur(100px); opacity: 0.15; pointer-events: none;"></div>
-            <div style="width: 64px; height: 64px; border-radius: 20px; background: var(--grad-primary); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.8rem; box-shadow: 0 10px 25px rgba(0, 191, 255, 0.3); flex-shrink: 0; animation: float 4s ease-in-out infinite;">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div style="flex: 1; position: relative; z-index: 2;">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                    <h3 style="font-size: 1.3rem; font-weight: 900; letter-spacing: -0.5px; margin: 0;">SDAC AI <span style="color: var(--primary);">Strategic Insights</span></h3>
-                    <span class="badge-premium" style="background: var(--primary-glow); color: var(--primary); font-size: 0.6rem;">LIVE ANALYSIS</span>
-                </div>
-                <div style="font-size: 1rem; color: var(--text-main); line-height: 1.7; font-weight: 500; font-family: 'Inter', sans-serif;">
-                    <?= $ai_insight ?>
-                </div>
-                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--success);"></span>
-                    Synthesized based on FY <?= $sel_year ?> Institutional Registry Data
-                </div>
-            </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 32px; margin-bottom: 32px;">
-            <!-- Flow Chart -->
-            <div class="premium-card">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px;">
-                    <div>
-                        <h3 style="font-size: 1.1rem; font-weight: 900; margin: 0;">Monthly Revenue Flow</h3>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Financial velocity registry for FY <?= $sel_year ?></p>
-                    </div>
-                    <div style="font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">KES Thousands (k)</div>
-                </div>
-                <div style="height: 250px; display: flex; align-items: flex-end; gap: 12px; padding-bottom: 12px;">
-                    <?php 
-                    $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                    $max_val = !empty($monthly_revenue) ? max(array_column($monthly_revenue, 'total')) : 100000;
-                    if($max_val == 0) $max_val = 1;
-
-                    foreach($months as $m): 
-                        $val = 0;
-                        foreach($monthly_revenue as $rev) {
-                            if(substr($rev['month'], 0, 3) == $m) { $val = $rev['total']; break; }
-                        }
-                        // Simulated data for demo
-                        if($val == 0 && array_search($m, $months) <= array_search(date('M'), $months)) {
-                            $val = rand(15000, 50000); 
-                        }
-                        $height = ($val / $max_val) * 100;
-                    ?>
-                    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-                        <div class="chart-column" style="width: 100%; height: <?= max(5, $height) ?>%; border-radius: 6px 6px 4px 4px; position: relative;" title="<?= number_format($val) ?>">
-                            <div style="position: absolute; top: -24px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; font-weight: 800; color: var(--text-muted);"><?= number_format($val/1000, 0) ?>k</div>
-                        </div>
-                        <div style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;"><?= $m ?></div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <!-- Top Tracks -->
-            <div class="premium-card">
-                <h3 style="font-size: 1.1rem; font-weight: 900; margin-bottom: 24px;">Top Performing Tracks</h3>
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <?php if(!empty($top_courses)): ?>
-                        <?php foreach($top_courses as $index => $tc): ?>
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--bg-main); border-radius: 16px; border: 1.5px solid var(--border-light); transition: 0.3s; cursor: pointer;" onmouseover="this.style.borderColor='var(--primary-glow)'" onmouseout="this.style.borderColor='var(--border-light)'">
-                            <div style="display: flex; align-items: center; gap: 16px;">
-                                <div style="width: 32px; height: 32px; border-radius: 10px; background: <?= $index == 0 ? 'var(--grad-primary)' : 'var(--border)' ?>; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem;"><?= $index + 1 ?></div>
-                                <div>
-                                    <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);"><?= htmlspecialchars($tc['title']) ?></div>
-                                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700;"><?= $tc['enrolls'] ?> Verified Enrolls</div>
-                                </div>
+        <div class="ax-grid">
+            <section class="ax-panel ax-span-8">
+                <div class="ax-panel-h"><div><h2><i class="fas fa-chart-column"></i> Last 12 months</h2><p><?= e(ax_money($sum12)) ?> approved from <?= date('M Y', strtotime(array_key_first($months) . '-01')) ?> to <?= date('M Y') ?>.</p></div>
+                    <div class="rv-legend"><span>Hover a bar for the course / certificate split</span></div></div>
+                <div class="ax-panel-b">
+                    <div class="ax-chart rv-chart" role="img" aria-label="Monthly revenue for the last 12 months">
+                        <?php foreach ($months as $ym => $m): $h = $m['total'] > 0 ? max(3, round($m['total'] / $maxMonth * 100)) : 0; ?>
+                            <div class="col" title="<?= e(date('F Y', strtotime($ym . '-01')) . ': ' . ax_money($m['total']) . ' — courses ' . ax_money($m['course']) . ', certificates ' . ax_money($m['certificate']) . ($m['other'] ? ', other ' . ax_money($m['other']) : '') . ' (' . $m['n'] . ' payments)') ?>">
+                                <em><?= $m['total'] >= 1000 ? round($m['total'] / 1000, $m['total'] < 10000 ? 1 : 0) . 'k' : ($m['total'] ? number_format($m['total']) : '') ?></em>
+                                <i style="height:<?= $h ?>%;<?= $h ? '' : 'opacity:.25' ?>"></i>
+                                <span><?= date('M', strtotime($ym . '-01')) ?></span>
                             </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">KES <?= number_format($tc['revenue']) ?></div>
-                            </div>
-                        </div>
                         <?php endforeach; ?>
-                    <?php else: ?>
-                        <div style="padding: 40px; text-align: center; color: var(--text-dim);">
-                            <i class="fas fa-chart-line" style="font-size: 2rem; opacity: 0.2; margin-bottom: 12px;"></i>
-                            <p style="font-size: 0.85rem; font-style: italic;">No fiscal performance data available.</p>
-                        </div>
-                    <?php endif; ?>
+                    </div>
                 </div>
-                
-                <div style="margin-top: 24px; padding: 16px; background: var(--primary-glow); border-radius: 16px; display: flex; gap: 12px; align-items: flex-start;">
-                    <i class="fas fa-lightbulb" style="color: var(--primary); margin-top: 4px;"></i>
-                    <p style="font-size: 0.75rem; line-height: 1.5; color: var(--text-main); font-weight: 600;">
-                        Tracks with <strong>Interactive Lab Units</strong> show 40% higher revenue retention compared to theoretical streams.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Instructor Matrix -->
-        <div class="table-card">
-            <div class="table-header">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <h2>Faculty Settlement <span>Matrix</span></h2>
-                    <span class="badge-premium" style="background: var(--bg-main); color: var(--text-dim);">80/20 Standard Revenue Split</span>
-                </div>
-            </div>
-            <div style="overflow-x: auto;">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Professor Identity</th>
-                            <th>Yield Volume</th>
-                            <th>Faculty Share (80%)</th>
-                            <th>Academy Surplus (20%)</th>
-                            <th>Total Generated</th>
-                            <th style="text-align: right;">Authorization</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if(!empty($tutor_revenue)): ?>
-                            <?php foreach($tutor_revenue as $tr): ?>
-                            <tr>
-                                <td>
-                                    <div class="user-identity">
-                                        <div class="avatar-sm" style="background: var(--primary-glow); color: var(--primary); border: none;">
-                                            <?= strtoupper(substr($tr['tutor_name'], 0, 1)) ?>
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: 800; color: var(--text-main);"><?= htmlspecialchars($tr['tutor_name']) ?></div>
-                                            <div style="font-size: 0.75rem; color: var(--text-muted);"><?= htmlspecialchars($tr['tutor_email']) ?></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge-premium" style="background: var(--bg-main); color: var(--text-dim); font-weight: 900;"><?= $tr['sales_count'] ?> Enrolls</span>
-                                </td>
-                                <td style="font-weight: 900; color: var(--success); font-family: 'Inter', sans-serif;">KES <?= number_format($tr['tutor_share']) ?></td>
-                                <td style="font-weight: 900; color: var(--primary); font-family: 'Inter', sans-serif;">KES <?= number_format($tr['academy_share']) ?></td>
-                                <td style="font-weight: 900; color: var(--text-main); font-family: 'Inter', sans-serif;">KES <?= number_format($tr['total_generated']) ?></td>
-                                <td>
-                                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                        <button class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border-color: var(--border); color: var(--text-dim); cursor: pointer;" title="Audit Statement">
-                                            <i class="fas fa-file-invoice" style="font-size: 0.8rem;"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                <details class="rv-more">
+                    <summary>Show the monthly table</summary>
+                    <div class="ax-table-wrap">
+                        <table class="ax-table cards">
+                            <thead><tr><th>Month</th><th>Course fees</th><th>Certificate fees</th><th>Other</th><th>Total</th><th>Payments</th></tr></thead>
+                            <tbody>
+                            <?php foreach (array_reverse($months, true) as $ym => $m): ?>
+                                <tr><td data-label="Month" class="strong"><?= date('F Y', strtotime($ym . '-01')) ?></td>
+                                    <td data-label="Course fees" class="num"><?= e(ax_money($m['course'])) ?></td>
+                                    <td data-label="Certificate fees" class="num"><?= e(ax_money($m['certificate'])) ?></td>
+                                    <td data-label="Other" class="num"><?= e(ax_money($m['other'])) ?></td>
+                                    <td data-label="Total" class="num strong"><?= e(ax_money($m['total'])) ?></td>
+                                    <td data-label="Payments" class="num"><?= (int)$m['n'] ?></td></tr>
                             <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 80px 0;">
-                                    <i class="fas fa-coins" style="font-size: 3rem; color: var(--border); margin-bottom: 20px; display: block;"></i>
-                                    <div style="font-weight: 800; color: var(--text-muted);">No verified settlement records found.</div>
-                                    <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 8px;">Ensure payments are audited in the Finance portal.</p>
-                                </td>
-                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </section>
+
+            <div class="ax-span-4 ax-stack">
+                <section class="ax-panel">
+                    <div class="ax-panel-h"><div><h2><i class="fas fa-layer-group"></i> Where it comes from</h2><p><?= e($periods[$period]) ?> · <?= e(ax_money($periodTotal)) ?></p></div></div>
+                    <div class="ax-panel-b">
+                        <?php if (!$byType): ?><div class="ax-empty" style="padding:24px"><b>No approved payments</b>in this period.</div><?php else: ?>
+                        <div class="rv-split">
+                            <?php foreach ($byType as $t): ?>
+                                <div class="row"><div><b><?= e($typeLabels[$t['payment_type']] ?? ucfirst((string)$t['payment_type'])) ?></b> <small><?= (int)$t['n'] ?> payment<?= $t['n'] == 1 ? '' : 's' ?> · <?= $pct($t['total'], $periodTotal) ?>%</small></div>
+                                    <span class="amt"><?= e(ax_money($t['total'])) ?></span>
+                                    <div class="ax-bar <?= $t['payment_type'] === 'certificate' ? 'orange' : ($t['payment_type'] === 'course' ? '' : 'green') ?>"><i style="width:<?= $pct($t['total'], $periodTotal) ?>%"></i></div></div>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="muted" style="margin-top:14px;font-size:.76rem;color:var(--text-muted)">Certificate fees are academy income; tutors are paid from course fees only (see <a href="payroll">Tutor Payroll</a>).</p>
                         <?php endif; ?>
-                    </tbody>
-                </table>
+                    </div>
+                </section>
+                <section class="ax-panel">
+                    <div class="ax-panel-h"><div><h2><i class="fas fa-route"></i> By learning mode</h2><p>Course fees · <?= e($periods[$period]) ?></p></div></div>
+                    <div class="ax-panel-b">
+                        <?php if (!$byMode): ?><div class="ax-empty" style="padding:24px"><b>No course fees</b>in this period.</div><?php else: ?>
+                        <div class="rv-split">
+                            <?php foreach ($byMode as $m): ?>
+                                <div class="row"><div><b><?= e($m['m'] ? mode_label($m['m']) : 'Not recorded') ?></b> <small><?= (int)$m['n'] ?> payment<?= $m['n'] == 1 ? '' : 's' ?> · <?= $pct($m['total'], $modeTotal) ?>%</small></div>
+                                    <span class="amt"><?= e(ax_money($m['total'])) ?></span>
+                                    <div class="ax-bar <?= $m['m'] === 'structured' ? 'orange' : '' ?>"><i style="width:<?= $pct($m['total'], $modeTotal) ?>%"></i></div></div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php if (array_filter($byMode, fn($m) => $m['m'] === '')): ?><p style="margin-top:12px;font-size:.76rem;color:var(--text-muted)">"Not recorded" = older payments made before tracks were saved with each payment.</p><?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                </section>
             </div>
+
+            <section class="ax-panel ax-span-8">
+                <div class="ax-panel-h"><div><h2><i class="fas fa-trophy"></i> Top courses by revenue</h2><p><?= e($periods[$period]) ?> · course fees and certificate fees</p></div></div>
+                <?php if (!$top): ?>
+                    <div class="ax-empty"><i class="fas fa-chart-line"></i><b>No course revenue yet</b>Approved course and certificate payments will rank courses here.</div>
+                <?php else: ?>
+                <div class="ax-table-wrap">
+                    <table class="ax-table cards">
+                        <thead><tr><th>Course</th><th>Course fees</th><th>Certificate fees</th><th>Total</th><th>Paying learners</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($top as $i => $t): ?>
+                            <tr>
+                                <td data-label=""><div class="ax-who"><span class="rv-rank <?= $i === 0 ? 'first' : '' ?>"><?= $i + 1 ?></span><div><b><?= e($t['title'] ?? 'Removed course #' . $t['course_id']) ?></b><small><?= e($t['tutor_name'] ?? '—') ?><?= $t['source'] ? ' · free ' . e($t['source']) : '' ?></small></div></div></td>
+                                <td data-label="Course fees" class="num"><?= e(ax_money($t['course_rev'])) ?></td>
+                                <td data-label="Certificate fees" class="num"><?= e(ax_money($t['cert_rev'])) ?><?= $t['certs'] ? ' <span class="muted">(' . (int)$t['certs'] . ')</span>' : '' ?></td>
+                                <td data-label="Total" class="num strong"><div><?= e(ax_money($t['total'])) ?><div class="ax-bar" style="margin-top:6px"><i style="width:<?= round($t['total'] / $topMax * 100) ?>%"></i></div></div></td>
+                                <td data-label="Paying learners" class="num"><?= (int)$t['buyers'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </section>
+
+            <section class="ax-panel ax-span-4">
+                <div class="ax-panel-h"><div><h2><i class="fas fa-gauge"></i> At a glance</h2><p><?= e($periods[$period]) ?></p></div></div>
+                <div class="ax-panel-b">
+                    <dl class="ax-kv">
+                        <dt>Paying learners</dt><dd><?= number_format($k['payers']) ?></dd>
+                        <dt>Average payment</dt><dd><?php $pn = array_sum(array_map(fn($r) => (int)$r['n'], $byType)); echo $pn ? e(ax_money($periodTotal / $pn)) : '—'; ?></dd>
+                        <dt>Revenue per learner</dt><dd><?= $k['payers'] ? e(ax_money($periodTotal / $k['payers'])) : '—' ?></dd>
+                        <dt>Approval time</dt><dd><?= $avgHours ? round((float)$avgHours, 1) . ' h average' : '—' ?> <small style="color:var(--text-muted)">(manual proofs)</small></dd>
+                        <dt>Pending</dt><dd><a href="verifications"><?= number_format($k['pending_n']) ?> to approve</a></dd>
+                    </dl>
+                </div>
+            </section>
+
+            <section class="ax-panel ax-span-12">
+                <div class="ax-panel-h"><div><h2><i class="fas fa-wand-magic-sparkles"></i> AI commentary</h2><p>Optional: sends these totals to the AI assistant and shows its suggestions. Numbers above are always from the database.</p></div>
+                    <?php if ($insight === null): ?><a class="ax-btn ghost sm" href="revenue?period=<?= e($period) ?>&amp;insights=1"><i class="fas fa-wand-magic-sparkles"></i> Get suggestions</a><?php endif; ?></div>
+                <?php if ($insight !== null): ?>
+                    <div class="ax-panel-b"><?= trim($insight) !== '' ? '<div class="rv-insight">' . e(trim(strip_tags($insight))) . '</div>' : '<div class="ax-alert info" style="margin:0"><i class="fas fa-circle-info"></i><div>The AI assistant did not answer. Check the AI key in the configuration and try again.</div></div>' ?></div>
+                <?php endif; ?>
+            </section>
         </div>
     </div>
 </main>
-
-<style>
-@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-</style>
-
 <script src="../assets/js/main.js"></script>
-<script>
-    function toggleSidebar() {
-        document.getElementById('dashSidebar').classList.toggle('open');
-        document.getElementById('sidebarOverlay').classList.toggle('open');
-    }
-</script>
+<?php ax_footer_js(); ?>
 </body></html>

@@ -67,8 +67,8 @@ $enrolled_ids = $user ? $pdo->query("SELECT course_id FROM enrollments WHERE stu
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Browse the full Skope Digital Academy course catalog. Filter by category, level, and price. Start learning today.">
 <title>Course Catalog – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Online Courses', 'path' => 'courses', 'description' => 'Browse Skope Digital Academy courses in coding, design, data, marketing and business skills. Learn self-paced or in a weekly class and earn a certificate.', 'breadcrumbs' => [['Courses', 'courses']]]); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -263,9 +263,10 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
   padding: 4px 10px; border-radius: 7px;
   font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
 }
-.level-beginner     { background: rgba(16,185,129,0.15); color: #10b981; }
-.level-intermediate { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.level-advanced     { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.level-beginner     { background: #ecfdf5; color: #047857; }
+.level-intermediate { background: #fffbeb; color: #b45309; }
+.level-advanced     { background: #fef2f2; color: #b91c1c; }
+.c-cat, .c-level { box-shadow: 0 4px 12px -4px rgba(0,0,0,.35); }
 
 .c-body { padding: 22px; flex-grow: 1; display: flex; flex-direction: column; }
 .c-title {
@@ -349,9 +350,6 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
 <!-- ════════════════ PAGE HERO ════════════════ -->
 <section class="page-hero">
   <div class="container" style="text-align:center; position:relative; z-index:1;">
-    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(0,191,255,0.09);color:#00BFFF;border:1px solid rgba(0,191,255,0.2);padding:6px 18px;border-radius:999px;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:20px;">
-      <i class="fas fa-book-open"></i> Official Course Catalog
-    </div>
     <h1>Find Your Next <span>Skill</span></h1>
     <p>Explore <?= number_format($total_published + 118) ?>+ professional courses across Technology, Business, Design, and more — built for real-world careers.</p>
 

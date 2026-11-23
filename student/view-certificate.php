@@ -53,6 +53,13 @@ try {
         exit;
     }
 
+    // A certificate still waiting for its fee stays locked for the student: send them to the pay page
+    // (same rule as the public /certificate page).
+    if ($currentUser['role'] === 'student' && ($cert['status'] ?? '') === 'pending') {
+        header('Location: ../certificate-pay?code=' . rawurlencode((string)$cert['verification_code']));
+        exit;
+    }
+
     // Status guard
     if (($cert['status'] ?? 'approved') === 'revoked') {
         $revoked = true;
@@ -82,12 +89,12 @@ $backLink = match($currentUser['role']) {
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Great+Vibes&family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
 
 <style>
-/* ─── Reset & Base ─────────────────────────────────────────── */
+/* ─── Reset & Base (page around the certificate: student portal look) ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -97,125 +104,100 @@ $backLink = match($currentUser['role']) {
     --orange:     #F7941D;
     --dark:       #0D1117;
     --ink:        #1c1c2e;
+
+    /* portal tokens (student-ui.css) */
+    --primary: #00A3E0;
+    --primary-dark: #0077C2;
+    --primary-soft: #E6F6FD;
+    --bg-main: #F4F7FB;
+    --surface: #FFFFFF;
+    --text-main: #0F172A;
+    --text-dim: #5B6B82;
+    --border: #E5EAF1;
+    --border-strong: #D5DDE8;
 }
 
 body {
-    font-family: 'Inter', sans-serif;
-    background: radial-gradient(ellipse at top, #1a1a2e 0%, #0d0d1a 60%, #000 100%);
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-main);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: 40px 20px 120px;
-    position: relative;
+    padding: 0 20px 48px;
     overflow-x: hidden;
 }
 
-/* Ambient orbs */
-body::before {
-    content: '';
-    position: fixed;
-    top: -200px;
-    left: -200px;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(0,174,239,0.06) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
-}
-body::after {
-    content: '';
-    position: fixed;
-    bottom: -200px;
-    right: -200px;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(247,148,29,0.05) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-/* ─── Top Nav Bar ──────────────────────────────────────────── */
+/* ─── Toolbar ──────────────────────────────────────────────── */
 .cert-nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    width: calc(100% + 40px);
+    margin: 0 -20px 28px;
+    padding: 12px 20px;
+    background: rgba(244, 247, 251, .9);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+}
+.cert-nav-inner {
     width: 100%;
     max-width: 1060px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 40px;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
 }
-.nav-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-    color: rgba(255,255,255,0.6);
-    font-size: 0.88rem;
-    font-weight: 600;
-    transition: 0.2s;
-}
-.nav-brand:hover { color: #fff; }
-.nav-brand i { font-size: 0.9rem; }
+.cert-nav-title { min-width: 0; flex: 1; }
+.cert-nav-title strong { display: block; font-size: 1rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cert-nav-title span { display: block; font-size: .78rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-.nav-actions { display: flex; gap: 12px; align-items: center; }
-
-/* ─── Buttons ──────────────────────────────────────────────── */
+/* ─── Buttons (same as the portal's sp-btn) ────────────────── */
 .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 12px 22px;
+    height: 42px;
+    padding: 0 18px;
     border-radius: 12px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.88rem;
-    font-weight: 600;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: .88rem;
+    font-weight: 700;
     cursor: pointer;
-    border: none;
     text-decoration: none;
-    transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     white-space: nowrap;
+    transition: background .15s, border-color .15s, color .15s;
 }
-.btn-primary {
-    background: linear-gradient(135deg, #00AEEF, #0080c0);
-    color: #fff;
-    box-shadow: 0 4px 20px rgba(0,174,239,0.35);
-}
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,174,239,0.45); }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: 0 1px 2px rgba(0,119,194,.25); }
+.btn-primary:hover { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(0,119,194,.25); }
+.btn-ghost { background: var(--surface); color: var(--text-main); border-color: var(--border-strong); }
+.btn-ghost:hover { border-color: var(--primary); color: var(--primary-dark); }
+.btn-icon { width: 42px; padding: 0; }
 
-.btn-gold {
-    background: linear-gradient(135deg, var(--gold), var(--gold-light));
-    color: #1a1000;
-    box-shadow: 0 4px 20px rgba(212,175,55,0.4);
-}
-.btn-gold:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(212,175,55,0.5); }
-
-.btn-ghost {
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.75);
-    border: 1px solid rgba(255,255,255,0.14);
-    backdrop-filter: blur(10px);
-}
-.btn-ghost:hover { background: rgba(255,255,255,0.14); color: #fff; }
-
-/* ─── Revoked Banner ───────────────────────────────────────── */
+/* ─── Status banners ───────────────────────────────────────── */
 .revoked-banner {
     width: 100%;
     max-width: 1060px;
-    background: rgba(239,68,68,0.15);
-    border: 1px solid rgba(239,68,68,0.4);
-    color: #fca5a5;
-    padding: 14px 24px;
+    background: #FDECEC;
+    color: #9B1C1C;
+    padding: 14px 18px;
     border-radius: 12px;
-    margin-bottom: 28px;
+    margin-bottom: 20px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    font-weight: 600;
-    font-size: 0.9rem;
+    font-size: .9rem;
 }
+.revoked-banner.warn { background: #FEF6E4; color: #8A5300; }
+.cert-hint { width: 100%; max-width: 1060px; margin-top: 14px; font-size: .8rem; color: var(--text-dim); text-align: center; }
 
 /* ─── Diploma Frame ────────────────────────────────────────── */
 .diploma-outer {
@@ -444,70 +426,77 @@ body::after {
 }
 
 /* ─── Print Styles ─────────────────────────────────────────── */
+@page { size: A4 landscape; margin: 8mm; }
 @media print {
     body {
         background: white !important;
         padding: 0 !important;
+        display: block !important;
+        min-height: 0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
-    body::before, body::after { display: none !important; }
-    .cert-nav, .cert-actions, .revoked-banner { display: none !important; }
+    .cert-nav, .revoked-banner, .cert-hint { display: none !important; }
     .diploma-outer {
         box-shadow: none !important;
         max-width: 100% !important;
         border: none !important;
+        animation: none !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
     .diploma-wrap {
         border: none !important;
         padding: 50px !important;
+        aspect-ratio: auto !important;
+        height: 193mm;
     }
-    page { size: A4 landscape; margin: 0; }
-}
-
-/* ─── Bottom Action Bar ────────────────────────────────────── */
-.cert-actions {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: rgba(0,0,0,0.8);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255,255,255,0.08);
-    padding: 16px 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
 }
 
 /* ─── Responsive ───────────────────────────────────────────── */
 @media (max-width: 768px) {
     .diploma-wrap { padding: 30px 24px; aspect-ratio: auto; min-height: 500px; }
     .dc-logo { height: 34px; }
-    .cert-actions { padding: 14px 20px; }
-    .btn { padding: 10px 16px; font-size: 0.82rem; }
+    .btn { height: 38px; padding: 0 14px; font-size: .82rem; }
+    .btn-icon { width: 38px; padding: 0; }
+}
+@media (max-width: 480px) {
+    .btn .lbl { display: none; }
+    .btn { padding: 0 12px; }
 }
 </style>
 </head>
 <body>
 
-<!-- ── Top Nav ──────────────────────────────────────────────── -->
-<nav class="cert-nav">
-    <a href="<?= $backLink ?>" class="nav-brand">
-        <i class="fas fa-arrow-left"></i>
-        <?= $currentUser['role'] === 'student' ? 'My Certificates' : 'Back' ?>
-    </a>
-    <div class="nav-actions">
-        <img src="../assets/images/Skope Digital  logo.png" style="height:36px;filter:brightness(0) invert(1);opacity:0.6;" alt="SDA">
+<!-- ── Toolbar ─────────────────────────────────────────────── -->
+<nav class="cert-nav" id="certActions">
+    <div class="cert-nav-inner">
+        <a href="<?= htmlspecialchars($backLink) ?>" class="btn btn-ghost btn-icon" title="Back" aria-label="<?= $currentUser['role'] === 'student' ? 'Back to my certificates' : 'Back' ?>"><i class="fas fa-arrow-left"></i></a>
+        <div class="cert-nav-title">
+            <strong><?= htmlspecialchars($cert['course_title']) ?></strong>
+            <span>Certificate &middot; code <?= htmlspecialchars((string)$cert['verification_code']) ?></span>
+        </div>
+        <div class="nav-actions">
+            <?php if ($currentUser['role'] === 'student'): ?>
+            <a href="transcript" class="btn btn-ghost"><i class="fas fa-file-lines"></i> <span class="lbl">Transcript</span></a>
+            <?php endif; ?>
+            <button type="button" onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> <span class="lbl">Print / save PDF</span></button>
+        </div>
     </div>
 </nav>
 
 <?php if ($revoked): ?>
 <div class="revoked-banner">
-    <i class="fas fa-ban" style="font-size:1.2rem;"></i>
+    <i class="fas fa-ban" style="font-size: 1.1rem; margin-top: 2px;"></i>
     <div>
-        <strong>Certificate Revoked</strong> — This certificate has been revoked by the academy and is no longer valid.
+        <strong>Certificate revoked.</strong> The academy has revoked this certificate and it is no longer valid.
+    </div>
+</div>
+<?php elseif (($cert['status'] ?? '') === 'pending'): ?>
+<div class="revoked-banner warn">
+    <i class="fas fa-lock" style="font-size: 1.1rem; margin-top: 2px;"></i>
+    <div>
+        <strong>Not unlocked yet.</strong> The learner has not paid the certificate fee, so this certificate is still locked for them.
     </div>
 </div>
 <?php endif; ?>
@@ -531,7 +520,7 @@ body::after {
             <div class="dc-top">
                 <img src="../assets/images/Skope Digital  logo.png" class="dc-logo" alt="Skope Digital Academy" onerror="this.style.display='none'">
                 <div class="dc-title">Certificate of Completion</div>
-                <div class="dc-subtitle">Awarded by Skope Digital Academy &nbsp;•&nbsp; <?= ucfirst($cert['course_level'] ?? 'Professional') ?> Level</div>
+                <div class="dc-subtitle">Awarded by Skope Digital Academy &nbsp;•&nbsp; <?= htmlspecialchars(ucfirst($cert['course_level'] ?? 'Professional')) ?> Level</div>
             </div>
 
             <!-- Middle: Student + Course -->
@@ -578,7 +567,7 @@ body::after {
 
             <!-- Verification Code + Date -->
             <div class="dc-code">
-                Verification Code: <strong><?= $cert['verification_code'] ?></strong>
+                Verification Code: <strong><?= htmlspecialchars((string)$cert['verification_code']) ?></strong>
                 &nbsp;|&nbsp; Issued: <?= date('d / m / Y', strtotime($cert['issued_at'])) ?>
                 <?php if (!empty($cert['issued_by_name'])): ?>
                 &nbsp;|&nbsp; Certified by: <?= htmlspecialchars($cert['issued_by_name']) ?>
@@ -592,30 +581,13 @@ body::after {
     </div><!-- /.diploma-wrap -->
 </div><!-- /.diploma-outer -->
 
-<!-- ── Fixed Bottom Action Bar ─────────────────────────────── -->
-<div class="cert-actions" id="certActions">
-    <button onclick="window.print()" class="btn btn-gold">
-        <i class="fas fa-download"></i> Download / Print PDF
-    </button>
-    <a href="<?= $backLink ?>" class="btn btn-ghost">
-        <i class="fas fa-th-large"></i>
-        <?= $currentUser['role'] === 'student' ? 'All Certificates' : 'Back' ?>
-    </a>
-    <?php if ($currentUser['role'] === 'student'): ?>
-    <a href="transcript" class="btn btn-ghost">
-        <i class="fas fa-scroll"></i> View Transcript
-    </a>
-    <?php endif; ?>
-</div>
+<p class="cert-hint"><i class="fas fa-circle-info"></i> Tip: in the print window, choose "Save as PDF" and landscape to download a copy.</p>
 
 <script>
-// Hide action bar on print, restore after
-window.addEventListener('beforeprint', function() {
-    document.getElementById('certActions').style.display = 'none';
-});
-window.addEventListener('afterprint', function() {
-    document.getElementById('certActions').style.display = 'flex';
-});
+// Opened from the download button on the certificates page: open the print dialog straight away
+if (new URLSearchParams(location.search).get('print') === '1') {
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });
+}
 </script>
 
 </body>

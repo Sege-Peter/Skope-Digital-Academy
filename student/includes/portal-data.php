@@ -31,7 +31,7 @@ try {
 
     // 3. Live Notifications
     $stmt = $pdo->prepare("SELECT * FROM notifications 
-                           WHERE (user_role = 'student' OR user_role = 'all' OR target_user_id = ?) 
+                           WHERE (target_user_id = ? OR (target_user_id IS NULL AND user_role IN ('student', 'all')))
                            ORDER BY created_at DESC LIMIT 8");
     $stmt->execute([$student['id']]);
     $portal_notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);

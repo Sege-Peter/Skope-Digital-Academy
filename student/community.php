@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Institutional Community';
+$pageTitle = 'Community';
 require_once 'includes/header.php';
 
 try {
@@ -17,91 +17,73 @@ try {
 require_once 'includes/layout-top.php';
 ?>
 
-<header class="portal-header" style="margin-bottom: 32px;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
-        <div class="greeting">
-            <h1 style="font-size: 1.85rem; font-weight: 950; margin: 0; letter-spacing: -1.5px;">Institutional Network</h1>
-            <p style="color: var(--text-dim); margin-top: 4px; font-weight: 600;">Collaborate, share knowledge, and grow with 4,000+ scholars.</p>
-        </div>
-        <button class="btn-premium" onclick="document.getElementById('postModal').style.display='flex'">
-            <i class="fas fa-plus"></i> NEW COLLABORATION
-        </button>
-    </div>
-</header>
+<div class="sp-page-head">
+    <div><h1>Community</h1><p>Posts and discussions from learners and tutors at the academy.</p></div>
+    <div class="sp-actions"><a href="messages" class="sp-btn ghost"><i class="fas fa-comment-dots"></i> Messages</a></div>
+</div>
 
-<div class="community-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px;">
-    <!-- Main Feed -->
-    <div class="feed-stack" style="display: flex; flex-direction: column; gap: 24px;">
-        <?php foreach($posts as $p): ?>
-        <div class="premium-card" style="padding: 28px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                <div style="display: flex; gap: 14px; align-items: center;">
-                    <div style="width: 48px; height: 48px; border-radius: 12px; overflow: hidden; background: #f1f5f9; border: 1px solid var(--border);">
-                        <?php if($p['author_avatar']): ?>
-                            <img src="../uploads/avatars/<?= htmlspecialchars($p['author_avatar']) ?>" style="width: 100%; height: 100%; object-fit: cover;">
-                        <?php else: ?>
-                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 950; color: #94a3b8;"><?= strtoupper(substr($p['author_name'], 0, 1)) ?></div>
-                        <?php endif; ?>
-                    </div>
-                    <div>
-                        <h5 style="margin: 0; font-size: 0.95rem; font-weight: 800;"><?= htmlspecialchars($p['author_name']) ?></h5>
-                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
-                            <span class="p-badge" style="font-size: 0.55rem; padding: 2px 8px;"><?= strtoupper($p['author_role']) ?></span>
-                            <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;"><i class="far fa-clock"></i> <?= date('M j, Y', strtotime($p['created_at'])) ?></span>
+<div class="sp-split">
+    <!-- Feed -->
+    <div>
+        <?php if (empty($posts)): ?>
+            <div class="sp-empty">
+                <div class="sp-ico"><i class="fas fa-users"></i></div>
+                <h3>No posts yet</h3>
+                <p>Community posts will show up here. In the meantime, message a tutor or check the latest announcements.</p>
+                <div class="sp-row" style="justify-content: center;">
+                    <a href="messages" class="sp-btn">Open messages</a>
+                    <a href="announcements" class="sp-btn ghost">Announcements</a>
+                </div>
+            </div>
+        <?php else: foreach ($posts as $p):
+            $role = strtolower((string)$p['author_role']);
+        ?>
+            <article class="sp-card">
+                <div class="sp-row" style="flex-wrap: nowrap; margin-bottom: 14px;">
+                    <span class="sp-avatar" style="width: 44px; height: 44px;">
+                        <?php $ini = mb_strtoupper(mb_substr((string)$p['author_name'], 0, 1)) ?: 'S'; ?>
+                        <?php if (!empty($p['author_avatar'])): ?><img src="../uploads/avatars/<?= htmlspecialchars($p['author_avatar']) ?>" alt="" onerror="this.replaceWith(<?= htmlspecialchars(json_encode($ini)) ?>)"><?php else: ?><?= htmlspecialchars($ini) ?><?php endif; ?>
+                    </span>
+                    <div style="min-width: 0;">
+                        <strong style="display: block; font-size: .92rem;"><?= htmlspecialchars($p['author_name']) ?></strong>
+                        <div class="sp-row" style="gap: 8px; margin-top: 2px;">
+                            <span class="sp-badge <?= $role === 'tutor' ? 'violet' : ($role === 'admin' ? 'orange' : '') ?>"><?= htmlspecialchars(ucfirst($role)) ?></span>
+                            <span class="sp-muted" style="font-size: .75rem;"><i class="far fa-clock"></i> <?= date('j M Y', strtotime($p['created_at'])) ?></span>
                         </div>
                     </div>
                 </div>
-                <button style="background: none; border: none; color: #cbd5e1; cursor: pointer;"><i class="fas fa-ellipsis-v"></i></button>
-            </div>
 
-            <div style="margin-bottom: 24px;">
-                <h4 style="margin: 0 0 10px; font-size: 1.15rem; font-weight: 900; line-height: 1.4; color: var(--text-main);"><?= htmlspecialchars($p['title']) ?></h4>
-                <p style="font-size: 0.92rem; line-height: 1.7; color: var(--text-dim);"><?= nl2br(htmlspecialchars($p['content'])) ?></p>
-            </div>
+                <h3 style="margin: 0 0 6px; font-size: 1.05rem; font-weight: 800; line-height: 1.4;"><?= htmlspecialchars($p['title']) ?></h3>
+                <p class="sp-muted" style="margin: 0; font-size: .92rem; line-height: 1.7;"><?= nl2br(htmlspecialchars($p['content'])) ?></p>
 
-            <div style="display: flex; gap: 20px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-                <button style="background: none; border: none; font-size: 0.75rem; font-weight: 800; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; gap: 8px;"><i class="far fa-heart"></i> <?= $p['like_count'] ?> Likes</button>
-                <button style="background: none; border: none; font-size: 0.75rem; font-weight: 800; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; gap: 8px;"><i class="far fa-comment"></i> <?= $p['comment_count'] ?> Comments</button>
-            </div>
-        </div>
-        <?php endforeach; ?>
-
-        <?php if(empty($posts)): ?>
-        <div class="premium-card" style="text-align: center; padding: 60px;">
-            <i class="fas fa-users-viewfinder fa-3x" style="color: #cbd5e1; margin-bottom: 20px;"></i>
-            <h4 style="font-weight: 900;">Network Initializing</h4>
-            <p style="color: #94a3b8; max-width: 300px; margin: 0 auto;">Our community is preparing new academic threads. Start the first collaboration!</p>
-        </div>
-        <?php endif; ?>
+                <div class="sp-row sp-muted" style="gap: 18px; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; font-size: .8rem; font-weight: 700;">
+                    <span><i class="far fa-heart"></i> <?= (int)$p['like_count'] ?> like<?= (int)$p['like_count'] == 1 ? '' : 's' ?></span>
+                    <span><i class="far fa-comment"></i> <?= (int)$p['comment_count'] ?> comment<?= (int)$p['comment_count'] == 1 ? '' : 's' ?></span>
+                </div>
+            </article>
+        <?php endforeach; endif; ?>
     </div>
 
-    <!-- Sidebar Info -->
-    <div class="side-panel-alt">
-        <div class="premium-card" style="padding: 24px; background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; border: none; margin-bottom: 24px;">
-            <h5 style="margin: 0 0 12px; font-weight: 900; color: white;">Global Lounge Rules</h5>
-            <ul style="padding-left: 18px; font-size: 0.8rem; margin: 0; color: rgba(255,255,255,0.7); line-height: 1.8;">
-                <li>Be constructive & respectful</li>
-                <li>Share only academic resources</li>
-                <li>No self-promotion</li>
+    <!-- Side -->
+    <aside>
+        <div class="sp-card dark" style="margin-bottom: 16px;">
+            <h4 style="margin: 0 0 10px; font-size: 1rem; font-weight: 800;">Community guidelines</h4>
+            <ul style="padding-left: 18px; margin: 0; font-size: .85rem; line-height: 1.8; color: rgba(255,255,255,.78);">
+                <li>Be kind and respectful</li>
+                <li>Share learning resources only</li>
+                <li>No self-promotion or spam</li>
             </ul>
         </div>
-        <div class="premium-card" style="padding: 24px;">
-            <h5 style="margin: 0 0 16px; font-weight: 900;">Trending Scholars</h5>
-            <div style="display: flex; flex-direction: column; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 36px; height: 36px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size:0.75rem;">JD</div>
-                    <span style="font-size: 0.85rem; font-weight: 700;">John Doe (Scholar)</span>
-                </div>
-                <!-- Add more as needed -->
+        <div class="sp-card" style="padding: 16px 18px 6px;">
+            <div class="sp-card-head" style="margin-bottom: 0;"><h4>Other ways to connect</h4></div>
+            <div class="sp-list">
+                <a href="messages" class="sp-list-item" style="text-decoration: none;"><span class="sp-ico" style="width: 34px; height: 34px;"><i class="fas fa-comment-dots"></i></span><div class="sp-grow"><h5>Messages</h5><p>Ask your tutor a question</p></div></a>
+                <a href="announcements" class="sp-list-item" style="text-decoration: none;"><span class="sp-ico orange" style="width: 34px; height: 34px;"><i class="fas fa-bullhorn"></i></span><div class="sp-grow"><h5>Announcements</h5><p>News from the academy</p></div></a>
+                <a href="leaderboard" class="sp-list-item" style="text-decoration: none;"><span class="sp-ico yellow" style="width: 34px; height: 34px;"><i class="fas fa-ranking-star"></i></span><div class="sp-grow"><h5>Leaderboard</h5><p>See who's learning the most</p></div></a>
+                <a href="referral" class="sp-list-item" style="text-decoration: none;"><span class="sp-ico green" style="width: 34px; height: 34px;"><i class="fas fa-gift"></i></span><div class="sp-grow"><h5>Refer a friend</h5><p>Learn together and earn coins</p></div></a>
             </div>
         </div>
-    </div>
+    </aside>
 </div>
-
-<style>
-@media (max-width: 1000px) {
-    .community-layout { grid-template-columns: 1fr; }
-}
-</style>
 
 <?php require_once 'includes/layout-bottom.php'; ?>

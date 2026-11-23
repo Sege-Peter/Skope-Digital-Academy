@@ -1,57 +1,42 @@
 <?php
-require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../includes/auth.php';
+/**
+ * CSV export of the learners in the signed-in tutor's courses (same rows as the Learners page).
+ */
+require_once __DIR__ . '/../includes/tutor_data.php';
 
-// Access control: Tutor or Admin
-if (!isLoggedIn() || ($_SESSION['role'] !== 'tutor' && $_SESSION['role'] !== 'admin')) {
-    die("Unauthorized access.");
+if (!isLoggedIn() || !in_array($_SESSION['role'] ?? '', ['tutor', 'admin'], true)) {
+    http_response_code(403);
+    exit('Please sign in as a tutor.');
 }
-
 $user = currentUser();
-$course_filter = $_GET['course_filter'] ?? '';
+$courseId = (int)($_GET['course_filter'] ?? 0);
 
 try {
-    $query = "SELECT u.name as student_name, u.email as student_email, 
-                     c.title as course_title, e.progress_percent, e.enrolled_at,
-                     (SELECT AVG(score) FROM quiz_attempts qa JOIN quizzes q ON qa.quiz_id = q.id WHERE qa.student_id = u.id AND q.course_id = c.id) as avg_score
-              FROM enrollments e
-              JOIN users u ON e.student_id = u.id
-              JOIN courses c ON e.course_id = c.id
-              WHERE c.tutor_id = ?";
-    
-    $params = [$user['id']];
-
-    if ($course_filter) {
-        $query .= " AND e.course_id = ?";
-        $params[] = $course_filter;
-    }
-
-    $query .= " ORDER BY e.enrolled_at DESC";
-    
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // CSV Headers
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=Student_Gradebook_' . date('Y-m-d') . '.csv');
-
-    $output = fopen('php://output', 'w');
-    fputcsv($output, ['Student Name', 'Email', 'Course', 'Progress %', 'Avg Quiz Score', 'Enrolled Date']);
-
-    foreach ($students as $row) {
-        fputcsv($output, [
-            $row['student_name'],
-            $row['student_email'],
-            $row['course_title'],
-            round($row['progress_percent'], 2) . '%',
-            ($row['avg_score'] !== null) ? round($row['avg_score'], 2) . '%' : 'N/A',
-            date('Y-m-d', strtotime($row['enrolled_at']))
-        ]);
-    }
-    fclose($output);
-    exit;
-
-} catch (Exception $e) {
-    die("Export Error: " . $e->getMessage());
+    $rows = td_enrolments($pdo, (int)$user['id'], ['course_id' => $courseId ?: null, 'order' => 'name']);
+} catch (Throwable $e) {
+    error_log('tutor export: ' . $e->getMessage());
+    http_response_code(500);
+    exit('The export failed. Please try again.');
 }
+
+/** Stop spreadsheet apps treating a cell as a formula. */
+function tp_csv_cell($v): string {
+    $v = (string)$v;
+    return preg_match('/^[=+\-@\t\r]/', $v) ? "'" . $v : $v;
+}
+
+header('Content-Type: text/csv; charset=utf-8');
+header('Content-Disposition: attachment; filename=learners_' . date('Y-m-d') . '.csv');
+$out = fopen('php://output', 'w');
+fputcsv($out, ['Learner', 'Email', 'Course', 'Status', 'Track', 'Progress %', 'Quiz average %', 'Enrolled on', 'Last active']);
+foreach ($rows as $r) {
+    fputcsv($out, array_map('tp_csv_cell', [
+        $r['student_name'], $r['student_email'], $r['course_title'], ucfirst($r['status']), mode_label($r['learning_mode'] ?: 'self_paced'),
+        round((float)$r['progress_percent'], 1),
+        $r['avg_quiz'] !== null ? round((float)$r['avg_quiz'], 1) : '',
+        date('Y-m-d', strtotime($r['enrolled_at'])),
+        $r['last_active'] ? date('Y-m-d H:i', strtotime($r['last_active'])) : '',
+    ]));
+}
+fclose($out);
+exit;

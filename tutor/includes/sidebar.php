@@ -1,281 +1,64 @@
-<style>
-/* ════════════════════════════════════════════════
-   TUTOR SIDEBAR — Premium Faculty Suite
-   Theme: Ocean Blue
-════════════════════════════════════════════════ */
-.sidebar {
-    position: fixed;
-    left: 0; top: 0; bottom: 0;
-    width: 260px;
-    background: #fff;
-    border-right: 1px solid #f1f5f9;
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
-}
+<?php
+/**
+ * Tutor portal sidebar. Rendered once by includes/header.php (older pages that still include it are harmless).
+ */
+if (defined('TP_SIDEBAR_DONE')) return;
+define('TP_SIDEBAR_DONE', true);
 
-.tsd-logo-wrap {
-    padding: 28px 28px 20px;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid #f8fafc;
-}
-.tsd-logo-img { height: 44px; object-fit: contain; }
-
-.tsd-nav {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-    scrollbar-width: none;
-}
-.tsd-nav::-webkit-scrollbar { display: none; }
-
-.tsd-section-label {
-    font-size: 0.6rem;
-    font-weight: 950;
-    color: #94A3B8;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    padding: 24px 12px 10px;
-}
-
-.tsd-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    text-decoration: none;
-    color: #475569;
-    font-size: 0.9rem;
-    font-weight: 700;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    margin-bottom: 3px;
-    border: 1px solid transparent;
-    position: relative;
-}
-
-.tsd-menu-item:hover {
-    background: #E0F7FF;
-    color: #0099CC;
-    transform: translateX(4px);
-    border-color: rgba(0, 191, 255, 0.15);
-}
-
-.tsd-menu-item.active {
-    background: linear-gradient(135deg, #00BFFF 0%, #0099CC 100%);
-    color: white;
-    box-shadow: 0 8px 20px rgba(0, 191, 255, 0.25);
-    border-color: transparent;
-}
-
-.tsd-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    background: #F8FAFC;
-    flex-shrink: 0;
-    transition: 0.25s;
-    color: #64748B;
-}
-
-.tsd-menu-item:hover .tsd-icon {
-    background: white;
-    color: #0099CC;
-    box-shadow: 0 2px 8px rgba(0, 191, 255, 0.15);
-}
-
-.tsd-menu-item.active .tsd-icon {
-    background: rgba(255, 255, 255, 0.25);
-    color: white;
-}
-
-.tsd-label { flex: 1; }
-
-.tsd-badge {
-    font-size: 0.6rem;
-    font-weight: 950;
-    padding: 3px 8px;
-    border-radius: 50px;
-    background: rgba(0, 191, 255, 0.15);
-    color: #0099CC;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-}
-.tsd-menu-item.active .tsd-badge {
-    background: rgba(255,255,255,0.25);
-    color: white;
-}
-
-.tsd-footer {
-    padding: 20px;
-    border-top: 1px solid #f1f5f9;
-}
-
-.tsd-user-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px;
-    border-radius: 16px;
-    background: #F8FAFC;
-    margin-bottom: 12px;
-    border: 1px solid #F1F5F9;
-}
-
-.tsd-avatar {
-    width: 40px;
-    height: 40px;
-    background: linear-gradient(135deg, #00BFFF 0%, #0099CC 100%);
-    color: #fff;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 950;
-    font-size: 1.1rem;
-    flex-shrink: 0;
-    box-shadow: 0 6px 14px rgba(0, 191, 255, 0.25);
-}
-
-.tsd-user-name {
-    font-size: 0.9rem;
-    font-weight: 950;
-    color: #0F172A;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 140px;
-    letter-spacing: -0.3px;
-}
-
-.tsd-user-role {
-    font-size: 0.7rem;
-    color: #64748B;
-    font-weight: 700;
-    margin-top: 2px;
-}
-
-.tsd-logout-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    padding: 13px;
-    border-radius: 14px;
-    background: #FEF2F2;
-    color: #EF4444;
-    font-size: 0.82rem;
-    font-weight: 800;
-    text-decoration: none;
-    transition: 0.3s;
-    border: 1px solid #FEE2E2;
-    box-sizing: border-box;
-}
-
-.tsd-logout-btn:hover {
-    background: #EF4444;
-    color: #fff;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(239, 68, 68, 0.15);
-}
-
-@media (max-width: 1024px) {
-    .sidebar {
-        transform: translateX(-100%);
-        width: 260px;
-        z-index: 1100;
-    }
-    .sidebar.open {
-        transform: translateX(0);
-        box-shadow: 20px 0 50px rgba(0,0,0,0.12);
-    }
-}
-</style>
-
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-<!-- Mobile Header Bar -->
-<div class="mobile-portal-header" id="mobilePortalHeader">
-    <img src="../assets/images/Skope Digital  logo.png" alt="Skope Digital Academy" class="mobile-logo">
-    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Open navigation">
-        <i class="fas fa-bars"></i>
-    </button>
-</div>
-
-<aside class="sidebar" id="dashSidebar">
-    <div class="tsd-logo-wrap">
-        <img src="../assets/images/Skope Digital  logo.png" alt="Skope Digital Academy" class="tsd-logo-img">
+$current_page = $current_page ?? basename($_SERVER['PHP_SELF']);
+$navCounts = $navCounts ?? ['grading' => 0, 'messages' => 0, 'alerts' => 0];
+$tpNav = [
+    'Overview' => [
+        ['index.php', './', 'fa-house', 'Dashboard', 0],
+    ],
+    'Teaching' => [
+        ['courses.php', 'courses', 'fa-book-open', 'Courses', 0],
+        ['lessons.php', 'lessons', 'fa-layer-group', 'Lessons', 0],
+        ['quizzes.php', 'quizzes', 'fa-circle-question', 'Quizzes', 0],
+        ['assignments.php', 'assignments', 'fa-clipboard-check', 'Assignments', $navCounts['grading']],
+    ],
+    'Learners' => [
+        ['students.php', 'students', 'fa-user-graduate', 'Learners', 0, ['student_profile.php', 'award_student.php']],
+        ['messages.php', 'messages', 'fa-comments', 'Messages', $navCounts['messages']],
+        ['leaderboard.php', 'leaderboard', 'fa-trophy', 'Leaderboard', 0],
+    ],
+    'Earnings' => [
+        ['revenue.php', 'revenue', 'fa-wallet', 'Earnings', 0],
+        ['analytics.php', 'analytics', 'fa-chart-column', 'Analytics', 0],
+    ],
+    'Account' => [
+        ['notifications.php', 'notifications', 'fa-bell', 'Notifications', $navCounts['alerts']],
+        ['profile.php', 'profile', 'fa-id-card', 'Profile', 0],
+    ],
+];
+?>
+<div class="tp-overlay" id="tpOverlay"></div>
+<aside class="tp-side" id="tpSide" aria-label="Tutor portal navigation">
+    <div class="tp-side-brand">
+        <img src="../assets/images/Skope Digital  logo.png" alt="">
+        <div><b>Skope Digital</b><small>Tutor portal</small></div>
+        <button type="button" class="tp-side-close" data-tp-close-menu aria-label="Close menu"><i class="fas fa-xmark"></i></button>
     </div>
-
-    <nav class="tsd-nav">
-        <a href="./" class="tsd-menu-item <?= $current_page == 'index.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-th-large"></i></span>
-            <span class="tsd-label">Command Center</span>
-        </a>
-
-        <div class="tsd-section-label">Institutional</div>
-        <a href="courses" class="tsd-menu-item <?= $current_page == 'courses.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-book-open"></i></span>
-            <span class="tsd-label">Course Registry</span>
-        </a>
-        <a href="lessons" class="tsd-menu-item <?= ($current_page == 'lessons.php') ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-layer-group"></i></span>
-            <span class="tsd-label">Curriculum Arc</span>
-        </a>
-        <a href="quizzes" class="tsd-menu-item <?= $current_page == 'quizzes.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-brain"></i></span>
-            <span class="tsd-label">Assessments</span>
-        </a>
-        <a href="assignments" class="tsd-menu-item <?= $current_page == 'assignments.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-laptop-code"></i></span>
-            <span class="tsd-label">Project Audits</span>
-        </a>
-        <a href="analytics" class="tsd-menu-item <?= $current_page == 'analytics.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-chart-pie"></i></span>
-            <span class="tsd-label">Performance</span>
-        </a>
-
-        <div class="tsd-section-label">Faculty</div>
-        <a href="students" class="tsd-menu-item <?= $current_page == 'students.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-user-graduate"></i></span>
-            <span class="tsd-label">Scholars</span>
-        </a>
-        <a href="revenue" class="tsd-menu-item <?= $current_page == 'revenue.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-wallet"></i></span>
-            <span class="tsd-label">Revenue Share</span>
-        </a>
-        <a href="leaderboard" class="tsd-menu-item <?= $current_page == 'leaderboard.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-trophy"></i></span>
-            <span class="tsd-label">Hall of Fame</span>
-        </a>
-        <a href="notifications" class="tsd-menu-item <?= $current_page == 'notifications.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-bell"></i></span>
-            <span class="tsd-label">Alerts Center</span>
-        </a>
-        <a href="profile" class="tsd-menu-item <?= $current_page == 'profile.php' ? 'active' : '' ?>">
-            <span class="tsd-icon"><i class="fas fa-id-card"></i></span>
-            <span class="tsd-label">Master Profile</span>
-        </a>
-    </nav>
-
-    <div class="tsd-footer">
-        <div class="tsd-user-card">
-            <div class="tsd-avatar"><?= strtoupper(substr($tutor['name'] ?? 'T', 0, 1)) ?></div>
-            <div class="tsd-user-info">
-                <div class="tsd-user-name"><?= htmlspecialchars($tutor['name'] ?? 'Tutor') ?></div>
-                <div class="tsd-user-role">Faculty Elite</div>
+    <nav class="tp-nav">
+        <?php foreach ($tpNav as $tpGroup => $tpItems): ?>
+            <div class="tp-nav-group">
+                <div class="tp-nav-label"><?= e($tpGroup) ?></div>
+                <?php foreach ($tpItems as $tpIt):
+                    $tpActive = $current_page === $tpIt[0] || in_array($current_page, $tpIt[5] ?? [], true); ?>
+                    <a href="<?= e($tpIt[1]) ?>" class="<?= $tpActive ? 'active' : '' ?>"<?= $tpActive ? ' aria-current="page"' : '' ?>>
+                        <i class="fas <?= e($tpIt[2]) ?>" aria-hidden="true"></i>
+                        <span class="tp-nav-text"><?= e($tpIt[3]) ?></span>
+                        <?php if ($tpIt[4] > 0): ?><span class="tp-count" aria-label="<?= (int)$tpIt[4] ?> new"><?= (int)min(99, $tpIt[4]) ?></span><?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
             </div>
-        </div>
-        <a href="../logout" class="tsd-logout-btn">
-            <i class="fas fa-power-off"></i> Secure Logoff
+        <?php endforeach; ?>
+    </nav>
+    <div class="tp-side-foot">
+        <a class="tp-side-user" href="profile">
+            <?= td_avatar($tutor['avatar'] ?? null, $tutor['name'] ?? 'Tutor') ?>
+            <span style="min-width:0"><b><?= e($tutor['name'] ?? 'Tutor') ?></b><small>Tutor</small></span>
         </a>
+        <a class="tp-signout" href="../logout"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i> Sign out</a>
     </div>
 </aside>

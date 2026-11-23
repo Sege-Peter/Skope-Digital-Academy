@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /tutor/
+Disallow: /student/
+Disallow: /api/
+Disallow: /includes/
+Disallow: /uploads/proofs/
+Disallow: /uploads/scholarships/
+Disallow: /checkout
+Disallow: /enroll
+Disallow: /certificate-pay
+Disallow: /verify-payment
+Disallow: /paystack-webhook
+Disallow: /google-auth
+Disallow: /cron
+Disallow: /calendar-feed
+Disallow: /email-preferences
+Disallow: /impersonate
+Disallow: /*?*reference=
+
+Sitemap: https://skopedigital.co.ke/sitemap.xml

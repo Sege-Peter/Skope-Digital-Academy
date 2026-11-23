@@ -20,8 +20,8 @@ $user = isLoggedIn() ? currentUser() : null;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Learn about Skope Digital Academy – Kenya's #1 AI-powered learning platform. Our mission, vision, and the team behind Africa's leading ed-tech hub.">
 <title>About Us – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'About Us', 'path' => 'about', 'description' => 'Skope Digital Academy is a Kisumu-based online academy helping young people in Kenya and East Africa learn coding and digital skills that lead to work.', 'breadcrumbs' => [['About', 'about']]]); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -43,7 +43,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
 
 /* ── HERO ── */
 .about-hero {
-  padding: 130px 0 100px;
+  padding: 80px 0 96px;
   background: linear-gradient(160deg, #f0f9ff 0%, #e8f4fd 50%, #fff8ee 100%);
   position: relative; overflow: hidden; text-align: center;
 }
@@ -262,6 +262,9 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
   .hero-cta-row { flex-direction: column; align-items: center; }
   .about-cta-btns { flex-direction: column; align-items: center; }
 }
+@media (max-width: 640px) {
+  .img-float { left: 12px; right: 12px; bottom: -22px; padding: 14px 16px; }
+}
 </style>
 </head>
 <body>
@@ -271,7 +274,6 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
 <!-- ══ HERO ══ -->
 <section class="about-hero">
   <div class="about-hero-inner" data-aos>
-    <div class="about-pill"><i class="fas fa-star"></i> Our Story & Mission</div>
     <h1>Building Kenya's <span>Digital Future</span>,<br>One Learner at a Time.</h1>
     <p>Skope Digital Academy was founded on a single belief: world-class education should be accessible to every ambitious mind in Africa — regardless of background or location.</p>
     <div class="hero-cta-row">

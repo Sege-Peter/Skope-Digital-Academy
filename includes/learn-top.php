@@ -8,12 +8,12 @@ $activeTab = $activeTab ?? 0;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <base href="<?= e(sda_base_href()) ?>">
 <title><?= e($pageTitle ?? 'Tutorials') ?> – Skope Digital Academy</title>
-<?php if (!empty($metaDescription)): ?><meta name="description" content="<?= e($metaDescription) ?>"><?php endif; ?>
+<?php require_once __DIR__ . '/seo.php'; sda_seo(['title' => ($pageTitle ?? 'Tutorials'), 'path' => sda_seo_current_path(), 'description' => $metaDescription ?? 'Free interactive tutorials in HTML, CSS, JavaScript, Python, SQL and PHP with examples you can run in your browser.', 'type' => 'article', 'breadcrumbs' => [['Tutorials', 'learn']], 'noindex' => !empty($q)]); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
-<link rel="stylesheet" href="assets/css/learn.css?v=4">
+<link rel="stylesheet" href="assets/css/learn.css?v=6">
 <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
 </head>
 <body class="lr-body<?= empty($tabs) ? ' no-tabs' : '' ?>">

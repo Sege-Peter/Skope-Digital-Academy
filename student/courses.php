@@ -1,101 +1,124 @@
 <?php
-$pageTitle = 'My Learning Path';
+$pageTitle = 'My courses';
 require_once 'includes/header.php';
 
 try {
-    // 1. Fetch active enrollments
-    $stmt = $pdo->prepare("SELECT e.*, c.title, c.thumbnail, c.level, cat.name as category_name, u.name as tutor_name
+    // All courses the student has joined: in progress first, then finished
+    $stmt = $pdo->prepare("SELECT e.*, c.title, c.thumbnail, c.level, c.total_lessons, cat.name as category_name, u.name as tutor_name
                            FROM enrollments e
                            JOIN courses c ON e.course_id = c.id
-                           JOIN users u ON c.tutor_id = u.id
+                           LEFT JOIN users u ON c.tutor_id = u.id
                            LEFT JOIN categories cat ON c.category_id = cat.id
-                           WHERE e.student_id = ? AND e.status = 'active' AND c.status = 'published'
-                           ORDER BY e.enrolled_at DESC");
+                           WHERE e.student_id = ? AND e.status IN ('active', 'completed') AND c.status = 'published'
+                           ORDER BY (e.status = 'completed'), e.enrolled_at DESC");
     $stmt->execute([$student['id']]);
     $enrollments = $stmt->fetchAll();
-
 } catch (Exception $e) {
+    error_log('student courses: ' . $e->getMessage());
     $enrollments = [];
 }
+
+$count_active = count(array_filter($enrollments, fn($e) => $e['status'] === 'active'));
+$count_done = count($enrollments) - $count_active;
 
 require_once 'includes/layout-top.php';
 ?>
 
-<header class="portal-header" style="margin-bottom: 40px;">
-    <div class="greeting">
-        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">My Learning Path<span style="color: var(--primary);">.</span></h1>
-        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Track your growth across all certifications and high-performance modules.</p>
+<div class="sp-page-head">
+    <div>
+        <h1>My courses</h1>
+        <p>Every course you've joined, with how far you've got in each one.</p>
     </div>
-    <div class="header-tools">
-        <a href="../courses" class="btn-premium" style="padding: 14px 28px; border-radius: 50px;"><i class="fas fa-compass"></i> Explore More</a>
+    <div class="sp-actions">
+        <a href="../courses" class="sp-btn"><i class="fas fa-compass"></i> Browse courses</a>
     </div>
-</header>
-
-<div style="margin-bottom: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px;">
-    <div class="premium-card glass-effect" style="display: flex; align-items: center; gap: 20px; padding: 24px;">
-        <div style="width: 60px; height: 60px; background: rgba(0, 174, 239, 0.08); color: var(--primary); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="fas fa-graduation-cap"></i>
-        </div>
-        <div>
-            <span style="display: block; font-size: 0.7rem; font-weight: 900; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;">Active Enrollments</span>
-            <strong style="font-size: 1.8rem; font-weight: 950; color: var(--text-main); line-height: 1;"><?= count($enrollments) ?></strong>
-        </div>
-    </div>
-    <!-- You can add more metric cards here if needed -->
 </div>
 
-<div class="courses-stack">
-    <?php if(!empty($enrollments)): ?>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 32px;">
-        <?php foreach($enrollments as $e): 
-            $prog = round($e['progress_percent']);
-        ?>
-        <div class="premium-card clickable-card" onclick="window.location.href='classroom?id=<?= $e['course_id'] ?>'" style="padding: 0; cursor: pointer; border-radius: 28px;">
-            <div style="position: relative; height: 200px; overflow: hidden;">
-                <img src="../<?= $e['thumbnail'] ? 'uploads/courses/'.$e['thumbnail'] : 'assets/images/course-placeholder.jpg' ?>" style="width: 100%; height: 100%; object-fit: cover; transition: 0.6s;">
-                <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(15, 23, 42, 0.85) 100%);"></div>
-                <span style="position: absolute; top: 16px; left: 16px; background: var(--primary); color: white; padding: 6px 14px; border-radius: 50px; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <?= $e['level'] ?>
-                </span>
-            </div>
-            <div style="padding: 28px; flex: 1; display: flex; flex-direction: column;">
-                <span style="font-size: 0.72rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 0.8px;"><?= htmlspecialchars($e['category_name'] ?: 'Academy Path') ?></span>
-                <h3 style="margin: 12px 0; font-size: 1.25rem; font-weight: 900; color: var(--text-main); line-height: 1.3; height: 2.6em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;"><?= htmlspecialchars($e['title']) ?></h3>
-                
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 28px;">
-                    <div style="width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; overflow: hidden;">
-                        <img src="../assets/images/user-placeholder.png" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>
-                    <span style="font-size: 0.85rem; color: var(--text-dim); font-weight: 600;"><?= htmlspecialchars($e['tutor_name']) ?></span>
-                </div>
+<?php if (empty($enrollments)): ?>
+    <div class="sp-empty">
+        <div class="sp-ico"><i class="fas fa-graduation-cap"></i></div>
+        <h3>You haven't joined a course yet</h3>
+        <p>Start free with a tutorial, or choose a course that ends with a certificate.</p>
+        <div class="sp-row" style="justify-content: center;">
+            <a href="../courses" class="sp-btn">Browse courses</a>
+            <a href="../learn" class="sp-btn ghost">Free tutorials</a>
+        </div>
+    </div>
+<?php else: ?>
+    <section class="sp-grid cols-3 sp-section">
+        <div class="sp-stat"><span class="sp-stat-icon"><i class="fas fa-book-open-reader"></i></span><div><strong><?= $count_active ?></strong><span>In progress</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-circle-check"></i></span><div><strong><?= $count_done ?></strong><span>Finished</span></div></div>
+        <div class="sp-stat"><span class="sp-stat-icon violet"><i class="fas fa-layer-group"></i></span><div><strong><?= count($enrollments) ?></strong><span>All courses</span></div></div>
+    </section>
 
-                <div style="margin-top: auto;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 800; margin-bottom: 10px;">
-                        <span style="color: var(--text-dim); text-transform: uppercase;">Module Progress</span>
-                        <span style="color: var(--primary);"><?= $prog ?>%</span>
+    <section class="sp-section">
+        <div class="sp-section-head">
+            <div class="sp-tabs" role="tablist">
+                <button type="button" class="sp-tab active" data-filter="active" onclick="filterCourses(this)">In progress (<?= $count_active ?>)</button>
+                <button type="button" class="sp-tab" data-filter="completed" onclick="filterCourses(this)">Finished (<?= $count_done ?>)</button>
+                <button type="button" class="sp-tab" data-filter="all" onclick="filterCourses(this)">All</button>
+            </div>
+        </div>
+
+        <div class="sp-grid cols-3" id="courseGrid">
+            <?php foreach ($enrollments as $c):
+                $isDone = $c['status'] === 'completed';
+                $progress = $isDone ? 100 : (int)round((float)($c['progress_percent'] ?? 0));
+            ?>
+            <a class="sp-card hover sp-course" data-status="<?= $isDone ? 'completed' : 'active' ?>" href="classroom?id=<?= (int)$c['course_id'] ?>">
+                <div class="sp-course-thumb">
+                    <img src="../uploads/courses/<?= htmlspecialchars($c['thumbnail'] ?: 'course-default.jpg') ?>" alt="" loading="lazy" onerror="this.style.display='none'">
+                    <span class="sp-badge <?= $isDone ? 'green' : '' ?>"><?= $isDone ? '✓ Finished' : (($c['learning_mode'] ?? '') === 'structured' ? 'Structured' : 'Self-paced') ?></span>
+                </div>
+                <div class="sp-course-body">
+                    <?php if (!empty($c['category_name'])): ?><span class="sp-small" style="color: var(--primary-dark); font-weight: 700;"><?= htmlspecialchars($c['category_name']) ?></span><?php endif; ?>
+                    <h3><?= htmlspecialchars($c['title']) ?></h3>
+                    <div class="sp-course-meta">
+                        <span><i class="fas fa-signal"></i> <?= ucfirst(htmlspecialchars($c['level'] ?? 'beginner')) ?></span>
+                        <?php if (!empty($c['total_lessons'])): ?><span><i class="fas fa-list"></i> <?= (int)$c['total_lessons'] ?> lessons</span><?php endif; ?>
+                        <?php if (!empty($c['tutor_name'])): ?><span><i class="fas fa-chalkboard-user"></i> <?= htmlspecialchars($c['tutor_name']) ?></span><?php endif; ?>
                     </div>
-                    <div style="height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden; margin-bottom: 24px;">
-                        <div style="height: 100%; background: var(--grad-primary); width: <?= $prog ?>%; border-radius: 10px; transition: 1s;"></div>
-                    </div>
-                    <div class="btn-premium" style="width: 100%; border-radius: 16px;">
-                        Continue Path <i class="fas fa-arrow-right" style="margin-left: 8px; font-size: 0.8rem;"></i>
+                    <div class="sp-progress <?= $isDone ? 'green' : '' ?>"><span style="width: <?= max(2, $progress) ?>%;"></span></div>
+                    <div class="sp-course-foot">
+                        <span class="sp-muted"><?= $progress ?>% complete</span>
+                        <span style="color: var(--primary-dark);"><?= $isDone ? 'Review' : ($progress > 0 ? 'Continue' : 'Start') ?> <i class="fas fa-arrow-right"></i></span>
                     </div>
                 </div>
-            </div>
+            </a>
+            <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
-        </div>
-    <?php else: ?>
-        <div class="premium-card" style="text-align: center; padding: 100px 40px; border-style: dashed; border-width: 2px;">
-            <div style="width: 80px; height: 80px; background: #f8fafc; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: var(--text-dim); font-size: 2rem;">
-                <i class="fas fa-book-open"></i>
-            </div>
-            <h3 style="font-weight: 900; font-size: 1.5rem; margin-bottom: 12px;">No Active Paths</h3>
-            <p style="color: var(--text-dim); max-width: 400px; margin: 0 auto 32px; line-height: 1.6;">You haven't enrolled in any courses yet. Start your journey by exploring our academy catalog.</p>
-            <a href="../courses" class="btn-premium" style="min-width: 200px;">Browse All Courses</a>
-        </div>
-    <?php endif; ?>
-</div>
 
+        <div class="sp-empty" id="emptyActive" style="display: none;">
+            <div class="sp-ico green"><i class="fas fa-flag-checkered"></i></div>
+            <h3>Nothing in progress</h3>
+            <p>You've finished every course you joined. Pick a new one to keep learning.</p>
+            <a href="../courses" class="sp-btn">Browse courses</a>
+        </div>
+        <div class="sp-empty" id="emptyCompleted" style="display: none;">
+            <div class="sp-ico"><i class="fas fa-hourglass-half"></i></div>
+            <h3>No finished courses yet</h3>
+            <p>When you complete a course it moves here, and you can download your certificate.</p>
+        </div>
+    </section>
+<?php endif; ?>
+
+<script>
+function filterCourses(btn) {
+    const f = btn.dataset.filter;
+    btn.parentElement.querySelectorAll('.sp-tab').forEach(b => b.classList.toggle('active', b === btn));
+    let shown = 0;
+    document.querySelectorAll('#courseGrid .sp-course').forEach(card => {
+        const show = f === 'all' || card.dataset.status === f;
+        card.style.display = show ? '' : 'none';
+        if (show) shown++;
+    });
+    document.getElementById('emptyActive').style.display = (f === 'active' && !shown) ? '' : 'none';
+    document.getElementById('emptyCompleted').style.display = (f === 'completed' && !shown) ? '' : 'none';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const first = document.querySelector('.sp-tab[data-filter="active"]');
+    if (first) filterCourses(first);
+});
+</script>
 
 <?php require_once 'includes/layout-bottom.php'; ?>

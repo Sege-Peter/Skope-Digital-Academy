@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Classroom Studio';
+$pageTitle = 'Classroom';
 require_once 'includes/header.php';
 
 $course_id = (int)($_GET['id'] ?? 0);
@@ -98,463 +98,404 @@ try {
 
 require_once 'includes/layout-top.php';
 if (!$active_lesson) {
-    echo '<div class="premium-card" style="padding:40px;margin:20px 0"><h2>' . e($enrollment['title'] ?? 'Course') . '</h2><p>Lessons for this course are being prepared. Check back soon.</p><a href="courses">Back to my courses</a></div>';
+    echo '<div class="sp-page-head"><div><h1>' . e($enrollment['title'] ?? 'Course') . '</h1><p>Your course classroom.</p></div></div>'
+       . '<div class="sp-empty"><div class="sp-ico"><i class="fas fa-hourglass-half"></i></div><h3>Lessons are on the way</h3>'
+       . '<p>Lessons for this course are being prepared. Check back soon.</p><a href="courses" class="sp-btn">Back to my courses</a></div>';
     require_once 'includes/layout-bottom.php';
     exit;
 }
 ?>
 <link rel="stylesheet" href="../assets/css/learn.css">
-
+<?php
+$lesson_total = count($lessons);
+$lesson_done_count = count(array_filter($lessons, fn($l) => ($l['progress_status'] ?? '') === 'completed'));
+$course_pct = max(0, min(100, (int)$enrollment['progress_percent']));
+$is_quiz_lesson = (!empty($active_lesson['attached_quiz_id']) && ($active_lesson['lesson_type'] === 'quiz' || strpos(strtoupper((string)$active_lesson['title']), 'QUIZ') !== false));
+$media_url = $active_lesson['video_url'] ?: $active_lesson['file_url'];
+$pdf_url = $active_lesson['pdf_resource'];
+$lesson_kind = $is_quiz_lesson ? 'Quiz' : ($active_lesson['lesson_type'] === 'video' ? 'Video' : ($active_lesson['lesson_type'] === 'pdf' ? 'Reading (PDF)' : 'Reading'));
+?>
 <style>
-    :root { 
-        --studio-vid-shadow: 0 40px 100px rgba(0,0,0,0.3); 
-        --glass: rgba(255, 255, 255, 0.8);
-        --glass-border: rgba(255, 255, 255, 0.5);
+    .pg-classroom .cr-crumbs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .8rem; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+    .pg-classroom .cr-crumbs a { color: var(--text-dim); text-decoration: none; }
+    .pg-classroom .cr-crumbs a:hover { color: var(--primary-dark); }
+    .pg-classroom .cr-crumbs i { font-size: .6rem; opacity: .6; }
+    .pg-classroom .cr-crumbs span { color: var(--primary-dark); }
+    .pg-classroom .sp-page-head { margin-bottom: 16px; }
+    .pg-classroom .sp-page-head h1 { overflow-wrap: anywhere; }
+
+    .pg-classroom .cr-track { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; margin-bottom: 20px; font-size: .84rem; }
+    .pg-classroom .cr-track .cr-meta { color: var(--text-dim); font-weight: 600; }
+    .pg-classroom .cr-track .cr-links { margin-left: auto; display: flex; gap: 16px; flex-wrap: wrap; }
+
+    .pg-classroom .cr-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+    .pg-classroom.focus .cr-layout { grid-template-columns: minmax(0, 1fr); }
+    .pg-classroom.focus .cr-side { display: none; }
+    .pg-classroom .cr-main > * + * { margin-top: 16px; }
+
+    .pg-classroom .cr-video { background: #000; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 16 / 9; }
+    .pg-classroom .cr-video iframe, .pg-classroom .cr-video video { width: 100%; height: 100%; display: block; border: 0; }
+    .pg-classroom .cr-feature { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .pg-classroom .cr-feature .sp-ico { width: 52px; height: 52px; border-radius: 14px; font-size: 1.3rem; }
+    .pg-classroom .cr-feature h3 { margin: 0; font-size: 1.05rem; font-weight: 800; }
+    .pg-classroom .cr-feature p { margin: 2px 0 0; color: var(--text-dim); font-size: .86rem; }
+    .pg-classroom .cr-feature.dark p { color: rgba(255,255,255,.75); }
+
+    .pg-classroom .cr-lesson { padding: 28px; }
+    .pg-classroom .cr-lesson .lr-content { color: var(--text-main); font-size: 1rem; overflow-wrap: anywhere; }
+    .pg-classroom .cr-lesson .lr-content img { max-width: 100%; height: auto; }
+    .pg-classroom .cr-lesson pre { overflow-x: auto; max-width: 100%; }
+
+    .pg-classroom .cr-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 16px; }
+    .pg-classroom .cr-actions form { margin: 0; }
+    .pg-classroom .cr-actions .cr-spacer { flex: 1; }
+
+    /* outline */
+    .pg-classroom .cr-side { position: sticky; top: calc(var(--topbar-h) + 16px); display: flex; flex-direction: column; gap: 16px; }
+    .pg-classroom .cr-outline { padding: 0; overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - var(--topbar-h) - 140px); }
+    .pg-classroom .cr-outline-head { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+    .pg-classroom .cr-outline-head h3 { margin: 0 0 10px; font-size: 1rem; font-weight: 800; }
+    .pg-classroom .cr-outline-scroll { overflow-y: auto; padding: 6px 8px 10px; }
+    .pg-classroom .cr-week { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 10px 6px; border: 0; background: none; cursor: pointer; font: inherit; font-size: .74rem; font-weight: 700; color: var(--text-dim); text-align: left; }
+    .pg-classroom .cr-week i { font-size: .65rem; }
+    .pg-classroom .cr-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; text-decoration: none; color: var(--text-main); border: 1px solid transparent; }
+    .pg-classroom .cr-item:hover { background: var(--surface-2); }
+    .pg-classroom .cr-item.active { background: var(--primary-soft); border-color: rgba(0,163,224,.35); }
+    .pg-classroom .cr-item.is-locked { opacity: .55; }
+    .pg-classroom .cr-num { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: .78rem; font-weight: 800; background: #EEF2F6; color: var(--text-dim); }
+    .pg-classroom .cr-item.active .cr-num { background: var(--primary); color: #fff; }
+    .pg-classroom .cr-item.completed .cr-num { background: var(--success); color: #fff; }
+    .pg-classroom .cr-item h5 { margin: 0; font-size: .86rem; font-weight: 700; line-height: 1.3; }
+    .pg-classroom .cr-item small { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: .72rem; color: var(--text-dim); }
+
+    .pg-classroom .cr-tutor { display: flex; align-items: center; gap: 12px; }
+    .pg-classroom .cr-tutor img { width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0; background: var(--primary-soft); }
+
+    /* AI study helper */
+    .cr-ai { position: fixed; bottom: 24px; right: 24px; width: 380px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-premium); z-index: 2000; display: none; flex-direction: column; overflow: hidden; }
+    .cr-ai-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .cr-ai-head strong { display: block; font-size: .9rem; }
+    .cr-ai-head span { font-size: .74rem; color: var(--text-dim); }
+    .cr-ai-chat { padding: 16px; height: 320px; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: .86rem; }
+    .cr-ai-chat .msg { padding: 10px 14px; border-radius: 14px; max-width: 88%; line-height: 1.5; overflow-wrap: anywhere; }
+    .cr-ai-chat .msg.bot { background: var(--surface-2); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .cr-ai-chat .msg.me { background: var(--primary-soft); color: #0B4F73; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .cr-ai-foot { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+    .cr-ai-foot input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border-strong); font: inherit; font-size: .88rem; outline: none; }
+    .cr-ai-foot input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+
+    .status-toast { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); z-index: 9999; display: none; max-width: calc(100vw - 32px); }
+    .status-toast > div { display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--success); color: #fff; border-radius: 12px; box-shadow: var(--shadow-md); font-weight: 700; font-size: .88rem; }
+
+    @media (max-width: 1100px) {
+        .pg-classroom .cr-layout { grid-template-columns: minmax(0, 1fr); }
+        .pg-classroom .cr-side { position: static; }
+        .pg-classroom .cr-outline { max-height: 520px; }
     }
-    .track-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 18px; padding: 12px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; font-size: .85rem; }
-    .track-bar .track-meta { color: #64748b; font-weight: 600; }
-    .track-bar .track-link { font-weight: 800; color: var(--primary); text-decoration: none; }
-    .lesson-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 28px; padding: 18px 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; }
-    .lesson-item.is-locked { opacity: .55; }
-    .studio-container { display: grid; grid-template-columns: 1fr 400px; gap: 40px; min-height: 90vh; transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); padding-bottom: 60px; }
-    .studio-container.focus-mode { grid-template-columns: 1fr 0; gap: 0; }
-    .studio-container.focus-mode .playlist-card { opacity: 0; pointer-events: none; transform: translateX(40px); }
-    
-    /* Studio Header Hero */
-    .studio-hero { margin-bottom: 40px; }
-    .breadcrumb { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-    .breadcrumb i { font-size: 0.6rem; opacity: 0.5; }
-    .studio-title { font-size: 2.5rem; font-weight: 950; letter-spacing: -1.5px; line-height: 1.1; color: var(--text-main); margin: 0; }
-
-    /* Premium Content Cards */
-    .premium-card { background: var(--glass); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid var(--glass-border); border-radius: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.06); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    .premium-card:hover { transform: translateY(-5px); box-shadow: 0 35px 70px -15px rgba(0,0,0,0.1); }
-
-    .content-group-card { background: white; border: 1px solid var(--border); border-radius: 24px; overflow: hidden; margin-bottom: 32px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.03); }
-    .group-header { padding: 24px 32px; display: flex; align-items: center; gap: 18px; background: linear-gradient(to right, #fdfdfd, #ffffff); border-bottom: 1px solid #f1f5f9; }
-    .group-chevron { width: 32px; height: 32px; border-radius: 12px; background: #F0F9FF; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0, 174, 239, 0.12); }
-    
-    .resource-item { padding: 24px 32px; display: flex; align-items: center; gap: 28px; transition: 0.3s; border-bottom: 1px solid #f1f5f9; position: relative; }
-    .resource-item:hover { background: #fafafa; }
-    .resource-item:last-child { border-bottom: none; }
-    
-    .resource-icon { width: 56px; height: 56px; border-radius: 18px; background: #f8fafc; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; transition: 0.4s; color: #475569; }
-    .resource-item:hover .resource-icon { transform: scale(1.15) rotate(-8deg); background: white; box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
-
-    .resource-title { display: block; font-size: 1.05rem; font-weight: 900; color: var(--text-main); text-decoration: none; margin-bottom: 5px; transition: 0.2s; }
-    .resource-title:hover { color: var(--primary); }
-    .resource-info { font-size: 0.78rem; color: #64748b; font-weight: 800; display: flex; align-items: center; gap: 10px; }
-    
-    .mark-done-btn { padding: 12px 24px; border-radius: 15px; border: 1px solid #e2e8f0; background: white; color: #475569; font-size: 0.85rem; font-weight: 900; cursor: pointer; transition: 0.3s; box-shadow: 0 5px 10px rgba(0,0,0,0.05); }
-    .mark-done-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); transform: translateY(-3px); box-shadow: 0 12px 25px rgba(0, 174, 239, 0.2); }
-    .mark-done-btn.done { border-color: #10b981; background: #10b981; color: white; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); }
-
-    .video-theater { background: #000; border-radius: 40px; overflow: hidden; box-shadow: var(--studio-vid-shadow); aspect-ratio: 16/9; position: relative; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 48px; animation: playerReveal 1s cubic-bezier(0.19, 1, 0.22, 1); }
-    @keyframes playerReveal { from { transform: scale(0.95) translateY(30px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-
-    /* Playlist High-Density Roadmap */
-    .playlist-card { background: white; border: 1px solid var(--border); border-radius: 35px; height: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 40px 80px rgba(2, 32, 71, 0.08); background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%); }
-    .playlist-header { padding: 32px; border-bottom: 1px solid #f1f5f9; }
-    .playlist-scroll { flex: 1; overflow-y: auto; padding: 20px 0; }
-    .playlist-scroll::-webkit-scrollbar { width: 5px; }
-    .playlist-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-
-
-    .lesson-item { display: flex; align-items: center; gap: 20px; padding: 20px 24px; border-radius: 24px; text-decoration: none; color: inherit; transition: 0.3s; margin: 0 20px 10px; border: 1px solid transparent; }
-    .lesson-item:hover { background: rgba(0, 174, 239, 0.04); transform: translateX(5px); }
-    .lesson-item.active { background: #F0F9FF; border-color: rgba(0, 174, 239, 0.3); box-shadow: 0 15px 30px rgba(0, 174, 239, 0.1); }
-    .item-num { width: 44px; height: 44px; border-radius: 16px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 900; color: #475569; flex-shrink: 0; transition: 0.3s; position: relative; }
-    .active .item-num { background: #00AEEF; color: white; transform: rotate(8deg); box-shadow: 0 10px 25px rgba(0, 174, 239, 0.4); }
-    .item-check { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; margin-left: auto; transition: 0.3s; flex-shrink: 0; }
-    .completed .item-check { background: #10b981; box-shadow: 0 5px 12px rgba(16, 185, 129, 0.3); }
-    .lesson-meta-label { font-size: 0.7rem; color: #94a3b8; font-weight: 800; display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-    
-    .pillar-divider { padding: 24px 24px 12px; font-size: 0.65rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 10px; }
-    .pillar-divider::before { content: ''; width: 4px; height: 4px; background: #e2e8f0; border-radius: 50%; }
-
-    .p-badge { background: linear-gradient(135deg, var(--primary), #0072FF); color: white; padding: 6px 14px; border-radius: 10px; font-size: 0.7rem; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-
-    /* Floating Study Widget */
-    .ai-study-buddy { position: fixed; bottom: 40px; right: 40px; width: 380px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 30px; box-shadow: 0 30px 100px rgba(0,0,0,0.18); border: 1px solid var(--border); z-index: 2000; display: none; flex-direction: column; overflow: hidden; animation: floatIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    @keyframes floatIn { from { transform: translateY(100px) scale(0.8); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
-
-    @media (max-width: 1100px) { 
-        .studio-container { grid-template-columns: 1fr; gap: 24px; padding: 12px; } 
-        .playlist-card { order: 2; height: 500px; border-radius: 24px; }
-        .studio-main { order: 1; }
-        .studio-title { font-size: 1.6rem; letter-spacing: -0.8px; }
-        .breadcrumb { font-size: 0.65rem; }
-        .premium-card { border-radius: 20px; padding: 24px !important; }
-        .resource-item { padding: 16px 20px; gap: 16px; }
-        .resource-icon { width: 44px; height: 44px; font-size: 1.2rem; }
-        .studio-hero { margin-bottom: 24px; }
-        .video-theater { border-radius: 20px; margin-bottom: 24px; }
-        .group-header { padding: 16px 20px; }
-    }
-
-    @media (max-width: 900px) {
-        .studio-content-layout { display: flex !important; flex-direction: column; gap: 24px !important; }
-        .module-brief-card { order: 1; }
-        .studio-sidebar-meta { order: 2; width: 100%; }
-        .studio-hero div { flex-direction: column; align-items: flex-start !important; gap: 12px; }
-        .ai-study-buddy { width: 92%; right: 4%; bottom: 20px; }
+    @media (max-width: 640px) {
+        .pg-classroom .cr-lesson { padding: 18px; }
+        .pg-classroom .cr-track .cr-links { margin-left: 0; }
+        .pg-classroom .cr-actions .sp-btn { flex: 1 1 auto; }
+        .pg-classroom .cr-actions .cr-spacer { display: none; }
+        .cr-ai { right: 16px; bottom: 16px; }
     }
 </style>
 
-<div id="statusToast" class="status-toast"></div>
+<div id="statusToast" class="status-toast" role="status"></div>
 
-<div class="studio-container" id="studioContainer">
-    <div class="studio-main">
-        <div class="studio-hero">
-            <nav class="breadcrumb" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; font-size: 0.72rem; font-weight: 950; text-transform: uppercase; letter-spacing: 1.2px;">
-                <a href="courses" style="text-decoration: none; color: #94a3b8; transition: 0.2s;">Learning Path</a> 
-                <i class="fas fa-chevron-right" style="font-size: 0.55rem; color: #cbd5e1; opacity: 0.6;"></i>
-                <span style="color: var(--primary); opacity: 0.9; cursor: default;"><?= htmlspecialchars($enrollment['title']) ?></span> 
-                <i class="fas fa-chevron-right" style="font-size: 0.55rem; color: #cbd5e1; opacity: 0.6;"></i>
-                <span style="color: #64748b; opacity: 0.4; font-weight: 800;">Module <?= $active_lesson['order_num'] ?></span>
+<div class="pg-classroom" id="studioContainer">
+    <div class="sp-page-head">
+        <div style="min-width: 0;">
+            <nav class="cr-crumbs" aria-label="Breadcrumb">
+                <a href="courses">My courses</a> <i class="fas fa-chevron-right"></i>
+                <span><?= htmlspecialchars($enrollment['title']) ?></span>
             </nav>
-            <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px;">
-                <h1 class="studio-title"><?= htmlspecialchars($active_lesson['title']) ?></h1>
-                <div style="display: flex; gap: 12px; margin-bottom: 6px;">
-                    <button onclick="toggleStudioFocus()" class="btn-action" style="background: white; border: 1px solid var(--border); color: var(--text-dim); padding: 12px 20px; font-weight: 800;"><i class="fas fa-magic"></i> Studio Focus</button>
-                </div>
-            </div>
+            <h1><?= htmlspecialchars($active_lesson['title']) ?></h1>
+            <p>Lesson <?= $active_idx + 1 ?> of <?= $lesson_total ?> · <?= $lesson_kind ?><?php if (!empty($active_lesson['duration_mins'])): ?> · <?= (int)$active_lesson['duration_mins'] ?> min<?php endif; ?></p>
         </div>
-
-        <div class="track-bar">
-            <span class="lr-pill <?= $is_structured ? 'struct' : 'self' ?>"><i class="fas <?= $is_structured ? 'fa-calendar-week' : 'fa-person-walking' ?>"></i> <?= e(mode_label($enrollment['learning_mode'])) ?></span>
-            <?php if ($is_structured): ?>
-                <span class="track-meta"><?= $enrollment['cohort_name'] ? e($enrollment['cohort_name']) . ' · ' : '' ?>Started <?= date('M j, Y', strtotime($enrollment['starts_on'] ?: 'today')) ?></span>
-                <?php if (!empty($active_lesson['due_at'])): ?><span class="track-meta"><i class="far fa-clock"></i> This lesson is due <?= date('D, M j', $active_lesson['due_at']) ?></span><?php endif; ?>
-            <?php else: ?>
-                <span class="track-meta">Every lesson is open. Go in any order.</span>
-            <?php endif; ?>
-            <?php if (!empty($enrollment['expires_at'])): ?><span class="track-meta">Access until <?= date('M j, Y', strtotime($enrollment['expires_at'])) ?></span><?php endif; ?>
-            <?php if (count(course_modes($enrollment)) > 1): ?><a class="track-link" href="../enroll?id=<?= $course_id ?>">Change track</a><?php endif; ?>
-            <a class="track-link" href="../learn?course=<?= $course_id ?>&lesson=<?= (int)$active_lesson['id'] ?>">Reading view</a>
+        <div class="sp-actions">
+            <button type="button" class="sp-btn ghost sm" onclick="toggleStudioFocus(this)" id="focusBtn"><i class="fas fa-expand"></i> <span>Hide outline</span></button>
         </div>
+    </div>
 
+    <div class="sp-card cr-track">
+        <span class="sp-badge <?= $is_structured ? 'orange' : '' ?>"><i class="fas <?= $is_structured ? 'fa-calendar-week' : 'fa-person-walking' ?>"></i> <?= e(mode_label($enrollment['learning_mode'])) ?></span>
+        <?php if ($is_structured): ?>
+            <span class="cr-meta"><?= $enrollment['cohort_name'] ? e($enrollment['cohort_name']) . ' · ' : '' ?>Started <?= date('M j, Y', strtotime($enrollment['starts_on'] ?: 'today')) ?></span>
+            <?php if (!empty($active_lesson['due_at'])): ?><span class="cr-meta"><i class="far fa-clock"></i> Due <?= date('D, M j', $active_lesson['due_at']) ?></span><?php endif; ?>
+        <?php else: ?>
+            <span class="cr-meta">Every lesson is open. Go in any order.</span>
+        <?php endif; ?>
+        <?php if (!empty($enrollment['expires_at'])): ?><span class="cr-meta">Access until <?= date('M j, Y', strtotime($enrollment['expires_at'])) ?></span><?php endif; ?>
+        <span class="cr-links">
+            <?php if (count(course_modes($enrollment)) > 1): ?><a class="sp-link" href="../enroll?id=<?= $course_id ?>">Change track</a><?php endif; ?>
+            <a class="sp-link" href="../learn?course=<?= $course_id ?>&lesson=<?= (int)$active_lesson['id'] ?>"><i class="fas fa-book-open"></i> Reading view</a>
+        </span>
+    </div>
+
+    <div class="cr-layout">
+        <div class="cr-main">
         <?php if (!empty($active_lesson['is_locked'])): ?>
-            <div class="lr-notice lock" style="margin-top:20px"><i class="fas fa-lock"></i><div>
+            <div class="sp-alert warning" style="margin: 0;"><i class="fas fa-lock" style="margin-top: 3px;"></i><div>
                 <strong><?= e($active_lesson['lock_reason']) ?></strong>
                 <?= $is_structured ? 'You are on the structured track, so lessons open on a weekly schedule and in order.' : '' ?>
                 <?php if ($is_structured && in_array('self_paced', course_modes($enrollment), true)): ?>
-                    Prefer to go faster? <a href="../enroll?id=<?= $course_id ?>&mode=self_paced">Switch to self-paced</a>.
+                    Prefer to go faster? <a href="../enroll?id=<?= $course_id ?>&mode=self_paced" style="font-weight: 700;">Switch to self-paced</a>.
                 <?php endif; ?>
-                <?php if ($prev_lesson): ?><div style="margin-top:12px"><a class="lr-btn lr-btn-primary" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Back to <?= e($prev_lesson['title']) ?></a></div><?php endif; ?>
+                <?php if ($prev_lesson): ?><div style="margin-top: 12px;"><a class="sp-btn sm" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Back to <?= e($prev_lesson['title']) ?></a></div><?php endif; ?>
             </div></div>
         <?php else: ?>
 
-        <div class="video-theater">
-            <?php 
-            $is_quiz_lesson = ($active_lesson && !empty($active_lesson['attached_quiz_id']) && ($active_lesson['lesson_type'] === 'quiz' || strpos(strtoupper($active_lesson['title']), 'QUIZ') !== false));
-            $media_url = $active_lesson['video_url'] ?: $active_lesson['file_url'];
-            $pdf_url = $active_lesson['pdf_resource'];
-
-            if($is_quiz_lesson): 
-            ?>
-                <div class="vid-placeholder" style="background: linear-gradient(135deg, #0b0f19 0%, #1e1b4b 100%);">
-                    <div style="background: rgba(0, 174, 239, 0.1); width: 100px; height: 100px; border-radius: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 1px solid rgba(0, 174, 239, 0.2);">
-                        <i class="fas fa-brain fa-3x" style="color: var(--primary);"></i>
+            <?php if ($is_quiz_lesson): ?>
+                <div class="sp-card dark cr-feature">
+                    <span class="sp-ico" style="background: rgba(255,255,255,.1); color: #fff;"><i class="fas fa-circle-question"></i></span>
+                    <div class="sp-grow" style="flex: 1; min-width: 200px;">
+                        <h3>Quiz time</h3>
+                        <p>Check what you have learned in this part of the course.</p>
                     </div>
-                    <h2 style="font-weight: 950; letter-spacing: -1.5px; margin-bottom: 8px;">KNOWLEDGE CHALLENGE UNLOCKED</h2>
-                    <p style="opacity: 0.7; margin-bottom: 32px; font-weight: 500;">Please proceed to the assessment to validate your module mastery.</p>
-                    <a href="take-quiz?id=<?= (int)$active_lesson['attached_quiz_id'] ?>" class="btn-premium" style="padding: 18px 48px; border-radius: 50px;">START CHALLENGE NOW</a>
+                    <a href="take-quiz?id=<?= (int)$active_lesson['attached_quiz_id'] ?>" class="sp-btn">Start quiz <i class="fas fa-arrow-right"></i></a>
                 </div>
-            <?php elseif($media_url): ?>
-                <?php if(strpos($media_url, 'youtube') !== false || strpos($media_url, 'vimeo') !== false): ?>
-                    <iframe width="100%" height="100%" src="<?= e(video_embed_url($media_url)) ?>" frameborder="0" allowfullscreen></iframe>
-                <?php else: ?>
-                    <video controls style="width: 100%; height: 100%;"><source src="../<?= htmlspecialchars($media_url) ?>" type="video/mp4"></video>
-                <?php endif; ?>
-            <?php elseif($pdf_url): ?>
-                <div class="vid-placeholder" style="background: #ffffff; color: var(--text-main); display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #e2e8f0;">
-                    <div style="width: 100px; height: 100px; background: #FFF1F2; color: #ef4444; border-radius: 30px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 2.8rem; box-shadow: 0 10px 20px rgba(239, 68, 68, 0.1);"><i class="fas fa-file-pdf"></i></div>
-                    <h3 style="font-weight: 950; margin: 0 0 8px; letter-spacing: -1px; text-transform: uppercase; font-size: 1.4rem;">Academic Resource Hub</h3>
-                    <p style="opacity: 0.6; margin: 0 0 32px; font-weight: 700; font-size: 0.9rem; max-width: 400px; text-align: center;">The instructor has digitized a strategic physical resource for this practical module.</p>
-                    <a href="../uploads/lessons/<?= htmlspecialchars($pdf_url) ?>" target="_blank" class="btn-premium" style="background: #ef4444; box-shadow: 0 15px 30px rgba(239, 68, 68, 0.25); border: none; padding: 18px 40px; border-radius: 50px;"><i class="fas fa-cloud-download-alt"></i> ACCESS LECTURE PDF</a>
+            <?php elseif ($media_url): ?>
+                <div class="cr-video">
+                    <?php if (strpos($media_url, 'youtube') !== false || strpos($media_url, 'vimeo') !== false): ?>
+                        <iframe src="<?= e(video_embed_url($media_url)) ?>" title="<?= e($active_lesson['title']) ?>" allowfullscreen></iframe>
+                    <?php else: ?>
+                        <video controls><source src="../<?= htmlspecialchars($media_url) ?>" type="video/mp4"></video>
+                    <?php endif; ?>
                 </div>
-            <?php else: ?>
-                <div class="vid-placeholder" style="background: #f8fafc; color: var(--text-dim);">
-                    <div style="width: 80px; height: 80px; background: white; border: 1px solid #e2e8f0; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 1.8rem; color: #cbd5e1;"><i class="fas fa-chalkboard"></i></div>
-                    <h4 style="font-weight: 950; letter-spacing: -0.5px; margin: 0 0 8px; color: var(--text-main);">Technical Documentation Only</h4>
-                    <p style="margin: 0; font-size: 0.85rem; font-weight: 700;">Please review the module concepts and technical brief below.</p>
+            <?php elseif ($pdf_url): ?>
+                <div class="sp-card cr-feature">
+                    <span class="sp-ico red"><i class="fas fa-file-pdf"></i></span>
+                    <div style="flex: 1; min-width: 200px;">
+                        <h3>Lesson notes (PDF)</h3>
+                        <p>Your tutor shared the notes for this lesson as a PDF.</p>
+                    </div>
+                    <a href="../uploads/lessons/<?= htmlspecialchars($pdf_url) ?>" target="_blank" rel="noopener" class="sp-btn"><i class="fas fa-download"></i> Open PDF</a>
                 </div>
             <?php endif; ?>
-        </div>
 
-            <!-- Academic Learning Materials (Tutor Only) -->
-            <?php if($active_lesson && ($active_lesson['pdf_resource'] || $active_lesson['lesson_type'] === 'pdf')): 
+            <?php if ($active_lesson['pdf_resource'] || $active_lesson['lesson_type'] === 'pdf'):
                 $file_name = !empty($active_lesson['pdf_resource']) ? $active_lesson['pdf_resource'] : $active_lesson['file_url'];
-                $display_name = !empty($active_lesson['title']) ? $active_lesson['title'] : "Practical Exercise";
-                if(!empty($file_name)):
+                $display_name = !empty($active_lesson['title']) ? $active_lesson['title'] : 'Practical exercise';
+                if (!empty($file_name)):
             ?>
-            <div class="content-group-card">
-                <div class="group-header">
-                    <div class="group-chevron"><i class="fas fa-chevron-down"></i></div>
-                    <h5 style="margin: 0; font-weight: 800; font-size: 1.1rem;">Academic Learning Materials</h5>
-                </div>
-                
-                <div class="resource-item">
-                    <div class="resource-icon"><i class="far fa-file-pdf" style="color: #ef4444;"></i></div>
-                    <div class="resource-meta">
-                        <a href="../uploads/lessons/<?= htmlspecialchars($file_name) ?>" class="resource-title" target="_blank"><?= htmlspecialchars($display_name) ?> PDF</a>
-                        <span class="resource-info">Digital Resource (Academic Material)</span>
+            <div class="sp-card">
+                <div class="sp-card-head" style="margin-bottom: 4px;"><h3>Learning materials</h3></div>
+                <div class="sp-list">
+                    <div class="sp-list-item">
+                        <span class="sp-ico red"><i class="far fa-file-pdf"></i></span>
+                        <div class="sp-grow">
+                            <h4><a href="../uploads/lessons/<?= htmlspecialchars($file_name) ?>" target="_blank" rel="noopener" style="text-decoration: none;"><?= htmlspecialchars($display_name) ?> (PDF)</a></h4>
+                            <p>Download or open in a new tab</p>
+                        </div>
+                        <form method="POST" style="margin: 0;">
+                            <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+                            <input type="hidden" name="complete_lesson" value="<?= (int)$active_lesson['id'] ?>">
+                            <button type="submit" class="sp-btn sm <?= $lesson_done ? '' : 'ghost' ?>" <?= $lesson_done ? 'style="background: var(--success);"' : '' ?>>
+                                <?= $lesson_done ? '<i class="fas fa-check"></i> Done' : 'Mark as done' ?>
+                            </button>
+                        </form>
                     </div>
-                    <form method="POST">
-                        <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
-                        <input type="hidden" name="complete_lesson" value="<?= $active_lesson['id'] ?>">
-                        <button type="submit" class="mark-done-btn <?= $lesson_done ? 'done' : '' ?>">
-                            <?= $lesson_done ? 'Done' : 'Mark as done' ?>
-                        </button>
-                    </form>
                 </div>
             </div>
             <?php endif; endif; ?>
 
-            <!-- C.A.T Assessments (Tutor Only) -->
-            <?php if($cat_quiz): ?>
-            <div class="content-group-card">
-                <div class="group-header">
-                    <div class="group-chevron"><i class="fas fa-chevron-down"></i></div>
-                    <h5 style="margin: 0; font-weight: 800; font-size: 1.1rem;">Continuous Assessment Test (C.A.T)</h5>
-                </div>
-                
-                <div class="resource-item">
-                    <div class="resource-icon"><i class="far fa-file-alt" style="color: #8b5cf6;"></i></div>
-                    <div class="resource-meta">
-                        <a href="take-quiz?id=<?= $cat_quiz['id'] ?>" class="resource-title"><?= htmlspecialchars($cat_quiz['title']) ?></a>
-                        <span class="resource-info">Time Allocation: <?= $cat_quiz['time_limit_mins'] ?> mins | Min. Score: <?= $cat_quiz['pass_score'] ?>%</span>
-                        
-                        <?php 
-                        $is_locked = (isset($active_lesson['release_date']) && strtotime($active_lesson['release_date']) > time());
-                        if($is_locked): ?>
-                        <div class="locked-notice">
-                            <i class="fas fa-lock"></i>
-                            <div>
-                                Not available unless: It is after **<?= date('j F Y, g:i A', strtotime($active_lesson['release_date'])) ?>**
-                                <a href="#" style="color: var(--primary); text-decoration: none; margin-left: auto; font-weight: 800;" onclick="event.preventDefault()">Show more <i class="fas fa-chevron-down"></i></a>
-                            </div>
+            <?php if ($cat_quiz):
+                $cat_locked = (isset($active_lesson['release_date']) && strtotime($active_lesson['release_date']) > time());
+            ?>
+            <div class="sp-card">
+                <div class="sp-card-head" style="margin-bottom: 4px;"><h3>Assessment test (CAT)</h3></div>
+                <div class="sp-list">
+                    <div class="sp-list-item">
+                        <span class="sp-ico violet"><i class="far fa-file-lines"></i></span>
+                        <div class="sp-grow">
+                            <h4><?= htmlspecialchars($cat_quiz['title']) ?></h4>
+                            <p><?= (int)$cat_quiz['time_limit_mins'] ?> min · Pass mark <?= (int)$cat_quiz['pass_score'] ?>%</p>
+                            <?php if ($cat_locked): ?>
+                                <p style="color: #A16207;"><i class="fas fa-lock"></i> Opens <?= date('j F Y, g:i A', strtotime($active_lesson['release_date'])) ?></p>
+                            <?php endif; ?>
                         </div>
-                        <?php endif; ?>
+                        <a href="take-quiz?id=<?= (int)$cat_quiz['id'] ?>" class="sp-btn sm">Open test</a>
                     </div>
                 </div>
             </div>
             <?php endif; ?>
 
-            <div class="studio-content-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px; margin-top: 40px;">
-                <div class="premium-card module-brief-card" style="padding: 40px;">
-                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 24px;">
-                        <div style="width: 50px; height: 50px; border-radius: 16px; background: #F0F9FF; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                            <i class="fas fa-quote-left"></i>
-                        </div>
-                        <div>
-                            <h4 style="font-weight: 950; margin: 0; font-size: 1.2rem; letter-spacing: -0.5px;">Module Brief</h4>
-                            <p style="margin: 0; font-size: 0.75rem; font-weight: 700; color: var(--text-dim);">Core concepts & strategic objectives</p>
-                        </div>
-                    </div>
-                    <div class="lr-content">
-                        <?= trim((string)$active_lesson['content']) !== '' ? render_lesson_text($active_lesson['content']) : '<p>Follow along with the media above.</p>' ?>
-                    </div>
-                    <?php if (!empty($active_lesson['code_example'])): ?>
-                    <div class="lr-example"><h3>Example</h3><pre><code><?= e($active_lesson['code_example']) ?></code></pre>
-                        <a class="lr-btn lr-btn-ok" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><?= tryit_runnable($active_lesson['code_lang']) ? 'Try it yourself' : 'Open in editor' ?> <i class="fas fa-arrow-up-right-from-square"></i></a></div>
-                    <?php endif; ?>
+            <article class="sp-card cr-lesson">
+                <div class="lr-content">
+                    <?= trim((string)$active_lesson['content']) !== '' ? render_lesson_text($active_lesson['content']) : '<p>Follow along with the video or notes above.</p>' ?>
                 </div>
+                <?php if (!empty($active_lesson['code_example'])): ?>
+                <div class="lr-example"><h3>Example</h3><pre><code><?= e($active_lesson['code_example']) ?></code></pre>
+                    <a class="lr-btn lr-btn-ok" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><?= tryit_runnable($active_lesson['code_lang']) ? 'Try it yourself' : 'Open in editor' ?> <i class="fas fa-arrow-up-right-from-square"></i></a></div>
+                <?php endif; ?>
+            </article>
 
-                <div class="studio-sidebar-meta">
-                    <div class="premium-card" style="padding: 32px 24px; text-align: center; margin-bottom: 24px;">
-                        <div style="position: relative; width: 80px; height: 80px; margin: 0 auto 16px;">
-                            <img src="../<?= htmlspecialchars($enrollment['tutor_avatar'] ?: 'assets/images/user-placeholder.png') ?>" style="width: 100%; height: 100%; border-radius: 20px; object-fit: cover; border: 3px solid white; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
-                            <div style="width: 16px; height: 16px; background: #22c55e; border: 3px solid white; border-radius: 50%; position: absolute; bottom: -2px; right: -2px;"></div>
-                        </div>
-                        <h6 style="margin: 0; font-weight: 950; font-size: 1.1rem; letter-spacing: -0.5px;"><?= htmlspecialchars($enrollment['tutor_name']) ?></h6>
-                        <span style="font-size: 0.65rem; font-weight: 900; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-top: 4px;">Faculty Lead</span>
-                        <div style="margin-top: 24px;">
-                            <a href="messages?to=<?= $enrollment['tutor_id'] ?>" class="btn-action" style="display: block; width: 100%; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; font-size: 0.75rem; font-weight: 950; border-radius: 12px; transition: 0.3s; text-decoration: none; color: #1e293b; text-align: center;"><i class="fas fa-envelope"></i> MESSAGE TUTOR</a>
-                        </div>
-                    </div>
-
-                    <button onclick="toggleAIStudyBuddy()" class="btn-premium" style="width: 100%; padding: 28px; border: none; background: linear-gradient(135deg, #6366f1, #8b5cf6); box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3); border-radius: 30px; cursor: pointer; text-align: center; justify-content: center; gap: 12px;">
-                        <i class="fas fa-sparkles"></i> <span>AI STUDY ASSISTANT</span>
-                    </button>
-                </div>
-            </div>
-            <div class="lesson-actions">
-                <?php if ($prev_lesson): ?><a class="lr-btn lr-btn-ghost" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Previous</a><?php endif; ?>
-                <?php if (!empty($active_lesson['code_example'])): ?><a class="lr-btn lr-btn-ghost" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><i class="fas fa-code"></i> Try it yourself</a><?php endif; ?>
-                <span style="flex:1"></span>
+            <div class="sp-card cr-actions">
+                <?php if ($prev_lesson): ?><a class="sp-btn ghost" href="?id=<?= $course_id ?>&lesson=<?= (int)$prev_lesson['id'] ?>"><i class="fas fa-chevron-left"></i> Previous</a><?php endif; ?>
+                <?php if (!empty($active_lesson['code_example'])): ?><a class="sp-btn ghost" href="../tryit?lesson=<?= (int)$active_lesson['id'] ?>" target="_blank" rel="noopener"><i class="fas fa-code"></i> Try it yourself</a><?php endif; ?>
+                <span class="cr-spacer"></span>
                 <?php if ($lesson_done): ?>
-                    <span class="lr-pill free"><i class="fas fa-check"></i> Completed</span>
-                    <?php if ($next_lesson): ?><a class="lr-btn lr-btn-primary" href="?id=<?= $course_id ?>&lesson=<?= (int)$next_lesson['id'] ?>">Next <i class="fas fa-chevron-right"></i></a><?php endif; ?>
+                    <span class="sp-badge green"><i class="fas fa-check"></i> Completed</span>
+                    <?php if ($next_lesson): ?>
+                        <a class="sp-btn" href="?id=<?= $course_id ?>&lesson=<?= (int)$next_lesson['id'] ?>">Next lesson <i class="fas fa-chevron-right"></i></a>
+                    <?php else: ?>
+                        <a class="sp-btn" href="courses">Back to my courses</a>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <form method="POST" style="margin:0">
+                    <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
                         <input type="hidden" name="complete_lesson" value="<?= (int)$active_lesson['id'] ?>">
-                        <button class="lr-btn lr-btn-ok" name="and_next" value="1"><i class="fas fa-check"></i> Mark complete<?= $next_lesson ? ' &amp; continue' : '' ?></button>
+                        <button class="sp-btn" style="background: var(--success);" name="and_next" value="1"><i class="fas fa-check"></i> Mark complete<?= $next_lesson ? ' &amp; next lesson' : '' ?></button>
                     </form>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-    </div>
-
-    <aside class="playlist-card">
-        <div class="playlist-header">
-            <h5 style="margin: 0; font-weight: 900; font-size: 1rem;">Curriculum Archive</h5>
-            <div style="margin-top: 16px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;">
-                    <span>Course Progress</span>
-                    <span><?= (int)$enrollment['progress_percent'] ?>%</span>
-                </div>
-                <div style="height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden;">
-                    <div style="height: 100%; background: linear-gradient(90deg, var(--primary), #0072FF); width: <?= (int)$enrollment['progress_percent'] ?>%; transition: 1s cubic-bezier(0.19, 1, 0.22, 1);"></div>
-                </div>
-            </div>
         </div>
-        <div class="playlist-scroll">
-            <?php foreach($lessons_by_week as $wnum => $wlessons): 
-                $is_active_week = false;
-                foreach($wlessons as $l) { if($active_lesson && $l['id'] == $active_lesson['id']) { $is_active_week = true; break; } }
-            ?>
-                <div class="pillar-divider" onclick="toggleWeek(<?= $wnum ?>)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-                    <span><?= $is_structured ? 'Week' : 'Module' ?> <?= $wnum ?><?php if ($is_structured && !empty($wlessons[0]['opens_at'])): ?> · <?= $wlessons[0]['opens_at'] > time() ? 'opens ' : 'opened ' ?><?= date('M j', $wlessons[0]['opens_at']) ?><?php endif; ?></span>
-                    <i class="fas fa-chevron-<?= $is_active_week ? 'down' : 'right' ?>" id="week-icon-<?= $wnum ?>" style="font-size: 0.7rem; opacity: 0.5;"></i>
+
+        <aside class="cr-side" id="courseOutline">
+            <div class="sp-card cr-outline">
+                <div class="cr-outline-head">
+                    <h3>Course outline</h3>
+                    <div class="sp-between sp-small" style="margin-bottom: 6px;">
+                        <span class="sp-muted"><?= $lesson_done_count ?> of <?= $lesson_total ?> lessons done</span>
+                        <strong><?= $course_pct ?>%</strong>
+                    </div>
+                    <div class="sp-progress <?= $course_pct >= 100 ? 'green' : '' ?>"><span style="width: <?= max(2, $course_pct) ?>%;"></span></div>
                 </div>
-                <div id="week-content-<?= $wnum ?>" style="display: <?= $is_active_week ? 'block' : 'none' ?>;">
-                    <?php foreach($wlessons as $l): ?>
-                        <a href="?id=<?= $course_id ?>&lesson=<?= $l['id'] ?>" class="lesson-item <?= ($active_lesson && $l['id'] == $active_lesson['id']) ? 'active' : '' ?> <?= $l['progress_status'] === 'completed' ? 'completed' : '' ?> <?= $l['is_locked'] ? 'is-locked' : '' ?>" <?= $l['is_locked'] ? 'title="' . e($l['lock_reason']) . '"' : '' ?>>
-                            <div class="item-num"><?= $l['order_num'] ?></div>
-                            <div class="lesson-info">
-                                <h6 style="margin: 0; color: var(--text-main); font-weight: 900; font-size: 0.9rem; line-height: 1.3;"><?= htmlspecialchars($l['title']) ?></h6>
-                                <div class="lesson-meta-label">
-                                    <i class="<?= $l['lesson_type'] == 'video' ? 'fas fa-play-circle' : 'far fa-file-alt' ?>"></i> 
-                                    <?= $l['is_locked'] ? '<i class="fas fa-lock"></i> ' . e($l['lock_reason']) : (int)($l['duration_mins'] ?: 15) . ' min' ?>
-                                </div>
-                            </div>
-                            <div class="item-check"><i class="fas fa-check"></i></div>
-                        </a>
+                <div class="cr-outline-scroll">
+                    <?php foreach ($lessons_by_week as $wnum => $wlessons):
+                        $wnum = (int)$wnum;
+                        $is_active_week = false;
+                        foreach ($wlessons as $l) { if ($l['id'] == $active_lesson['id']) { $is_active_week = true; break; } }
+                    ?>
+                        <button type="button" class="cr-week" onclick="toggleWeek(<?= $wnum ?>)" aria-expanded="<?= $is_active_week ? 'true' : 'false' ?>">
+                            <span><?= $is_structured ? 'Week' : 'Module' ?> <?= $wnum ?><?php if ($is_structured && !empty($wlessons[0]['opens_at'])): ?> · <?= $wlessons[0]['opens_at'] > time() ? 'opens ' : 'opened ' ?><?= date('M j', $wlessons[0]['opens_at']) ?><?php endif; ?></span>
+                            <i class="fas fa-chevron-<?= $is_active_week ? 'down' : 'right' ?>" id="week-icon-<?= $wnum ?>"></i>
+                        </button>
+                        <div id="week-content-<?= $wnum ?>" style="display: <?= $is_active_week ? 'block' : 'none' ?>;">
+                            <?php foreach ($wlessons as $l):
+                                $l_done = $l['progress_status'] === 'completed';
+                                $l_active = $l['id'] == $active_lesson['id'];
+                            ?>
+                                <a href="?id=<?= $course_id ?>&lesson=<?= (int)$l['id'] ?>" class="cr-item <?= $l_active ? 'active' : '' ?> <?= $l_done ? 'completed' : '' ?> <?= $l['is_locked'] ? 'is-locked' : '' ?>" <?= $l['is_locked'] ? 'title="' . e($l['lock_reason']) . '"' : '' ?> <?= $l_active ? 'aria-current="page"' : '' ?>>
+                                    <span class="cr-num"><?= $l_done ? '<i class="fas fa-check"></i>' : (int)$l['order_num'] ?></span>
+                                    <span style="min-width: 0;">
+                                        <h5><?= htmlspecialchars($l['title']) ?></h5>
+                                        <small>
+                                            <i class="<?= $l['lesson_type'] == 'video' ? 'fas fa-play-circle' : 'far fa-file-alt' ?>"></i>
+                                            <?= $l['is_locked'] ? '<i class="fas fa-lock"></i> ' . e($l['lock_reason']) : (int)($l['duration_mins'] ?: 15) . ' min' ?>
+                                        </small>
+                                    </span>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
                     <?php endforeach; ?>
                 </div>
-            <?php endforeach; ?>
-        </div>
-    </aside>
-</div>
+            </div>
 
-<!-- AI Study Buddy Interface -->
-<div class="ai-study-buddy" id="aiBuddy">
-    <div style="padding: 24px; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);">
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="position: relative;">
-                <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%; border: 3px solid white; position: absolute; bottom: 0; right: 0; z-index: 5;"></div>
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-                    <i class="fas fa-microchip"></i>
+            <div class="sp-card">
+                <div class="cr-tutor">
+                    <img src="../<?= htmlspecialchars($enrollment['tutor_avatar'] ?: 'assets/images/user-placeholder.png') ?>" alt="" onerror="this.style.visibility='hidden'">
+                    <div style="min-width: 0;">
+                        <span class="sp-muted sp-small">Your tutor</span>
+                        <strong style="display: block;" class="sp-truncate"><?= htmlspecialchars($enrollment['tutor_name']) ?></strong>
+                    </div>
+                </div>
+                <div style="display: grid; gap: 8px; margin-top: 14px;">
+                    <a href="messages?to=<?= (int)$enrollment['tutor_id'] ?>" class="sp-btn ghost block"><i class="far fa-envelope"></i> Message tutor</a>
+                    <button type="button" onclick="toggleAIStudyBuddy()" class="sp-btn soft block"><i class="fas fa-wand-magic-sparkles"></i> Ask the AI study helper</button>
                 </div>
             </div>
-            <div>
-                <h6 style="margin: 0; font-weight: 950; font-size: 0.85rem; letter-spacing: 0.5px;">SDA QUANTUM AI</h6>
-                <span style="font-size: 0.65rem; font-weight: 800; opacity: 0.8; text-transform: uppercase;">Active Mentor</span>
-            </div>
-        </div>
-        <button onclick="toggleAIStudyBuddy()" style="background: rgba(255,255,255,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; transition: 0.3s;"><i class="fas fa-times"></i></button>
+        </aside>
     </div>
-    <div class="ai-chat" id="aiChat" style="padding: 24px; height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 18px 18px 18px 4px; border: 1px solid #e2e8f0; font-size: 0.85rem; font-weight: 600; line-height: 1.6; color: #334155;">
-            Greetings! I'm synchronized with **Module <?= $active_lesson['order_num'] ?>: <?= htmlspecialchars($active_lesson['title']) ?>**. 
-            How can I assist your learning today?
+</div>
+
+<!-- AI study helper -->
+<div class="cr-ai" id="aiBuddy" role="dialog" aria-label="AI study helper">
+    <div class="cr-ai-head">
+        <div class="sp-row" style="gap: 10px; flex-wrap: nowrap;">
+            <span class="sp-ico violet" style="width: 36px; height: 36px;"><i class="fas fa-wand-magic-sparkles"></i></span>
+            <div><strong>AI study helper</strong><span>Ask about this lesson</span></div>
         </div>
+        <button type="button" class="sp-icon-btn" onclick="toggleAIStudyBuddy()" aria-label="Close" style="width: 34px; height: 34px;"><i class="fas fa-xmark"></i></button>
     </div>
-    <div style="padding: 24px; border-top: 1px solid #f1f5f9; display: flex; gap: 12px;">
-        <input type="text" id="aiQuery" placeholder="Ask about this module..." style="flex: 1; padding: 15px 20px; border: 1px solid #e2e8f0; border-radius: 16px; outline: none; font-size: 0.85rem; font-weight: 600; background: #f8fafc; transition: 0.3s;" onkeypress="if(event.key === 'Enter') askAIBuddy()">
-        <button onclick="askAIBuddy()" class="btn-premium" style="width: 54px; height: 54px; border-radius: 16px; border: none; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; cursor: pointer; transform-origin: center; transition: 0.3s; box-shadow: 0 10px 20px rgba(99,102,241,0.25);"><i class="fas fa-paper-plane"></i></button>
+    <div class="cr-ai-chat" id="aiChat">
+        <div class="msg bot">Hi! I can help with "<?= htmlspecialchars($active_lesson['title']) ?>". What would you like to know?</div>
+    </div>
+    <div class="cr-ai-foot">
+        <input type="text" id="aiQuery" placeholder="Ask a question..." onkeypress="if(event.key === 'Enter') askAIBuddy()" aria-label="Your question">
+        <button type="button" onclick="askAIBuddy()" class="sp-btn" aria-label="Send" style="padding: 0 14px;"><i class="fas fa-paper-plane"></i></button>
     </div>
 </div>
 
 <script>
-    function toggleStudioFocus() {
+    // Focus mode: hide the course outline so the lesson gets the full width.
+    function toggleStudioFocus(btn) {
         const container = document.getElementById('studioContainer');
-        const sidebar = document.getElementById('dashSidebar');
-        const btn = event.currentTarget;
-        container.classList.toggle('focus-mode');
-        
-        if (container.classList.contains('focus-mode')) {
-            sidebar.style.display = 'none';
-            document.body.style.marginLeft = '0';
-            btn.innerHTML = '<i class="fas fa-compress"></i> STANDARD';
-            btn.style.background = 'var(--primary)';
-            btn.style.color = 'white';
-        } else {
-            sidebar.style.display = 'flex';
-            document.body.style.marginLeft = '280px';
-            btn.innerHTML = '<i class="fas fa-magic"></i> STUDIO FOCUS';
-            btn.style.background = 'white';
-            btn.style.color = 'var(--text-dim)';
-        }
+        const on = container.classList.toggle('focus');
+        btn.innerHTML = on ? '<i class="fas fa-compress"></i> <span>Show outline</span>' : '<i class="fas fa-expand"></i> <span>Hide outline</span>';
     }
 
     function toggleAIStudyBuddy() {
         const buddy = document.getElementById('aiBuddy');
         buddy.style.display = (buddy.style.display === 'flex') ? 'none' : 'flex';
+        if (buddy.style.display === 'flex') document.getElementById('aiQuery').focus();
     }
 
     function askAIBuddy() {
         const q = document.getElementById('aiQuery');
         const chat = document.getElementById('aiChat');
-        if(!q.value.trim()) return;
+        if (!q.value.trim()) return;
 
         const uMsg = document.createElement('div');
-        uMsg.style.cssText = 'background: #F0F9FF; padding: 14px 18px; border-radius: 20px 20px 4px 20px; align-self: flex-end; max-width: 85%; font-size: 0.85rem; font-weight: 600; color: #0369a1; border: 1px solid #bae6fd;';
+        uMsg.className = 'msg me';
         uMsg.textContent = q.value;
         chat.appendChild(uMsg);
 
         const aiStatus = document.createElement('div');
-        aiStatus.style.cssText = 'background: #f1f5f9; padding: 14px 18px; border-radius: 20px 20px 20px 4px; align-self: flex-start; font-size: 0.85rem; font-weight: 600; color: #475569;';
-        aiStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processing query...';
+        aiStatus.className = 'msg bot';
+        aiStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Thinking...';
         chat.appendChild(aiStatus);
         chat.scrollTop = chat.scrollHeight;
 
         const formData = new FormData();
         formData.append('action', 'mentor_chat');
         formData.append('query', q.value);
-        formData.append('context', 'Classroom Mode. Lesson: <?= addslashes($active_lesson["title"]) ?>. Module Content: <?= addslashes(substr(strip_tags($active_lesson["content"]), 0, 500)) ?>');
+        formData.append('context', <?= json_encode('Classroom Mode. Lesson: ' . $active_lesson['title'] . '. Module Content: ' . mb_substr(strip_tags((string)$active_lesson['content']), 0, 500), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?>);
 
         fetch('../includes/ai_controller', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
-                aiStatus.innerHTML = data.response || 'System calibration required. Please retry.';
+                aiStatus.innerHTML = data.response || 'Sorry, I could not answer that. Please try again.';
                 chat.scrollTop = chat.scrollHeight;
-            });
-        
+            })
+            .catch(() => { aiStatus.textContent = 'Sorry, the study helper is not available right now. Please try again.'; });
+
         q.value = '';
     }
 
     function toggleWeek(wnum) {
         const content = document.getElementById('week-content-' + wnum);
         const icon = document.getElementById('week-icon-' + wnum);
-        if(content.style.display === 'none') {
-            content.style.display = 'block';
-            icon.classList.remove('fa-chevron-right');
-            icon.classList.add('fa-chevron-down');
-        } else {
-            content.style.display = 'none';
-            icon.classList.remove('fa-chevron-down');
-            icon.classList.add('fa-chevron-right');
-        }
+        const open = content.style.display === 'none';
+        content.style.display = open ? 'block' : 'none';
+        icon.classList.toggle('fa-chevron-right', !open);
+        icon.classList.toggle('fa-chevron-down', open);
+        if (icon.parentElement) icon.parentElement.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
-    window.onload = function() {
-        <?php if(isset($_GET['success'])): ?>
+    window.addEventListener('load', function () {
+        const cur = document.querySelector('.cr-item.active');
+        const box = document.querySelector('.cr-outline-scroll');
+        if (cur && box && window.innerWidth > 1100) box.scrollTop = cur.offsetTop - box.offsetTop - 60;
+        <?php if (isset($_GET['success'])): ?>
             const toast = document.getElementById('statusToast');
-            toast.innerHTML = '<div style="display:flex; align-items:center; gap:12px; padding: 16px 24px; background: #10b981; color: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);"><i class="fas fa-check-circle"></i> Milestone Synchronized! Lesson Completed.</div>';
+            toast.innerHTML = '<div><i class="fas fa-check-circle"></i> Lesson marked complete. Nice work!</div>';
             toast.style.display = 'block';
             setTimeout(() => toast.style.display = 'none', 4000);
         <?php endif; ?>
-    }
+    });
 </script>
-
-<style>
-    .status-toast { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: none; animation: slideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-    @keyframes slideDown { from { transform: translate(-50%, -100px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-</style>
-
 
 <?php require_once 'includes/layout-bottom.php'; ?>

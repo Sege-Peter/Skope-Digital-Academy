@@ -47,30 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $reset_link = $site . '/reset-password?token=' . $token;
                     
-                    $subject = "Skope Digital Academy - Password Reset";
-                    $message = "
-                    <html>
-                    <head><title>Password Reset Request</title></head>
-                    <body style='font-family: Inter, sans-serif; background: #f8fafc; padding: 30px;'>
-                        <div style='background: white; padding: 40px; border-radius: 12px; max-width: 600px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
-                            <h2 style='color: #0f172a;'>Password Reset Request</h2>
-                            <p style='color: #475569; line-height: 1.6;'>Hello <strong>".htmlspecialchars($user['name'])."</strong>,</p>
-                            <p style='color: #475569; line-height: 1.6;'>We received a request to reset your password. Click the secure link below to proceed:</p>
-                            <div style='text-align: center; margin: 30px 0;'>
-                                <a href='$reset_link' style='background: #00BFFF; color: white; padding: 14px 28px; text-decoration: none; border-radius: 12px; font-weight: 800; font-family: Poppins, sans-serif;'>RESET PASSWORD</a>
-                            </div>
-                            <p style='color: #64748b; font-size: 13px;'>If you did not request a password reset, you can safely ignore this email.</p>
-                            <p style='color: #64748b; font-size: 13px;'>This link will expire in 1 hour.</p>
-                        </div>
-                    </body>
-                    </html>
-                    ";
-
-                    $headers = "MIME-Version: 1.0" . "\r\n";
-                    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-                    $headers .= "From: Skope Support <support@skopedigital.com>" . "\r\n";
-
-                    @mail($email, $subject, $message, $headers);
+                    require_once __DIR__ . '/includes/mailer.php';
+                    sda_mail($email, 'Reset your Skope Digital Academy password',
+                        '<h2 style="margin:0 0 12px;color:#0f172a">Reset your password</h2>'
+                        . '<p>Hello <strong>' . htmlspecialchars($user['name']) . '</strong>,</p>'
+                        . '<p>We received a request to reset the password on your account. Click the button below to choose a new one.</p>'
+                        . sda_mail_button($reset_link, 'Reset password')
+                        . '<p style="color:#64748b;font-size:13px">This link expires in 1 hour. If you did not ask for this, you can ignore this email; your password stays the same.</p>');
                 }
 
                 // Show success message regardless of existence to prevent email scraping
@@ -90,10 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Forgot Password', 'path' => 'forgot-password', 'noindex' => true]); ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=3">
+    <link rel="stylesheet" href="assets/css/auth.css?v=9">
     <link rel="icon" type="image/png" href="assets/images/Skope Digital  logo.png">
 </head>
 <body>

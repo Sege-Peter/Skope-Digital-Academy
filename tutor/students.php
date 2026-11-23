@@ -1,440 +1,192 @@
 <?php
-$pageTitle = 'Student Roster';
+/**
+ * Tutor: learners in my courses. Counts come from td_learner_summary() (same as dashboard/analytics/leaderboard).
+ * Also: add a learner by email, CSV import, CSV export.
+ */
+require_once __DIR__ . '/../includes/tutor_data.php';
+requireRole('tutor');
+$tutor = currentUser();
+$tid = (int)$tutor['id'];
+
+function tp_welcome_email(string $to, string $name, string $course, ?string $tempPass): void {
+    require_once __DIR__ . '/../includes/mailer.php';
+    $body = '<h2 style="margin:0 0 12px;color:#0f172a">You have been enrolled</h2>'
+        . '<p>Hello <strong>' . htmlspecialchars($name) . '</strong>,</p>'
+        . '<p>You have been enrolled in <strong>' . htmlspecialchars($course) . '</strong> at Skope Digital Academy.</p>';
+    if ($tempPass !== null) {
+        $body .= '<div style="background:#f0f9ff;border:1px solid #bae6fd;padding:18px;border-radius:8px;margin:22px 0;text-align:center">'
+            . '<div style="font-size:13px;color:#0284c7;font-weight:700;text-transform:uppercase;margin-bottom:6px">Your temporary password</div>'
+            . '<div style="font-family:monospace;font-size:20px;font-weight:700;color:#0284c7;letter-spacing:2px">' . htmlspecialchars($tempPass) . '</div></div>'
+            . '<p>Sign in with this email address and the password above. You will be asked to choose your own password the first time.</p>';
+    } else {
+        $body .= '<p>Sign in with your usual email and password to start.</p>';
+    }
+    sda_mail($to, 'Welcome to ' . $course . ' – Skope Digital Academy', $body . sda_mail_button(sda_site_url() . '/login', 'Sign in'));
+}
+
+/** Enrol one person by email into one of the tutor's courses. Returns [ok(bool), message]. */
+function tp_enrol(PDO $pdo, int $tid, string $name, string $email, int $courseId): array {
+    if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a name and a valid email address.'];
+    $c = $pdo->prepare("SELECT id, title FROM courses WHERE id = ? AND tutor_id = ?");
+    $c->execute([$courseId, $tid]);
+    $course = $c->fetch();
+    if (!$course) return [false, 'You can only enrol learners into your own courses.'];
+    $u = $pdo->prepare("SELECT id, role FROM users WHERE email = ?");
+    $u->execute([$email]);
+    $existing = $u->fetch();
+    $temp = null;
+    if ($existing) {
+        if ($existing['role'] !== 'student') return [false, "$email belongs to a staff account and cannot be enrolled."];
+        $uid = (int)$existing['id'];
+    } else {
+        $temp = 'Sda-' . random_int(100000, 999999) . '!';
+        $pdo->prepare("INSERT INTO users (name, email, password, role, status, requires_password_change) VALUES (?, ?, ?, 'student', 'active', 1)")
+            ->execute([$name, $email, password_hash($temp, PASSWORD_DEFAULT)]);
+        $uid = (int)$pdo->lastInsertId();
+    }
+    $chk = $pdo->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
+    $chk->execute([$uid, $courseId]);
+    if ($chk->fetch()) return [false, "$email is already enrolled in {$course['title']}."];
+    $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status, starts_on) VALUES (?, ?, 'active', CURDATE())")->execute([$uid, $courseId]);
+    try { tp_welcome_email($email, $name, $course['title'], $temp); } catch (Throwable $e) { error_log('tutor enrol email: ' . $e->getMessage()); }
+    return [true, "$name was enrolled in {$course['title']}" . ($temp ? ' and emailed a temporary password.' : '.')];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verifyCsrf()) {
+        td_flash('err', 'Your session expired. Please try again.');
+    } elseif (isset($_POST['enroll_student'])) {
+        try {
+            [$ok, $msg] = tp_enrol($pdo, $tid, trim((string)$_POST['student_name']), trim((string)$_POST['student_email']), (int)$_POST['course_id']);
+            td_flash($ok ? 'ok' : 'err', $msg);
+        } catch (Throwable $e) { error_log('tutor enrol: ' . $e->getMessage()); td_flash('err', 'The learner could not be enrolled.'); }
+    } elseif (isset($_POST['import_csv'])) {
+        $done = $skipped = 0;
+        if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK && ($h = fopen($_FILES['csv_file']['tmp_name'], 'r'))) {
+            $row = 0;
+            while (($data = fgetcsv($h, 1000, ',')) !== false) {
+                if (++$row === 1 || count($data) < 3) continue;
+                try {
+                    [$ok] = tp_enrol($pdo, $tid, trim((string)$data[0]), trim((string)$data[1]), (int)trim((string)$data[2]));
+                    $ok ? $done++ : $skipped++;
+                } catch (Throwable $e) { $skipped++; }
+            }
+            fclose($h);
+            td_flash('ok', "Import finished: $done enrolled, $skipped skipped (already enrolled, invalid row or not your course).");
+        } else {
+            td_flash('err', 'Choose a CSV file to import.');
+        }
+    }
+    td_redirect('students');
+}
+
+$search = trim((string)($_GET['search'] ?? ''));
+$course_filter = (int)($_GET['course_id'] ?? 0);
+$show = ($_GET['show'] ?? '') === 'pending' ? 'pending' : 'learners';
+
+$sum = td_learner_summary($pdo, $tid);
+$pageTitle = 'Learners';
+$pageSub = $sum['learners'] . ' learner' . ($sum['learners'] === 1 ? '' : 's') . ' in ' . $sum['enrolments'] . ' enrolment' . ($sum['enrolments'] === 1 ? '' : 's')
+         . ' (' . $sum['active'] . ' active, ' . $sum['completed'] . ' completed)' . ($sum['pending'] ? ' · ' . $sum['pending'] . ' pending' : '') . '.';
+$pageActions = '<button type="button" class="tp-btn primary" data-open="enrollModal"><i class="fas fa-user-plus"></i> Add learner</button>'
+             . '<button type="button" class="tp-btn" data-open="importModal"><i class="fas fa-file-csv"></i> Import CSV</button>'
+             . '<a class="tp-btn" href="export_students' . ($course_filter ? '?course_filter=' . $course_filter : '') . '"><i class="fas fa-file-arrow-down"></i> Export</a>';
 require_once 'includes/header.php';
 
-$tutor = currentUser();
-
-$search = $_GET['search'] ?? '';
-$course_filter = $_GET['course_id'] ?? '';
-
-// Helper to securely send welcome email
-function sendStudentWelcomeEmail($to_email, $student_name, $course_title, $temp_password) {
-    $subject = "Welcome to Skope Digital Academy - $course_title";
-    
-    $message = "
-    <html>
-    <head>
-      <title>Welcome to Skope Digital Academy</title>
-      <style>
-        body { font-family: 'Inter', Arial, sans-serif; background-color: #f8fafc; padding: 30px; }
-        .container { background-color: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 600px; margin: 0 auto; }
-        .header { color: #0f172a; font-size: 24px; font-weight: 800; margin-bottom: 20px; }
-        .text { color: #475569; font-size: 16px; line-height: 1.6; }
-        .box { background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 20px; border-radius: 8px; margin: 24px 0; text-align: center; }
-        .password { font-family: monospace; font-size: 20px; font-weight: bold; color: #0284c7; letter-spacing: 2px; }
-        .footer { font-size: 13px; color: #94a3b8; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
-      </style>
-    </head>
-    <body>
-      <div class='container'>
-        <div class='header'>Your Academic Journey Begins!</div>
-        <div class='text'>
-          Hello <strong>".htmlspecialchars($student_name)."</strong>,<br><br>
-          You have successfully been enrolled in <strong>".htmlspecialchars($course_title)."</strong> at Skope Digital Academy. We are thrilled to have you!
-        </div>
-        <div class='box'>
-          <div style='font-size: 14px; color: #0284c7; font-weight: bold; text-transform: uppercase; margin-bottom: 8px;'>Your Temporary Access Pass is:</div>
-          <div class='password'>".htmlspecialchars($temp_password)."</div>
-        </div>
-        <div class='text'>
-          <em>For security protocols, you will be mandated to change this temporary password during your first login.</em>
-        </div>
-        <div class='footer'>
-          If you received this in error, please disregard.<br>
-          Skope Digital Academy Admissions
-        </div>
-      </div>
-    </body>
-    </html>
-    ";
-
-    $headers = "MIME-Version: 1.0" . "\r\n";
-    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-    $headers .= "From: Skope Admin <admissions@skopedigital.com>" . "\r\n";
-
-    @mail($to_email, $subject, $message, $headers);
-}
-
-$enroll_msg = '';
-$enroll_err = '';
-
-// Handle Manual Student Enrollment
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['enroll_student'])) {
-    $s_name = trim($_POST['student_name']);
-    $s_email = trim($_POST['student_email']);
-    $c_id = (int)$_POST['course_id'];
-    
-    $temp_pass = 'Pass' . rand(1000, 9999) . '!';
-    $hashed_pass = password_hash($temp_pass, PASSWORD_DEFAULT);
-
-    try {
-        $chk_c = $pdo->prepare("SELECT id FROM courses WHERE id = ? AND tutor_id = ?");
-        $chk_c->execute([$c_id, $tutor['id']]);
-        if (!$chk_c->fetch()) {
-            throw new Exception("You can only enroll students into your own courses.");
-        }
-
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$s_email]);
-        $existing = $stmt->fetch();
-
-        if ($existing) {
-            $u_id = $existing['id'];
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, status, requires_password_change) VALUES (?, ?, ?, 'student', 'active', 1)");
-            $stmt->execute([$s_name, $s_email, $hashed_pass]);
-            $u_id = $pdo->lastInsertId();
-        }
-
-        $chk = $pdo->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
-        $chk->execute([$u_id, $c_id]);
-        if ($chk->fetch()) {
-            $enroll_err = "Student is already enrolled in this course.";
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active')");
-            $stmt->execute([$u_id, $c_id]);
-            $enroll_msg = "Successfully enrolled in course!";
-            
-            $c_t = $pdo->prepare("SELECT title FROM courses WHERE id = ?");
-            $c_t->execute([$c_id]);
-            $courseInfo = $c_t->fetch();
-            $c_title_mail = $courseInfo ? $courseInfo['title'] : 'Course';
-
-            sendStudentWelcomeEmail($s_email, $s_name, $c_title_mail, $temp_pass);
-        }
-
-        header("Location: students?msg=" . urlencode($enroll_msg) . "&err=" . urlencode($enroll_err));
-        exit;
-
-    } catch (Exception $e) {
-        header("Location: students?err=" . urlencode($e->getMessage()));
-        exit;
-    }
-}
-
-// Handle CSV Import
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
-    if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
-        $file = $_FILES['csv_file']['tmp_name'];
-        $handle = fopen($file, "r");
-        if ($handle !== FALSE) {
-            $row = 0;
-            $success_count = 0;
-            $error_count = 0;
-            
-            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                $row++;
-                if ($row == 1) continue;
-                
-                if (count($data) >= 3) {
-                    $s_name = trim($data[0]);
-                    $s_email = trim($data[1]);
-                    $c_id = (int)trim($data[2]);
-                    
-                    if(empty($s_name) || empty($s_email) || !$c_id) { $error_count++; continue; }
-
-                    try {
-                        $chk_c = $pdo->prepare("SELECT id FROM courses WHERE id = ? AND tutor_id = ?");
-                        $chk_c->execute([$c_id, $tutor['id']]);
-                        if (!$chk_c->fetch()) continue;
-
-                        $temp_pass = 'Pass' . rand(1000, 9999) . '!';
-                        $hashed_pass = password_hash($temp_pass, PASSWORD_DEFAULT);
-
-                        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-                        $stmt->execute([$s_email]);
-                        $existing = $stmt->fetch();
-                        
-                        if ($existing) { $u_id = $existing['id']; } 
-                        else {
-                            $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, requires_password_change) VALUES (?, ?, ?, 'student', 1)");
-                            $stmt->execute([$s_name, $s_email, $hashed_pass]);
-                            $u_id = $pdo->lastInsertId();
-                        }
-
-                        $chk = $pdo->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
-                        $chk->execute([$u_id, $c_id]);
-                        if (!$chk->fetch()) {
-                            $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active')");
-                            $stmt->execute([$u_id, $c_id]);
-                            
-                            $c_t = $pdo->prepare("SELECT title FROM courses WHERE id = ?");
-                            $c_t->execute([$c_id]);
-                            $c_title_mail = ($cInfo = $c_t->fetch()) ? $cInfo['title'] : 'Course';
-                            sendStudentWelcomeEmail($s_email, $s_name, $c_title_mail, $temp_pass);
-                            $success_count++;
-                        }
-                    } catch (Exception $e) { $error_count++; }
-                }
-            }
-            fclose($handle);
-            $enroll_msg = "CSV Import Complete: $success_count enrolled, $error_count skipped.";
-            header("Location: students?msg=" . urlencode($enroll_msg));
-            exit;
-        }
-    }
-}
-
-try {
-    // Fetch tutor's courses for the filter dropdown
-    $stmt = $pdo->prepare("SELECT id, title FROM courses WHERE tutor_id = ? ORDER BY title ASC");
-    $stmt->execute([$tutor['id']]);
-    $tutor_courses = $stmt->fetchAll();
-
-    // Fetch students enrolled in this tutor's courses
-    $query = "SELECT u.id as student_id, u.name as student_name, u.email as student_email, u.avatar, u.last_login,
-                     c.title as course_title, e.progress_percent, e.enrolled_at, e.course_id,
-                     (SELECT AVG(score) FROM quiz_attempts qa JOIN quizzes q ON qa.quiz_id = q.id WHERE qa.student_id = u.id AND q.course_id = c.id) as avg_score
-              FROM enrollments e
-              JOIN users u ON e.student_id = u.id
-              JOIN courses c ON e.course_id = c.id
-              WHERE c.tutor_id = ?";
-    
-    $params = [$tutor['id']];
-
-    if ($search) {
-        $query .= " AND (u.name LIKE ? OR u.email LIKE ?)";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
-    }
-
-    if ($course_filter) {
-        $query .= " AND e.course_id = ?";
-        $params[] = $course_filter;
-    }
-
-    $query .= " ORDER BY e.enrolled_at DESC";
-    
-    $stmt = $pdo->prepare($query);
-    $stmt->execute($params);
-    $students = $stmt->fetchAll();
-
-} catch (Exception $e) {
-    error_log($e->getMessage());
-    $students = [];
-    $tutor_courses = [];
-}
+$tutor_courses = td_course_options($pdo, $tid);
+$rows = td_enrolments($pdo, $tid, ['statuses' => $show === 'pending' ? ['pending'] : TD_LEARNER_STATUSES, 'course_id' => $course_filter, 'search' => $search]);
+$csrf = csrfToken();
 ?>
+<?php if ($note = td_orphan_note($sum)): ?><div class="tp-alert info"><i class="fas fa-circle-info"></i><div><?= e($note) ?></div></div><?php endif; ?>
 
-
-<?php require_once 'includes/sidebar.php'; ?>
-
-<main class="main-content">
-<header class="portal-header" style="margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
-    <div class="greeting">
-        <h1 style="font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 950; margin: 0; letter-spacing: -1.5px; color: var(--text-main);">Scholars<span style="color: var(--primary);">.</span></h1>
-        <p style="color: var(--text-dim); margin-top: 8px; font-weight: 500; font-size: 1rem;">Directing academic performance and enrollment of <span style="color: var(--primary); font-weight: 700;"><?= count($students) ?> active learners</span>.</p>
+<section class="tp-card" style="margin-bottom:18px">
+    <div class="tp-card-body">
+        <form method="get" action="students" class="tp-filter">
+            <input type="hidden" name="show" value="<?= e($show) ?>">
+            <div class="tp-field"><label for="s-q">Search</label><div class="tp-search"><i class="fas fa-magnifying-glass"></i><input id="s-q" type="search" name="search" placeholder="Name or email" value="<?= e($search) ?>"></div></div>
+            <div class="tp-field"><label for="s-c">Course</label>
+                <select id="s-c" name="course_id" onchange="this.form.submit()"><option value="">All courses</option>
+                    <?php foreach ($tutor_courses as $c): ?><option value="<?= (int)$c['id'] ?>" <?= $course_filter === (int)$c['id'] ? 'selected' : '' ?>><?= e($c['title']) ?></option><?php endforeach; ?>
+                </select></div>
+            <button type="submit" class="tp-btn"><i class="fas fa-filter"></i> Apply</button>
+            <?php if ($search !== '' || $course_filter): ?><a class="tp-btn ghost" href="students?show=<?= e($show) ?>">Clear</a><?php endif; ?>
+        </form>
     </div>
-    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <button onclick="document.getElementById('enrollModal').style.display='flex'" class="btn-premium" style="padding: 12px 24px;">
-            <i class="fas fa-user-plus"></i> ENROLL SCHOLAR
-        </button>
-        <button onclick="document.getElementById('importModal').style.display='flex'" class="btn-premium" style="padding: 12px 24px; background: var(--secondary); border: none;">
-            <i class="fas fa-file-csv"></i> BULK IMPORT
-        </button>
-        <a href="export_students?course_filter=<?= urlencode($course_filter) ?>" class="btn-premium" style="padding: 12px 24px; background: #10B981; border: none; text-decoration: none; display: flex; align-items: center; justify-content: center;">
-            <i class="fas fa-file-export"></i> EXPORT
-        </a>
-    </div>
-</header>
+</section>
 
-<div class="premium-card" style="padding: 24px 32px; margin-bottom: 40px;">
-    <form method="GET" action="students" class="grid-3" style="align-items: flex-end;">
-        <div>
-            <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Scholar Identity Search</label>
-            <div style="position: relative;">
-                <i class="fas fa-search" style="position: absolute; left: 18px; top: 16px; color: #94a3b8;"></i>
-                <input type="text" name="search" style="width: 100%; padding: 14px 18px 14px 48px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none;" placeholder="Search by name or email..." value="<?= htmlspecialchars($search) ?>">
-            </div>
-        </div>
-        <div>
-            <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Academic Track Filter</label>
-            <select name="course_id" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none; background: #f8fafc;" onchange="this.form.submit()">
-                <option value="">Viewing All Tracks</option>
-                <?php foreach($tutor_courses as $c): ?>
-                    <option value="<?= $c['id'] ?>" <?= $course_filter == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['title']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <button type="submit" class="btn-premium" style="height: 54px; width: 100%;">SEARCH</button>
-    </form>
-</div>
+<nav class="tp-tabs" style="margin-bottom:14px" aria-label="Show">
+    <a href="students?<?= e(http_build_query(array_filter(['search' => $search, 'course_id' => $course_filter ?: null]))) ?>" class="<?= $show === 'learners' ? 'active' : '' ?>">Learners (<?= $sum['enrolments'] ?>)</a>
+    <a href="students?<?= e(http_build_query(array_filter(['show' => 'pending', 'search' => $search, 'course_id' => $course_filter ?: null]))) ?>" class="<?= $show === 'pending' ? 'active' : '' ?>">Pending (<?= $sum['pending'] ?>)</a>
+</nav>
 
-<div class="premium-card" style="padding: 0; overflow: hidden;">
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; min-width: 1000px;">
-            <thead>
-                <tr style="background: #F8FAFC; border-bottom: 1px solid #f1f5f9;">
-                    <th style="padding: 24px 32px; text-align: left; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Identity</th>
-                    <th style="padding: 24px 32px; text-align: left; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Program Track</th>
-                    <th style="padding: 24px 32px; text-align: left; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Arc Progress</th>
-                    <th style="padding: 24px 32px; text-align: left; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Academic Health</th>
-                    <th style="padding: 24px 32px; text-align: left; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Engagement</th>
-                    <th style="padding: 24px 32px; text-align: right; font-size: 0.75rem; font-weight: 950; color: #94A3B8; text-transform: uppercase; letter-spacing: 1.5px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if(!empty($students)): ?>
-                    <?php foreach($students as $s): ?>
-                    <tr style="border-bottom: 1px solid #f1f5f9; transition: 0.2s;" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 24px 32px;">
-                            <div style="display: flex; align-items: center; gap: 16px;">
-                                <div style="width: 44px; height: 44px; border-radius: 14px; background: #E0F7FF; color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 950; font-size: 1.1rem; overflow: hidden; border: 1px solid #E0F7FF;">
-                                    <?php if($s['avatar']): ?>
-                                        <img src="../uploads/avatars/<?= htmlspecialchars($s['avatar']) ?>" style="width:100%; height:100%; object-fit:cover;">
-                                    <?php else: ?>
-                                        <?= strtoupper(substr($s['student_name'], 0, 1)) ?>
-                                    <?php endif; ?>
-                                </div>
-                                <div>
-                                    <div style="font-weight: 900; color: var(--text-main); font-size: 0.95rem; letter-spacing: -0.3px;"><?= htmlspecialchars($s['student_name']) ?></div>
-                                    <div style="font-size: 0.8rem; color: var(--text-dim); font-weight: 600;"><?= htmlspecialchars($s['student_email']) ?></div>
-                                </div>
-                            </div>
-                        </td>
-                        <td style="padding: 24px 32px;">
-                            <div style="padding: 6px 14px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 50px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.2px;">
-                                <i class="fas fa-bookmark" style="color: var(--primary); font-size: 0.7rem;"></i>
-                                <?= htmlspecialchars($s['course_title']) ?>
-                            </div>
-                            <div style="font-size: 0.65rem; color: #94A3B8; font-weight: 850; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px;">Enrolled <?= date('M d, Y', strtotime($s['enrolled_at'])) ?></div>
-                        </td>
-                        <td style="padding: 24px 32px;">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div style="flex: 1; height: 8px; background: #F1F5F9; border-radius: 10px; overflow: hidden;">
-                                    <div style="height: 100%; background: var(--grad-primary); border-radius: 10px; width: <?= $s['progress_percent'] ?>%;"></div>
-                                </div>
-                                <span style="font-size: 0.9rem; font-weight: 950; color: var(--primary);"><?= round($s['progress_percent']) ?>%</span>
-                            </div>
-                        </td>
-                        <td style="padding: 24px 32px;">
-                            <?php 
-                            $score = $s['avg_score'];
-                            if($score === null): ?>
-                                <span style="font-size: 0.75rem; font-weight: 900; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px;">Pending Audit</span>
-                            <?php else: 
-                                $isHigh = $score >= 80;
-                                $isMid = $score >= 60;
-                                $color = $isHigh ? '#10B981' : ($isMid ? '#F59E0B' : '#EF4444');
-                                $bg = $isHigh ? '#ECFDF5' : ($isMid ? '#FFFBEB' : '#FEF2F2');
-                            ?>
-                                <div style="padding: 6px 14px; background: <?= $bg ?>; border: 1px solid <?= $color ?>44; border-radius: 50px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 950; color: <?= $color ?>;">
-                                    <i class="fas <?= $isHigh ? 'fa-star' : ($isMid ? 'fa-bolt' : 'fa-exclamation-triangle') ?>"></i>
-                                    <?= round($score) ?>% Avg
-                                </div>
-                            <?php endif; ?>
-                        </td>
-                        <td style="padding: 24px 32px;">
-                            <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main);"><?= $s['last_login'] ? date('M d, g:i a', strtotime($s['last_login'])) : 'Pending Login' ?></div>
-                            <div style="font-size: 0.65rem; color: #94A3B8; font-weight: 850; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;"><?= $s['last_login'] ? 'Engagement Verified' : 'Awaiting Access' ?></div>
-                        </td>
-                        <td style="padding: 24px 32px; text-align: right;">
-                            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                <a href="student_profile?id=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); text-decoration: none; transition: 0.2s;" onmouseover="this.style.color='var(--primary)'; this.style.borderColor='var(--primary)';" title="View Profile"><i class="fas fa-user-graduate"></i></a>
-                                <a href="../impersonate?action=start&uid=<?= $s['student_id'] ?>" style="width: 40px; height: 40px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10B981; text-decoration: none; transition: 0.2s;" onmouseover="this.style.background='#ECFDF5';" title="Secure Proxy Login"><i class="fas fa-fingerprint"></i></a>
-                            </div>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
+<section class="tp-card">
+    <?php if ($rows): ?>
+        <div class="tp-table-wrap">
+            <table class="tp-table stack">
+                <thead><tr><th>Learner</th><th>Course</th><th>Progress</th><th class="num">Quiz average</th><th>Last active</th><th class="actions"><span class="tp-sr">Actions</span></th></tr></thead>
+                <tbody>
+                <?php foreach ($rows as $s): [$sl, $sc] = td_enrol_status($s['status']); ?>
                     <tr>
-                        <td colspan="6" style="padding: 100px 40px; text-align: center;">
-                            <div style="width: 80px; height: 80px; background: #F8FAFC; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 2rem; color: #CBD5E1;"><i class="fas fa-user-slash"></i></div>
-                            <h3 style="margin: 0 0 8px; font-weight: 950; font-size: 1.25rem;">No scholars matched.</h3>
-                            <p style="color: var(--text-dim); font-weight: 600;">Try clearing your search or filtering by another track.</p>
+                        <td data-label=""><span class="tp-who"><?= td_avatar($s['avatar'], $s['student_name']) ?><span><b><?= e($s['student_name']) ?></b><small><?= e($s['student_email']) ?></small></span></span></td>
+                        <td data-label="Course"><?= e($s['course_title']) ?> <span class="tp-pill <?= $sc ?>"><?= $sl ?></span>
+                            <div class="tp-note"><?= e(mode_label($s['learning_mode'] ?: 'self_paced')) ?><?= $s['cohort_name'] ? ' · ' . e($s['cohort_name']) : '' ?> · enrolled <?= e(date('j M Y', strtotime($s['enrolled_at']))) ?></div></td>
+                        <td data-label="Progress"><div class="tp-progress"><div class="tp-progress-bar"><span style="width:<?= max(0, min(100, (float)$s['progress_percent'])) ?>%"></span></div><b><?= round((float)$s['progress_percent']) ?>%</b></div></td>
+                        <td data-label="Quiz average" class="num"><?php if ($s['avg_quiz'] === null): ?><span class="tp-note">No quizzes taken</span><?php else: $q = (float)$s['avg_quiz']; ?><span class="tp-pill <?= $q >= 80 ? 'ok' : ($q >= 60 ? 'warn' : 'bad') ?>"><?= round($q) ?>%</span><?php endif; ?></td>
+                        <td data-label="Last active"><?= $s['last_active'] ? e(td_ago($s['last_active'])) : ($s['last_login'] ? 'Signed in ' . e(td_ago($s['last_login'])) : '<span class="tp-note">Not yet</span>') ?></td>
+                        <td class="actions">
+                            <a class="tp-btn sm" href="student_profile?id=<?= (int)$s['student_id'] ?>"><i class="fas fa-user"></i> Profile</a>
+                            <a class="tp-btn sm" href="messages?to=<?= (int)$s['student_id'] ?>"><i class="fas fa-comment"></i> Message</a>
+                            <form method="post" action="../impersonate?action=start"><input type="hidden" name="csrf_token" value="<?= e($csrf) ?>"><input type="hidden" name="uid" value="<?= (int)$s['student_id'] ?>"><button type="submit" class="tp-btn sm" title="Open the learner portal as this learner"><i class="fas fa-eye"></i> View as learner</button></form>
                         </td>
                     </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-</main>
-
-<!-- Enroll Student Modal -->
-<div id="enrollModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); z-index: 9999; align-items: center; justify-content: center; animation: fadeIn 0.3s ease;">
-    <div class="premium-card" style="width: 90%; max-width: 500px; padding: 48px; position: relative; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
-        <button onclick="document.getElementById('enrollModal').style.display='none'" style="position: absolute; right: 24px; top: 24px; background: none; border: none; font-size: 1.5rem; color: #94A3B8; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='var(--text-main)'">&times;</button>
-        
-        <h2 style="margin: 0 0 12px; font-size: 1.6rem; font-weight: 950; letter-spacing: -0.8px; color: var(--text-main);">Manual Enrollment</h2>
-        <p style="color: var(--text-dim); margin-bottom: 40px; font-weight: 600;">Directly onboard a new scholar into your elite academy.</p>
-
-        <form method="POST">
-            <input type="hidden" name="enroll_student" value="1">
-            <div style="margin-bottom: 24px;">
-                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Full Legal Name</label>
-                <input type="text" name="student_name" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none;" required placeholder="e.g. Alexander Hamilton">
-            </div>
-            <div style="margin-bottom: 24px;">
-                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Institutional Email</label>
-                <input type="email" name="student_email" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none;" required placeholder="alex@university.com">
-            </div>
-            <div style="margin-bottom: 40px;">
-                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">Academic Track Allocation</label>
-                <select name="course_id" style="width: 100%; padding: 14px 18px; border: 1px solid #e2e8f0; border-radius: 14px; font-size: 0.95rem; font-weight: 600; outline: none; background: #f8fafc;" required>
-                    <?php foreach($tutor_courses as $c): ?>
-                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['title']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="submit" class="btn-premium" style="width: 100%; height: 58px;">ONBOARD SCHOLAR</button>
-        </form>
-    </div>
-</div>
-
-<!-- Import Modal -->
-<div id="importModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); z-index: 9999; align-items: center; justify-content: center; animation: fadeIn 0.3s ease;">
-    <div class="premium-card" style="width: 90%; max-width: 500px; padding: 48px; position: relative; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);">
-        <button onclick="document.getElementById('importModal').style.display='none'" style="position: absolute; right: 24px; top: 24px; background: none; border: none; font-size: 1.5rem; color: #94A3B8; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='var(--text-main)'">&times;</button>
-        
-        <h2 style="margin: 0 0 12px; font-size: 1.6rem; font-weight: 950; letter-spacing: -0.8px; color: var(--text-main);">Bulk Arc Ingestion</h2>
-        <p style="color: var(--text-dim); margin-bottom: 32px; font-weight: 600;">Import scholar data streams via institutional CSV.</p>
-
-        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 20px; border-radius: 16px; margin-bottom: 32px; font-size: 0.8rem; color: var(--text-dim); line-height: 1.6;">
-            <strong style="color: var(--text-main); font-weight: 900; display: block; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Data Structure Protocol:</strong>
-            1. Name, 2. Email, 3. CourseID <br>
-            <span style="font-weight: 900; color: var(--primary);">* Passwords will be auto-generated & sent via mail.</span>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
+    <?php else: ?>
+        <div class="tp-empty" style="padding:44px 22px">
+            <i class="fas fa-user-graduate"></i>
+            <?php if ($search !== '' || $course_filter): ?>
+                <h3>No learners match</h3><p>Try another name or email, or show all courses.</p>
+                <div class="tp-actions"><a class="tp-btn sm" href="students?show=<?= e($show) ?>">Clear filters</a></div>
+            <?php elseif ($show === 'pending'): ?>
+                <h3>No pending enrolments</h3><p>Learners who have started enrolling but not finished paying or been approved show here.</p>
+            <?php else: ?>
+                <h3>No learners yet</h3><p>Learners appear here once they enrol in one of your courses. You can also add someone yourself by email.</p>
+                <div class="tp-actions"><button type="button" class="tp-btn sm primary" data-open="enrollModal"><i class="fas fa-user-plus"></i> Add learner</button></div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+</section>
 
-        <form method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="import_csv" value="1">
-            <div style="margin-bottom: 40px;">
-                <label style="display: block; font-size: 0.7rem; font-weight: 950; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;">CSV DATA STREAM</label>
-                <div style="position: relative; border: 2px dashed #E2E8F0; border-radius: 16px; padding: 32px; text-align: center; transition: 0.2s;" onmouseover="this.style.borderColor='var(--primary)'; this.style.background='#E0F7FF';" onmouseout="this.style.borderColor='#E2E8F0'; this.style.background='transparent';">
-                    <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--primary); opacity: 0.4; margin-bottom: 16px;"></i>
-                    <p style="margin: 0; font-weight: 700; color: var(--text-main); font-size: 0.9rem;">Drop CSV or Click to Browse</p>
-                    <input type="file" name="csv_file" accept=".csv" required style="position: absolute; inset: 0; opacity: 0; cursor: pointer;">
-                </div>
-            </div>
-            <button type="submit" class="btn-premium" style="width: 100%; height: 58px; background: var(--secondary);">EXECUTE BATCH IMPORT</button>
-        </form>
+<div class="tp-modal" id="enrollModal" role="dialog" aria-modal="true" aria-labelledby="enT"<?= isset($_GET['enrol']) ? ' data-autoopen' : '' ?>>
+    <div class="tp-modal-box">
+        <div class="tp-modal-head"><div><h2 id="enT">Add a learner</h2><p>If the email is new, an account is created and a temporary password is emailed.</p></div><button type="button" class="tp-iconbtn" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+        <div class="tp-modal-body">
+            <?php if ($tutor_courses): ?>
+            <form method="post" action="students" class="tp-form">
+                <input type="hidden" name="enroll_student" value="1"><input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                <div class="tp-field"><label for="en-n">Full name</label><input id="en-n" type="text" name="student_name" required autocomplete="off"></div>
+                <div class="tp-field"><label for="en-e">Email</label><input id="en-e" type="email" name="student_email" required autocomplete="off"></div>
+                <div class="tp-field"><label for="en-c">Course</label><select id="en-c" name="course_id" required><?php foreach ($tutor_courses as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['title']) ?></option><?php endforeach; ?></select></div>
+                <div class="tp-modal-foot"><button type="button" class="tp-btn" data-close>Cancel</button><button type="submit" class="tp-btn primary"><i class="fas fa-user-plus"></i> Enrol</button></div>
+            </form>
+            <?php else: ?><div class="tp-empty"><i class="fas fa-book"></i><h3>Create a course first</h3><div class="tp-actions"><a class="tp-btn sm primary" href="courses?action=new">New course</a></div></div><?php endif; ?>
+        </div>
     </div>
 </div>
 
-<script src="../assets/js/main.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const msg = urlParams.get('msg');
-        const err = urlParams.get('err');
-        
-        if (msg) {
-            SDAC.showToast(msg, "success");
-            window.history.replaceState(null, null, window.location.pathname);
-        }
-        if (err) {
-            SDAC.showToast(err, "error");
-            window.history.replaceState(null, null, window.location.pathname);
-        }
-    });
-
-    // Close modal on backdrop click
-    window.addEventListener('click', (e) => {
-        const enrollModal = document.getElementById('enrollModal');
-        const importModal = document.getElementById('importModal');
-        if (e.target === enrollModal) enrollModal.style.display = 'none';
-        if (e.target === importModal) importModal.style.display = 'none';
-    });
-</script>
-</body>
-</html>
+<div class="tp-modal" id="importModal" role="dialog" aria-modal="true" aria-labelledby="imT">
+    <div class="tp-modal-box">
+        <div class="tp-modal-head"><div><h2 id="imT">Import learners from CSV</h2><p>One learner per row. The first row is treated as a heading.</p></div><button type="button" class="tp-iconbtn" data-close aria-label="Close"><i class="fas fa-xmark"></i></button></div>
+        <div class="tp-modal-body">
+            <div class="tp-alert info"><i class="fas fa-table"></i><div>Columns: <b>name, email, course ID</b>.<?php if ($tutor_courses): ?> Your course IDs: <?= implode(', ', array_map(fn($c) => e($c['title']) . ' = <b>' . (int)$c['id'] . '</b>', $tutor_courses)) ?>.<?php endif; ?></div></div>
+            <form method="post" action="students" enctype="multipart/form-data" class="tp-form">
+                <input type="hidden" name="import_csv" value="1"><input type="hidden" name="csrf_token" value="<?= e($csrf) ?>">
+                <div class="tp-field"><label for="im-f">CSV file</label><input id="im-f" type="file" name="csv_file" accept=".csv,text/csv" required></div>
+                <div class="tp-modal-foot"><button type="button" class="tp-btn" data-close>Cancel</button><button type="submit" class="tp-btn primary"><i class="fas fa-upload"></i> Import</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php require 'includes/footer.php'; ?>

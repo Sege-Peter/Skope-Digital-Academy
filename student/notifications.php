@@ -1,100 +1,116 @@
 <?php
-$pageTitle = 'Institutional Intelligence';
-require_once '../includes/header.php';
+$pageTitle = 'Notifications';
+require_once 'includes/header.php'; // student-only access check happens here
 
-// Auth Check: Student only
-if ($user['role'] !== 'student') { header('Location: ../login'); exit; }
+$uid = (int)$student['id'];
+// Notifications for this student: ones sent to them, plus broadcasts to all students / everyone.
+// (Before, every student's personal notifications were shown to every student.)
+$notif_scope = "(target_user_id = ? OR (target_user_id IS NULL AND user_role IN ('student', 'all')))";
 
-// 1. Mark all as read if requested
+// 1. Mark all as read
 if (isset($_GET['mark_all_read'])) {
-    $stmt = $pdo->prepare("UPDATE notifications SET read_status = 1 WHERE (user_role = 'student' OR user_role = 'all' OR target_user_id = ?) AND read_status = 0");
-    $stmt->execute([$user['id']]);
+    try {
+        $stmt = $pdo->prepare("UPDATE notifications SET read_status = 1 WHERE $notif_scope AND read_status = 0");
+        $stmt->execute([$uid]);
+    } catch (Exception $e) { error_log('notifications mark all: ' . $e->getMessage()); }
     header('Location: notifications');
     exit;
 }
 
-// 2. Fetch Notifications (Global student, targeted student, or all)
+// 1b. Mark one as read
+if (isset($_GET['read'])) {
+    try {
+        $stmt = $pdo->prepare("UPDATE notifications SET read_status = 1 WHERE id = ? AND $notif_scope");
+        $stmt->execute([(int)$_GET['read'], $uid]);
+    } catch (Exception $e) { error_log('notifications mark one: ' . $e->getMessage()); }
+    header('Location: notifications');
+    exit;
+}
+
+// 2. Fetch notifications
 try {
-    $stmt = $pdo->prepare("SELECT * FROM notifications 
-                           WHERE (user_role = 'student' OR user_role = 'all' OR target_user_id = ?) 
-                           ORDER BY created_at DESC 
-                           LIMIT 50");
-    $stmt->execute([$user['id']]);
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE $notif_scope ORDER BY created_at DESC, id DESC LIMIT 50");
+    $stmt->execute([$uid]);
     $notifications = $stmt->fetchAll();
 } catch (Exception $e) { $notifications = []; }
+
+$unread_here = count(array_filter($notifications, fn($n) => empty($n['read_status'])));
+$filter = ($_GET['show'] ?? '') === 'unread' ? 'unread' : 'all';
+$shown = $filter === 'unread' ? array_values(array_filter($notifications, fn($n) => empty($n['read_status']))) : $notifications;
+
+// Pick an icon and colour from the notification text
+function notif_style($n) {
+    $t = strtolower(($n['title'] ?? '') . ' ' . ($n['message'] ?? ''));
+    if (str_contains($t, 'badge')) return ['fa-medal', 'violet'];
+    if (str_contains($t, 'certificate')) return ['fa-certificate', 'green'];
+    if (str_contains($t, 'payment')) return ['fa-receipt', 'green'];
+    if (str_contains($t, 'assignment')) return ['fa-file-pen', 'orange'];
+    if (str_contains($t, 'quiz')) return ['fa-circle-question', ''];
+    if (str_contains($t, 'reminder')) return ['fa-calendar-day', 'orange'];
+    if (str_contains($t, 'scholarship')) return ['fa-graduation-cap', 'violet'];
+    return empty($n['target_user_id']) ? ['fa-bullhorn', 'yellow'] : ['fa-bell', ''];
+}
+
+require_once 'includes/layout-top.php';
 ?>
 
-<?php require_once '../includes/sidebar.php'; ?>
-
 <style>
-    .notif-card { background: white; border: 1px solid var(--dark-border); border-radius: 24px; overflow: hidden; box-shadow: var(--shadow-sm); }
-    .notif-item { display: flex; align-items: flex-start; gap: 24px; padding: 32px; border-bottom: 1px solid var(--bg-light); transition: 0.3s; position: relative; }
-    .notif-item:last-child { border: none; }
-    .notif-item.unread { background: #f0f9ff; border-left: 4px solid var(--primary); }
-    .notif-item:hover { background: #f8fafc; }
-    
-    .notif-icon { width: 56px; height: 56px; border-radius: 16px; background: white; border: 1px solid var(--dark-border); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--primary); flex-shrink: 0; box-shadow: var(--shadow-sm); }
-    .unread .notif-icon { background: var(--primary); color: white; border-color: var(--primary); }
-    
-    .notif-content { flex: 1; }
-    .notif-title { font-family: 'Poppins', sans-serif; font-weight: 800; color: var(--dark); font-size: 1.15rem; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-    .notif-badge { font-size: 0.65rem; font-weight: 800; background: var(--primary-glow); color: var(--primary); padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 1px; }
-    .notif-msg { font-size: 1rem; color: var(--text-muted); line-height: 1.7; }
-    .notif-time { font-size: 0.75rem; color: var(--text-dim); margin-top: 16px; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.pg-notif .sp-list-item { align-items: flex-start; padding: 16px 18px; gap: 14px; border-left: 3px solid transparent; }
+.pg-notif .sp-list-item.unread { background: var(--primary-soft); border-left-color: var(--primary); }
+.pg-notif .sp-list-item.unread h4::after { content: ''; display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; background: var(--primary); vertical-align: middle; }
+.pg-notif .sp-list-item p { font-size: .86rem; line-height: 1.55; overflow-wrap: anywhere; }
+.pg-notif .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: .74rem; color: var(--text-muted); }
+.pg-notif .mark { font-size: .76rem; white-space: nowrap; }
+@media (max-width: 640px) { .pg-notif .sp-list-item { padding: 14px 12px; } .pg-notif .sp-ico { width: 34px; height: 34px; } }
 </style>
 
-<main class="main-content">
-    <header class="admin-header" style="background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--dark-border); padding: 0 40px; height: 90px;">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()" style="background: var(--bg-light); width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary);"><i class="fas fa-bars"></i></button>
-            <div>
-                <h1 style="font-family: 'Poppins', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px;">Institutional <span style="color: var(--primary);">Intelligence</span></h1>
-                <p style="color: var(--text-dim); font-size: 0.85rem; font-weight: 500; margin-top: 2px;">Official platform broadcasts and administrative alerts.</p>
-            </div>
-        </div>
-        <div>
-            <a href="?mark_all_read=1" class="btn btn-ghost" style="font-size: 0.85rem; font-weight: 700; color: var(--text-dim);">
-                <i class="fas fa-check-double"></i> Mark all as read
-            </a>
-        </div>
-    </header>
+<div class="sp-page-head">
+    <div><h1>Notifications</h1><p>Updates about your courses, badges, certificates and announcements.</p></div>
+    <?php if ($unread_here): ?>
+    <div class="sp-actions">
+        <a href="?mark_all_read=1" class="sp-btn ghost"><i class="fas fa-check-double"></i> Mark all as read</a>
+    </div>
+    <?php endif; ?>
+</div>
 
-    <div class="notif-card" data-aos>
-        <?php if(!empty($notifications)): ?>
-            <?php foreach($notifications as $n): ?>
-            <div class="notif-item <?= $n['read_status'] ? '' : 'unread' ?>">
-                <div class="notif-icon">
-                    <i class="fas fa-bullhorn"></i>
-                </div>
-                <div class="notif-content">
-                    <div class="notif-title">
-                        <?= htmlspecialchars($n['title']) ?>
-                        <?php if(!$n['read_status']): ?>
-                            <span class="notif-badge">New Alert</span>
-                        <?php endif; ?>
+<div class="sp-section-head">
+    <div class="sp-tabs">
+        <a href="notifications" class="sp-tab <?= $filter === 'all' ? 'active' : '' ?>">All (<?= count($notifications) ?>)</a>
+        <a href="?show=unread" class="sp-tab <?= $filter === 'unread' ? 'active' : '' ?>">Unread (<?= $unread_here ?>)</a>
+    </div>
+</div>
+
+<?php if (empty($shown)): ?>
+    <div class="sp-empty">
+        <div class="sp-ico green"><i class="fas fa-bell-slash"></i></div>
+        <h3><?= $filter === 'unread' ? "You're all caught up" : 'No notifications yet' ?></h3>
+        <p><?= $filter === 'unread' ? 'You have read everything. New updates will show up here.' : 'Badges, certificates, grades and announcements will show up here.' ?></p>
+        <?php if ($filter === 'unread'): ?><a href="notifications" class="sp-btn ghost">See all notifications</a><?php endif; ?>
+    </div>
+<?php else: ?>
+    <div class="sp-card flush pg-notif">
+        <div class="sp-list">
+            <?php foreach ($shown as $n):
+                [$ic, $col] = notif_style($n);
+                $is_unread = empty($n['read_status']);
+            ?>
+            <div class="sp-list-item <?= $is_unread ? 'unread' : '' ?>">
+                <span class="sp-ico <?= $col ?>"><i class="fas <?= $ic ?>"></i></span>
+                <div class="sp-grow">
+                    <h4><?= htmlspecialchars($n['title'] ?: 'Update') ?></h4>
+                    <?php if (!empty($n['message'])): ?><p><?= nl2br(htmlspecialchars($n['message'])) ?></p><?php endif; ?>
+                    <div class="meta">
+                        <span><i class="far fa-clock"></i> <?= !empty($n['created_at']) ? date('j M Y, H:i', strtotime($n['created_at'])) : '' ?></span>
+                        <span class="sp-badge <?= empty($n['target_user_id']) ? 'yellow' : 'gray' ?>" style="height: 20px; font-size: .68rem;"><?= empty($n['target_user_id']) ? 'Announcement' : 'For you' ?></span>
                     </div>
-                    <div class="notif-msg"><?= nl2br(htmlspecialchars($n['message'])) ?></div>
-                    <div class="notif-time">
-                        <i class="far fa-clock"></i> 
-                        <?= date('F j, Y \a\t H:i', strtotime($n['created_at'])) ?>
-                        <span style="margin: 0 8px; opacity: 0.3;">•</span>
-                        <span style="color: var(--primary); font-weight: 700;">Platform Broadcast</span>
-                    </div>
                 </div>
+                <?php if ($is_unread): ?>
+                    <a href="?read=<?= (int)$n['id'] ?>" class="sp-link mark" title="Mark as read"><i class="fas fa-check"></i><span class="sp-hide-sm">Mark as read</span></a>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
-        <?php else: ?>
-            <div style="text-align: center; padding: 120px 40px;">
-                <div style="width: 100px; height: 100px; background: var(--bg-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: var(--text-dim); font-size: 2.5rem;">
-                    <i class="fas fa-satellite"></i>
-                </div>
-                <h3 style="font-family: 'Poppins', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--dark); margin-bottom: 12px;">No incoming alerts</h3>
-                <p style="color: var(--text-dim); max-width: 400px; margin: 0 auto;">High-priority institutional communications will appear here once deployed by the administration.</p>
-            </div>
-        <?php endif; ?>
+        </div>
     </div>
-</main>
+<?php endif; ?>
 
-<script src="../assets/js/main.js"></script>
-</body>
-</html>
+<?php require_once 'includes/layout-bottom.php'; ?>

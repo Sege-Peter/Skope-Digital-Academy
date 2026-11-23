@@ -51,8 +51,8 @@ $user = isLoggedIn() ? currentUser() : null;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Skope Digital Academy – Kenya's #1 AI-powered online learning platform. Earn globally verified certifications, access scholarships, and grow with industry mentors.">
 <title>Skope Digital Academy – Knowledge Without Limits</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Skope Digital Academy – Learn Coding & Digital Skills Online in Kenya', 'path' => '', 'description' => 'Online academy in Kisumu, Kenya: free coding tutorials, self-paced and weekly classes in digital and income skills, scholarships and verifiable certificates.', 'keywords' => 'online courses Kenya, learn coding Kenya, digital skills, Kisumu, free tutorials, certificates, scholarships']); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -394,7 +394,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 }
 
 @media (max-width: 768px) {
-  .hero-section { padding: 60px 0 40px; }
+  .hero-section { padding: 40px 0 40px; }
   .stats-bar { gap: 24px; padding-top: 24px; }
   .stat-num { font-size: 1.6rem; }
   .stat-lbl { font-size: 0.7rem; }
@@ -433,7 +433,6 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 
       <!-- LEFT: Copy -->
       <div>
-        <div class="badge-pill"><i class="fas fa-bolt"></i> Kenya's #1 E-learning Platform</div>
 
         <h1 class="hero-headline">
           Learn <span class="c-blue">Smart.</span><br>
@@ -583,11 +582,11 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
       Trusted by learners at leading global organisations
     </p>
     <div class="partner-row">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/LinkedIn_Logo.svg" alt="LinkedIn">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/2/1b/Adobe_Systems_logo_and_wordmark.svg" alt="Adobe">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/LinkedIn_Logo.svg" alt="LinkedIn" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/7/7b/Adobe_Systems_logo_and_wordmark.svg" alt="Adobe" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
     </div>
   </div>
 </section>
@@ -765,8 +764,15 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <h2 style="font-family: 'Poppins', sans-serif; font-weight: 950; font-size: clamp(1.8rem, 5vw, 2.8rem); margin-bottom: 16px; line-height: 1.1; letter-spacing: -1.5px;">Support Our <span style="color: #00BFFF;">Learners.</span></h2>
         <p style="font-size: 1.1rem; opacity: 0.85; line-height: 1.6; margin-bottom: 0;">Your contribution directly funds tuition and certifications for talented students in need. Join us in breaking the barriers to elite digital education.</p>
       </div>
-      <div style="display: flex; gap: 16px;">
-        <a href="donate" class="btn-premium" style="background: #00BFFF; border: none; padding: 20px 48px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,191,255,0.25);">Donate Now <i class="fas fa-heart" style="margin-left: 10px;"></i></a>
+      <div class="donate-cta-wrap" style="display: flex; gap: 16px;">
+        <a href="donate" class="btn-premium donate-cta">Donate Now <i class="fas fa-heart"></i></a>
+        <style>
+          .donate-cta { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: #00BFFF; color: #fff !important; text-decoration: none;
+            font: 800 1.05rem 'Poppins', sans-serif; border: none; padding: 18px 44px; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,191,255,0.25); transition: transform .2s, background .2s; }
+          .donate-cta:hover { background: #0099d6; transform: translateY(-2px); }
+          .donate-cta i { color: #fff; }
+          @media (max-width: 600px) { .donate-cta-wrap { width: 100%; } .donate-cta { width: 100%; padding: 16px 24px; } }
+        </style>
       </div>
     </div>
   </div>

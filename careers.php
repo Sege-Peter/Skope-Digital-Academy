@@ -9,6 +9,7 @@ $user = isLoggedIn() ? currentUser() : null;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Careers – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Careers', 'path' => 'careers', 'description' => 'Work or teach with Skope Digital Academy. See open roles and how to become a tutor for learners across Kenya and East Africa.', 'breadcrumbs' => [['Careers', 'careers']]]); ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -28,6 +29,14 @@ $user = isLoggedIn() ? currentUser() : null;
     .culture-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
     .culture-card { text-align: center; }
     @media (max-width: 768px) { .culture-grid { grid-template-columns: 1fr; gap: 32px; } .culture-section { padding: 64px 0; } }
+    @media (max-width: 700px) {
+        .careers-hero { padding: 64px 0; }
+        .careers-hero h1 { font-size: clamp(2rem, 9vw, 2.6rem); }
+        .careers-hero p { font-size: 1.05rem; }
+        .job-card { flex-direction: column; align-items: flex-start; gap: 18px; padding: 22px; }
+        .job-card .btn { width: 100%; justify-content: center; }
+        .job-meta { flex-wrap: wrap; gap: 8px 16px; }
+    }
     .culture-icon { font-size: 2.5rem; color: var(--secondary); margin-bottom: 24px; }
 </style>
 </head>
@@ -85,7 +94,7 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-tag"></i> Academic Team</span>
                     </div>
                 </div>
-                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20Senior%20Learning%20Experience%20Designer" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:info@skopedigital.co.ke?subject=Application%3A%20Senior%20Learning%20Experience%20Designer" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div class="job-card">
@@ -97,7 +106,7 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-robot"></i> Technology</span>
                     </div>
                 </div>
-                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20AI%20Content%20Strategy%20Lead" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:info@skopedigital.co.ke?subject=Application%3A%20AI%20Content%20Strategy%20Lead" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div class="job-card">
@@ -109,11 +118,11 @@ $user = isLoggedIn() ? currentUser() : null;
                         <span><i class="fas fa-user-graduate"></i> Operations</span>
                     </div>
                 </div>
-                <a href="mailto:careers@skopedigital.ac.ke?subject=Application%3A%20Student%20Success%20Coordinator" class="btn btn-ghost">Apply Now</a>
+                <a href="mailto:info@skopedigital.co.ke?subject=Application%3A%20Student%20Success%20Coordinator" class="btn btn-ghost">Apply Now</a>
             </div>
 
             <div style="text-align: center; margin-top: 60px;">
-                <p style="color: var(--text-dim);">Don't see a role that fits? Send your CV to <a href="mailto:careers@skopedigital.ac.ke" style="color: var(--primary); font-weight: 700;">careers@skopedigital.ac.ke</a></p>
+                <p style="color: var(--text-dim);">Don't see a role that fits? Send your CV to <a href="mailto:info@skopedigital.co.ke" style="color: var(--primary); font-weight: 700;">info@skopedigital.co.ke</a></p>
             </div>
         </div>
     </div>

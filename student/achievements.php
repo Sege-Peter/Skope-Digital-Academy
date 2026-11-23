@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'My Achievements';
+$pageTitle = 'Achievements';
 require_once 'includes/header.php';
 require_once __DIR__ . '/../includes/progress.php';
 
@@ -77,179 +77,282 @@ function badge_progress(array $b, array $stats): array {
     $need = max(1, (int)$b['criteria_value']);
     return [min($have, $need), $need, (int)floor(min(1, $have / $need) * 100)];
 }
+$kindInfo = [
+    'skill'       => ['Skill badges', 'Earned by finishing a course'],
+    'path'        => ['Path badges', 'Earned by finishing every course in a learning path'],
+    'achievement' => ['Milestones', 'Earned along the way as you keep learning'],
+    'manual'      => ['Special awards', 'Given by your tutors and the academy'],
+];
+$totalShown = array_sum(array_map('count', $byKind));
+$earnedShown = 0;
+foreach ($byKind as $list) foreach ($list as $b) if ($b['awarded_at']) $earnedShown++;
+$xpToNext = max(0, (int)$lv['to'] - (int)$lv['xp']);
+$bestStreak = max((int)$me['best_streak'], $streak);
+$timeLabel = $hours >= 1 ? number_format($hours, 1) . 'h' : (int)round($stats['seconds'] / 60) . 'm';
+
+require_once 'includes/layout-top.php';
 ?>
-<?php require_once 'includes/sidebar.php'; ?>
 <style>
-  .ach { --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --blue: #0080ff; --gold: #f59e0b; font-family: 'Inter', sans-serif; }
-  .ach h2 { font: 800 1.2rem 'Poppins', 'Inter', sans-serif; color: var(--ink); margin: 34px 0 14px; display: flex; align-items: center; gap: 10px; }
-  .ach h2 small { font: 500 .85rem 'Inter', sans-serif; color: var(--muted); }
-  .ach-hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; padding: 26px; border-radius: 22px; color: #e2e8f0;
-              background: radial-gradient(circle at 100% 0, rgba(0,191,255,.3), transparent 45%), radial-gradient(circle at 0 120%, rgba(255,140,0,.25), transparent 45%), #0b1324; }
-  .ach-ring { --p: 0; width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center;
-              background: conic-gradient(#fbbf24 calc(var(--p) * 1%), rgba(255,255,255,.1) 0); }
-  .ach-ring div { width: 100px; height: 100px; border-radius: 50%; background: #0b1324; display: grid; place-items: center; text-align: center; }
-  .ach-ring b { display: block; font: 800 2rem 'Poppins', sans-serif; color: #fff; line-height: 1; }
-  .ach-ring small { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #94a3b8; }
-  .ach-hero h1 { margin: 0; font: 800 1.7rem 'Poppins', sans-serif; color: #fff; }
-  .ach-hero .title { color: #fbbf24; font-weight: 700; }
-  .ach-hero .next { margin: 6px 0 16px; color: #94a3b8; font-size: .9rem; }
-  .ach-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
-  .ach-stat { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 12px 14px; }
-  .ach-stat b { display: block; font: 800 1.35rem 'Poppins', sans-serif; color: #fff; }
-  .ach-stat span { font-size: .78rem; color: #94a3b8; }
-  .ach-stat i { color: #fbbf24; margin-right: 4px; }
-  .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 14px; }
-  .ach-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
-  .bdg { display: flex; gap: 14px; align-items: center; }
-  .bdg-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 56px; font-size: 1.35rem; color: #fff;
-              background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--bc) 55%, #fff), var(--bc)); box-shadow: 0 0 0 5px color-mix(in srgb, var(--bc) 15%, transparent); }
-  .bdg.locked .bdg-icon { background: #e2e8f0; color: #94a3b8; box-shadow: none; }
-  .bdg strong { display: block; color: var(--ink); font-size: .95rem; }
-  .bdg span { display: block; color: var(--muted); font-size: .8rem; line-height: 1.4; }
-  .bdg .when { color: #0f9d6b; font-weight: 600; margin-top: 3px; }
-  .bdg .prog { height: 5px; border-radius: 5px; background: var(--line); margin-top: 7px; overflow: hidden; }
-  .bdg .prog i { display: block; height: 100%; background: var(--blue); }
-  .skill .bdg-icon { border-radius: 16px; }
-  .cert-card { display: flex; flex-direction: column; gap: 6px; border-left: 4px solid #c9a227; }
-  .cert-card strong { color: var(--ink); }
-  .cert-card small { color: var(--muted); }
-  .cert-card .acts { display: flex; gap: 8px; margin-top: 6px; }
-  .btn-s { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; font-size: .8rem; font-weight: 700; text-decoration: none; border: 1px solid var(--line); color: var(--ink); background: #fff; }
-  .btn-s.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .crs { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; }
-  .crs strong { color: var(--ink); }
-  .crs .rank { font: 800 1.3rem 'Poppins', sans-serif; color: var(--gold); text-align: right; }
-  .crs .rank small { display: block; font: 600 .7rem 'Inter', sans-serif; color: var(--muted); }
-  .bar { height: 7px; border-radius: 7px; background: var(--line); overflow: hidden; grid-column: 1 / -1; }
-  .bar i { display: block; height: 100%; background: linear-gradient(90deg, #00bfff, var(--blue)); }
-  .crs-foot { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); }
-  .crs-foot a { font-weight: 700; color: var(--blue); text-decoration: none; }
-  .path-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-  .path-steps span { font-size: .76rem; font-weight: 700; padding: 4px 10px; border-radius: 99px; background: #f1f5f9; color: #475569; }
-  .path-steps span.done { background: #e7f7f0; color: #0f7a54; }
-  .feed { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
-  .feed li { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-top: 1px solid #f1f5f9; font-size: .88rem; color: #334155; }
-  .feed li:first-child { border-top: 0; }
-  .feed i { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #eff6ff; color: var(--blue); flex: 0 0 30px; }
-  .feed .xp { margin-left: auto; font-weight: 800; color: #b45309; white-space: nowrap; }
-  .feed time { color: #94a3b8; font-size: .76rem; white-space: nowrap; }
-  .privacy { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-  .empty { color: var(--muted); background: #fff; border: 1px dashed #cbd5e1; border-radius: 14px; padding: 18px; }
-  @media (max-width: 640px) { .ach-hero { grid-template-columns: 1fr; text-align: center; } .ach-ring { margin: 0 auto; } }
+  .pg-ach .ach-hero-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: center; }
+  .pg-ach .ach-ring { --p: 0; width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center;
+      background: conic-gradient(#FFC53D calc(var(--p) * 1%), rgba(255,255,255,.12) 0); }
+  .pg-ach .ach-ring > div { width: 108px; height: 108px; border-radius: 50%; background: #111C33; display: grid; place-items: center; text-align: center; }
+  .pg-ach .ach-ring b { display: block; font-size: 2.3rem; font-weight: 800; line-height: 1; color: #fff; }
+  .pg-ach .ach-ring small { font-size: .72rem; color: rgba(255,255,255,.65); font-weight: 600; }
+  .pg-ach .ach-hero h2 { margin: 10px 0 4px; font-size: clamp(1.3rem, 3vw, 1.7rem); font-weight: 800; }
+  .pg-ach .ach-hero .sp-between { font-size: .78rem; color: rgba(255,255,255,.75); }
+  .pg-ach .ach-badges { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .pg-ach .bdg { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+      padding: 20px 16px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .pg-ach .bdg.earned { border-color: color-mix(in srgb, var(--bc) 35%, var(--border));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--bc) 9%, #fff), #fff 65%); }
+  .pg-ach .bdg-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; color: #fff;
+      background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--bc) 55%, #fff), var(--bc));
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--bc) 14%, transparent); margin-bottom: 6px; }
+  .pg-ach .bdg.skill .bdg-icon { border-radius: 18px; }
+  .pg-ach .bdg.locked .bdg-icon { background: #EEF2F6; color: #A0AEC0; box-shadow: none; }
+  .pg-ach .bdg.locked h4 { color: var(--text-dim); }
+  .pg-ach .bdg h4 { margin: 0; font-size: .92rem; font-weight: 800; }
+  .pg-ach .bdg p { margin: 0; font-size: .78rem; color: var(--text-dim); line-height: 1.4; }
+  .pg-ach .bdg .sp-progress { width: 100%; height: 6px; margin-top: 4px; }
+  .pg-ach .bdg-lock { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); font-size: .68rem; }
+  .pg-ach .bdg-when { margin-top: auto; padding-top: 6px; }
+  .pg-ach .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .pg-ach .chips span { font-size: .74rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #EEF2F6; color: var(--text-dim); }
+  .pg-ach .chips span.done { background: var(--success-soft); color: #0B8A4F; }
+  .pg-ach .rank { font-size: 1.3rem; font-weight: 800; color: #B7791F; text-align: right; line-height: 1.1; }
+  .pg-ach .rank small { display: block; font-size: .7rem; font-weight: 600; color: var(--text-dim); }
+  .pg-ach .xp-plus { font-weight: 800; color: #B7791F; white-space: nowrap; font-size: .85rem; }
+  @media (max-width: 640px) {
+    .pg-ach .ach-hero-grid { grid-template-columns: 1fr; text-align: center; }
+    .pg-ach .ach-ring { margin: 0 auto; }
+    .pg-ach .ach-hero .sp-row { justify-content: center; }
+  }
 </style>
-<main class="main-content ach" style="padding-bottom: 80px;">
-  <section class="ach-hero">
-    <div class="ach-ring" style="--p: <?= (int)$lv['pct'] ?>"><div><span><b><?= (int)$lv['level'] ?></b><small>Level</small></span></div></div>
-    <div>
-      <h1><?= e($student['name']) ?></h1>
-      <div class="title"><?= e($lv['title']) ?> · <?= number_format($lv['xp']) ?> XP</div>
-      <div class="next"><?= number_format(max(0, $lv['to'] - $lv['xp'])) ?> XP to level <?= (int)$lv['level'] + 1 ?></div>
-      <div class="ach-stats">
-        <div class="ach-stat"><b><i class="fas fa-fire"></i><?= $streak ?></b><span>Day streak · best <?= max((int)$me['best_streak'], $streak) ?></span></div>
-        <div class="ach-stat"><b><?= (int)$stats['lessons'] ?></b><span>Lessons completed</span></div>
-        <div class="ach-stat"><b><?= $hours >= 1 ? number_format($hours, 1) . 'h' : (int)round($stats['seconds'] / 60) . 'm' ?></b><span>Time learning</span></div>
-        <div class="ach-stat"><b><?= $earnedCount ?></b><span>Badges earned</span></div>
-        <div class="ach-stat"><b><?= count($certs) ?></b><span>Certificates</span></div>
+
+<div class="pg-ach">
+  <div class="sp-page-head">
+    <div><h1>Achievements</h1><p>Your level, badges, learning paths and certificates, all in one place.</p></div>
+    <div class="sp-actions"><a href="leaderboard" class="sp-btn ghost"><i class="fas fa-ranking-star"></i> Leaderboard</a></div>
+  </div>
+
+  <!-- Level -->
+  <section class="sp-hero ach-hero">
+    <div class="ach-hero-grid">
+      <div class="ach-ring" style="--p: <?= max(0, min(100, (int)$lv['pct'])) ?>" role="img" aria-label="Level <?= (int)$lv['level'] ?>, <?= (int)$lv['pct'] ?>% of the way to the next level">
+        <div><span><b><?= (int)$lv['level'] ?></b><small>Level</small></span></div>
+      </div>
+      <div>
+        <div class="sp-row">
+          <span class="sp-badge dark"><i class="fas fa-medal" style="color: #FFC53D;"></i> <?= e($lv['title']) ?></span>
+          <?php if ($streak > 0): ?><span class="sp-badge dark">🔥 <?= $streak ?>-day streak</span><?php endif; ?>
+        </div>
+        <h2><?= number_format((int)$lv['xp']) ?> XP earned</h2>
+        <p><?= $xpToNext > 0 ? 'Earn ' . number_format($xpToNext) . ' more XP to reach level ' . ((int)$lv['level'] + 1) . '. Every lesson, exercise and quiz counts.' : 'You have reached the next level. Keep going!' ?></p>
+        <div class="sp-progress dark" style="margin: 16px 0 8px; height: 10px;"><span style="width: <?= max(3, (int)$lv['pct']) ?>%;"></span></div>
+        <div class="sp-between">
+          <span>Level <?= (int)$lv['level'] ?> · <?= number_format((int)$lv['from']) ?> XP</span>
+          <span>Level <?= (int)$lv['level'] + 1 ?> · <?= number_format((int)$lv['to']) ?> XP</span>
+        </div>
       </div>
     </div>
   </section>
 
-  <h2><i class="fas fa-ranking-star" style="color:#f59e0b"></i> My courses &amp; ranks</h2>
-  <?php if (!$courses): ?>
-    <div class="empty">You're not taking any courses yet. <a href="../learn">Start a free tutorial</a> – progress, XP and badges are tracked automatically.</div>
-  <?php else: ?>
-  <div class="ach-grid">
-    <?php foreach ($courses as $c): ?>
-      <div class="ach-card crs">
-        <strong><?= e($c['title']) ?></strong>
-        <div class="rank"><?= $c['rank'] ? '#' . (int)$c['rank'] : '–' ?><small>of <?= (int)$c['learners'] ?></small></div>
-        <div class="bar"><i style="width:<?= (int)round($c['progress_percent']) ?>%"></i></div>
-        <div class="crs-foot"><span><?= (int)round($c['progress_percent']) ?>% · <?= number_format($c['xp']) ?> XP<?= $c['status'] === 'completed' ? ' · <i class="fas fa-check" style="color:#0f9d6b"></i> done' : '' ?></span>
-          <?php if ($c['slug']): ?><a href="../learn/<?= e($c['slug']) ?>/leaderboard">Leaderboard</a><?php endif; ?></div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-  <?php endif; ?>
+  <!-- Stats -->
+  <section class="sp-grid cols-4 sp-section">
+    <div class="sp-stat"><span class="sp-stat-icon orange"><i class="fas fa-fire"></i></span><div><strong><?= $streak ?></strong><span>Day streak · best <?= $bestStreak ?></span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-circle-check"></i></span><div><strong><?= (int)$stats['lessons'] ?></strong><span>Lessons completed</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon"><i class="fas fa-clock"></i></span><div><strong><?= $timeLabel ?></strong><span>Time learning</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon violet"><i class="fas fa-medal"></i></span><div><strong><?= $earnedCount ?></strong><span>Badges earned</span></div></div>
+    <a href="certificates" class="sp-stat" style="text-decoration: none;"><span class="sp-stat-icon yellow"><i class="fas fa-certificate"></i></span><div><strong><?= count($certs) ?></strong><span>Certificates</span></div></a>
+  </section>
 
-  <h2><i class="fas fa-certificate" style="color:#c9a227"></i> Certificates <small>issued automatically when you finish</small></h2>
-  <?php if (!$certs): ?>
-    <div class="empty">Complete every lesson of a course (and pass its final quiz) to receive a certificate you can download and share.</div>
-  <?php else: ?>
-  <div class="ach-grid">
-    <?php foreach ($certs as $c): $t = $c['certificate_type'] === 'path' ? $c['path_title'] : $c['course_title']; ?>
-      <div class="ach-card cert-card">
-        <small><?= $c['certificate_type'] === 'path' ? 'Learning path' : 'Course' ?> · <?= date('j M Y', strtotime($c['issued_at'])) ?></small>
-        <strong><?= e($t) ?></strong>
-        <small><?= $c['status'] === 'pending' ? '<i class="fas fa-lock"></i> Ready to unlock' : 'Code ' . e($c['verification_code']) ?><?= $c['score'] !== null ? ' · Score ' . (int)$c['score'] . '%' : '' ?></small>
-        <?php if ($c['status'] === 'pending'): ?>
-        <div class="acts"><a class="btn-s primary" href="../certificate-pay?code=<?= e(rawurlencode($c['verification_code'])) ?>" style="background:#f59e0b;border-color:#f59e0b"><i class="fas fa-lock-open"></i> Unlock · <?= e(money((float)$c['fee'])) ?></a></div>
-        <?php else: ?>
-        <div class="acts"><a class="btn-s primary" href="../certificate?code=<?= e(rawurlencode($c['verification_code'])) ?>" target="_blank" rel="noopener"><i class="fas fa-eye"></i> View</a>
-          <button type="button" class="btn-s" data-copy="<?= e(rawurlencode($c['verification_code'])) ?>"><i class="fas fa-link"></i> Copy link</button></div>
+  <!-- Badges -->
+  <?php foreach ($kindInfo as $kind => [$label, $hint]):
+      if (!$byKind[$kind]) continue;
+      $got = count(array_filter($byKind[$kind], fn($b) => $b['awarded_at']));
+      // earned first, then locked ones closest to done
+      usort($byKind[$kind], function ($a, $b) {
+          if ((bool)$a['awarded_at'] !== (bool)$b['awarded_at']) return $a['awarded_at'] ? -1 : 1;
+          return 0;
+      });
+  ?>
+  <section class="sp-section">
+    <div class="sp-section-head">
+      <div><h2><?= $label ?></h2><p><?= $hint ?></p></div>
+      <span class="sp-badge <?= $got ? 'green' : 'gray' ?>"><?= $got ?> of <?= count($byKind[$kind]) ?> earned</span>
+    </div>
+    <div class="ach-badges">
+      <?php foreach ($byKind[$kind] as $b):
+          $earned = (bool)$b['awarded_at'];
+          $icon = str_starts_with((string)$b['icon'], 'fa-') ? $b['icon'] : 'fa-award';
+      ?>
+      <div class="bdg <?= $earned ? 'earned' : 'locked' ?> <?= $kind === 'skill' ? 'skill' : '' ?>" style="--bc: <?= e($b['color'] ?: '#0080ff') ?>">
+        <?php if (!$earned): ?><span class="bdg-lock" title="Locked"><i class="fas fa-lock"></i></span><?php endif; ?>
+        <div class="bdg-icon"><i class="fas <?= e($icon) ?>"></i></div>
+        <h4><?= e($b['name']) ?></h4>
+        <p><?= e($b['description']) ?></p>
+        <?php if ($earned): ?>
+          <span class="sp-badge green bdg-when"><i class="fas fa-check"></i> Earned <?= date('j M Y', strtotime($b['awarded_at'])) ?></span>
+        <?php elseif ($kind === 'achievement' && isset($stats[$b['criteria_type']])): [$h, $n, $pc] = badge_progress($b, $stats); ?>
+          <div class="sp-progress" title="<?= $pc ?>%"><span style="width: <?= max(2, $pc) ?>%;"></span></div>
+          <span class="sp-small sp-muted"><?= number_format($h) ?> / <?= number_format($n) ?></span>
         <?php endif; ?>
       </div>
-    <?php endforeach; ?>
-  </div>
-  <?php endif; ?>
-
-  <h2><i class="fas fa-route" style="color:#0080ff"></i> Learning paths</h2>
-  <div class="ach-grid">
-    <?php foreach ($paths as $p): ?>
-      <div class="ach-card">
-        <strong style="color:var(--ink)"><i class="fas <?= e($p['icon']) ?>" style="color:<?= e($p['color']) ?>"></i> <?= e($p['title']) ?></strong>
-        <div class="path-steps"><?php foreach ($p['courses'] as $c): ?><span class="<?= !empty($c['completed']) ? 'done' : '' ?>"><?= !empty($c['completed']) ? '✓ ' : '' ?><?= e($c['tutorial_short'] ?: $c['title']) ?></span><?php endforeach; ?></div>
-        <div class="bar"><i style="width:<?= (int)$p['pct'] ?>%"></i></div>
-        <div class="crs-foot" style="margin-top:6px"><span><?= (int)$p['done'] ?>/<?= count($p['courses']) ?> courses</span><span><i class="fas fa-award"></i> Badge + certificate</span></div>
-      </div>
-    <?php endforeach; ?>
-  </div>
-
-  <?php foreach (['skill' => ['Skill badges', 'fa-certificate', 'earned by completing a course'], 'path' => ['Path badges', 'fa-route', 'earned by completing a learning path'], 'achievement' => ['Achievements', 'fa-medal', 'milestones along the way'], 'manual' => ['Special awards', 'fa-gift', 'from your tutors and the academy']] as $kind => [$label, $icon, $hint]):
-      if (!$byKind[$kind]) continue; ?>
-    <h2><i class="fas <?= $icon ?>" style="color:#8b5cf6"></i> <?= $label ?> <small><?= $hint ?></small></h2>
-    <div class="ach-grid">
-      <?php foreach ($byKind[$kind] as $b): $earned = (bool)$b['awarded_at']; ?>
-        <div class="ach-card <?= $kind === 'skill' ? 'skill' : '' ?>">
-          <div class="bdg <?= $earned ? '' : 'locked' ?>" style="--bc: <?= e($b['color'] ?: '#0080ff') ?>">
-            <div class="bdg-icon"><i class="fas <?= e(str_starts_with((string)$b['icon'], 'fa-') ? $b['icon'] : 'fa-award') ?>"></i></div>
-            <div style="min-width:0">
-              <strong><?= e($b['name']) ?></strong>
-              <span><?= e($b['description']) ?></span>
-              <?php if ($earned): ?>
-                <span class="when"><i class="fas fa-check"></i> Earned <?= date('j M Y', strtotime($b['awarded_at'])) ?></span>
-              <?php elseif ($kind === 'achievement' && isset($stats[$b['criteria_type']])): [$h, $n, $pc] = badge_progress($b, $stats); ?>
-                <div class="prog"><i style="width:<?= $pc ?>%"></i></div><span><?= number_format($h) ?> / <?= number_format($n) ?></span>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
       <?php endforeach; ?>
     </div>
+  </section>
   <?php endforeach; ?>
-
-  <h2><i class="fas fa-clock-rotate-left" style="color:#0f9d6b"></i> Recent activity</h2>
-  <?php if (!$events): ?>
-    <div class="empty">Your learning activity will appear here.</div>
-  <?php else: ?>
-  <ul class="feed">
-    <?php foreach ($events as $ev): [$ic, $lbl] = $eventLabels[$ev['event_type']] ?? ['fa-bolt', 'Activity']; ?>
-      <li><i class="fas <?= $ic ?>"></i><span><?= e($lbl) ?> <?= $ev['lesson_title'] ? '<b>' . e($ev['lesson_title']) . '</b>' : ($ev['course_title'] ? '<b>' . e($ev['course_title']) . '</b>' : '') ?></span>
-        <span class="xp">+<?= (int)$ev['xp'] ?> XP</span><time datetime="<?= e($ev['created_at']) ?>"><?= date('j M, H:i', strtotime($ev['created_at'])) ?></time></li>
-    <?php endforeach; ?>
-  </ul>
+  <?php if (!$totalShown): ?>
+    <div class="sp-empty sp-section">
+      <div class="sp-ico violet"><i class="fas fa-medal"></i></div>
+      <h3>No badges yet</h3>
+      <p>Finish your first lesson to earn the First Steps badge.</p>
+      <a href="../learn" class="sp-btn">Start a free tutorial</a>
+    </div>
   <?php endif; ?>
 
-  <h2 id="privacy"><i class="fas fa-user-shield" style="color:#64748b"></i> Leaderboard privacy</h2>
-  <form method="post" class="ach-card privacy">
-    <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
-    <input type="hidden" name="leaderboard_visibility" value="1">
-    <label style="display:flex;gap:10px;align-items:center;cursor:pointer"><input type="checkbox" name="show" value="1" <?= $me['show_on_leaderboard'] ? 'checked' : '' ?> style="width:18px;height:18px">
-      <span>Show me on course leaderboards (as first name and last initial)</span></label>
-    <button class="btn-s primary" type="submit">Save</button>
-    <?php if (isset($_GET['saved'])): ?><span style="color:#0f9d6b;font-weight:600"><i class="fas fa-check"></i> Saved</span><?php endif; ?>
-  </form>
-</main>
-<script src="../assets/js/main.js"></script>
+  <!-- Learning paths -->
+  <?php if ($paths): ?>
+  <section class="sp-section">
+    <div class="sp-section-head"><div><h2>Learning paths</h2><p>Finish every course in a path to earn its badge and certificate</p></div></div>
+    <div class="sp-grid cols-3">
+      <?php foreach ($paths as $p): $pc = (int)$p['pct']; ?>
+      <div class="sp-card">
+        <div class="sp-between">
+          <div class="sp-row" style="flex-wrap: nowrap; min-width: 0;">
+            <span class="sp-ico" style="background: color-mix(in srgb, <?= e($p['color'] ?: '#00A3E0') ?> 14%, #fff); color: <?= e($p['color'] ?: '#00A3E0') ?>;"><i class="fas <?= e($p['icon'] ?: 'fa-route') ?>"></i></span>
+            <h3 style="margin: 0; font-size: .98rem; font-weight: 800;"><?= e($p['title']) ?></h3>
+          </div>
+          <span class="sp-badge <?= $pc >= 100 ? 'green' : ($pc > 0 ? '' : 'gray') ?>"><?= $pc ?>%</span>
+        </div>
+        <div class="chips">
+          <?php foreach ($p['courses'] as $c): ?><span class="<?= !empty($c['completed']) ? 'done' : '' ?>"><?= !empty($c['completed']) ? '✓ ' : '' ?><?= e($c['tutorial_short'] ?: $c['title']) ?></span><?php endforeach; ?>
+        </div>
+        <div class="sp-progress <?= $pc >= 100 ? 'green' : '' ?>"><span style="width: <?= max(2, $pc) ?>%;"></span></div>
+        <div class="sp-between sp-small sp-muted" style="margin-top: 8px;">
+          <span><?= (int)$p['done'] ?> of <?= count($p['courses']) ?> courses done</span>
+          <span><i class="fas fa-award"></i> Badge + certificate</span>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <!-- Courses & ranks -->
+  <section class="sp-section">
+    <div class="sp-section-head"><div><h2>My courses and ranks</h2><p>Your place on each course leaderboard, by XP earned in that course</p></div></div>
+    <?php if (!$courses): ?>
+      <div class="sp-empty">
+        <div class="sp-ico"><i class="fas fa-ranking-star"></i></div>
+        <h3>You're not taking any courses yet</h3>
+        <p>Start a free tutorial. Progress, XP and badges are tracked automatically.</p>
+        <a href="../learn" class="sp-btn">Free tutorials</a>
+      </div>
+    <?php else: ?>
+    <div class="sp-grid cols-3">
+      <?php foreach ($courses as $c): $cp = (int)round((float)$c['progress_percent']); $done = $c['status'] === 'completed'; ?>
+      <div class="sp-card">
+        <div class="sp-between" style="align-items: flex-start;">
+          <h3 style="margin: 0; font-size: .95rem; font-weight: 800; min-width: 0;"><?= e($c['title']) ?></h3>
+          <div class="rank"><?= $c['rank'] ? '#' . (int)$c['rank'] : '–' ?><small>of <?= (int)$c['learners'] ?></small></div>
+        </div>
+        <div class="sp-progress <?= $done ? 'green' : '' ?>" style="margin: 12px 0 8px;"><span style="width: <?= max(2, $cp) ?>%;"></span></div>
+        <div class="sp-between sp-small">
+          <span class="sp-muted"><?= $cp ?>% · <?= number_format($c['xp']) ?> XP<?= $done ? ' · <i class="fas fa-check" style="color: var(--success);"></i> Done' : '' ?></span>
+          <?php if ($c['slug']): ?><a class="sp-link" href="../learn/<?= e($c['slug']) ?>/leaderboard">Leaderboard</a><?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+  </section>
+
+  <!-- Certificates -->
+  <section class="sp-section">
+    <div class="sp-section-head">
+      <div><h2>Certificates</h2><p>Issued automatically when you finish a course or path</p></div>
+      <a href="certificates" class="sp-link">All certificates <i class="fas fa-arrow-right"></i></a>
+    </div>
+    <?php if (!$certs): ?>
+      <div class="sp-empty" style="padding: 28px;">
+        <p style="margin: 0;">Complete every lesson of a course (and pass its final quiz) to receive a certificate you can download and share.</p>
+      </div>
+    <?php else: ?>
+    <div class="sp-grid cols-3">
+      <?php foreach ($certs as $c): $t = $c['certificate_type'] === 'path' ? $c['path_title'] : $c['course_title']; $pending = $c['status'] === 'pending'; ?>
+      <div class="sp-card" style="border-left: 4px solid #C9A227;">
+        <span class="sp-small sp-muted"><?= $c['certificate_type'] === 'path' ? 'Learning path' : 'Course' ?> · <?= date('j M Y', strtotime($c['issued_at'])) ?></span>
+        <h3 style="margin: 4px 0; font-size: .98rem; font-weight: 800;"><?= e($t) ?></h3>
+        <p class="sp-small sp-muted" style="margin: 0 0 12px;"><?= $pending ? '<i class="fas fa-lock"></i> Ready to unlock' : 'Code ' . e($c['verification_code']) ?><?= $c['score'] !== null ? ' · Score ' . (int)$c['score'] . '%' : '' ?></p>
+        <div class="sp-row">
+          <?php if ($pending): ?>
+            <a class="sp-btn sm orange" href="../certificate-pay?code=<?= e(rawurlencode($c['verification_code'])) ?>"><i class="fas fa-lock-open"></i> Unlock · <?= e(money((float)$c['fee'])) ?></a>
+          <?php else: ?>
+            <a class="sp-btn sm" href="../certificate?code=<?= e(rawurlencode($c['verification_code'])) ?>" target="_blank" rel="noopener"><i class="fas fa-eye"></i> View</a>
+            <button type="button" class="sp-btn sm ghost" data-copy="<?= e(rawurlencode($c['verification_code'])) ?>"><i class="fas fa-link"></i> Copy link</button>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+  </section>
+
+  <!-- Activity + privacy -->
+  <section class="sp-split sp-section">
+    <div>
+      <div class="sp-section-head"><div><h2>Recent XP</h2><p>The last things that earned you XP</p></div></div>
+      <div class="sp-card" style="padding: 6px 18px;">
+        <?php if (!$events): ?>
+          <p class="sp-muted sp-small" style="padding: 14px 0; margin: 0;">Your learning activity will appear here. Finish a lesson to earn your first XP.</p>
+        <?php else: ?>
+        <div class="sp-list">
+          <?php foreach ($events as $ev): [$ic, $lbl] = $eventLabels[$ev['event_type']] ?? ['fa-bolt', 'Activity'];
+              $what = $ev['lesson_title'] ?: ($ev['course_title'] ?: ''); ?>
+          <div class="sp-list-item">
+            <span class="sp-ico yellow" style="width: 34px; height: 34px;"><i class="fas <?= e($ic) ?>"></i></span>
+            <div class="sp-grow">
+              <h5 class="sp-truncate"><?= e($lbl) ?><?= $what !== '' ? ' ' . e($what) : '' ?></h5>
+              <p><time datetime="<?= e($ev['created_at']) ?>"><?= date('j M, H:i', strtotime($ev['created_at'])) ?></time></p>
+            </div>
+            <span class="xp-plus">+<?= (int)$ev['xp'] ?> XP</span>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div>
+      <div class="sp-section-head"><div><h2>How to earn XP</h2></div></div>
+      <div class="sp-card" style="padding: 6px 18px; margin-bottom: 16px;">
+        <div class="sp-list">
+          <?php foreach ([['Finish a lesson', 'lesson_complete'], ['Solve an exercise', 'exercise_pass'], ['Pass a quiz', 'quiz_pass'], ['Finish a course', 'course_complete'], ['Finish a learning path', 'path_complete']] as [$t, $k]): ?>
+          <div class="sp-list-item" style="padding: 10px 0;"><div class="sp-grow"><h5><?= $t ?></h5></div><span class="xp-plus">+<?= (int)(XP_RULES[$k] ?? 0) ?> XP</span></div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+
+      <form method="post" class="sp-card" id="privacy">
+        <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+        <input type="hidden" name="leaderboard_visibility" value="1">
+        <div class="sp-card-head" style="margin-bottom: 10px;"><h4><i class="fas fa-user-shield" style="color: var(--text-dim);"></i> Leaderboard privacy</h4></div>
+        <label style="display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: .88rem;">
+          <input type="checkbox" name="show" value="1" <?= $me['show_on_leaderboard'] ? 'checked' : '' ?> style="width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0;">
+          <span>Show me on course leaderboards (first name and last initial only)</span>
+        </label>
+        <div class="sp-row" style="margin-top: 14px;">
+          <button class="sp-btn sm" type="submit">Save</button>
+          <?php if (isset($_GET['saved'])): ?><span class="sp-badge green"><i class="fas fa-check"></i> Saved</span><?php endif; ?>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+
 <script>
 document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('click', () => {
   const url = new URL('../certificate?code=' + btn.dataset.copy, location.href).href;
@@ -258,5 +361,5 @@ document.querySelectorAll('[data-copy]').forEach((btn) => btn.addEventListener('
     () => { window.open(url, '_blank', 'noopener'); });
 }));
 </script>
-</body>
-</html>
+
+<?php require_once 'includes/layout-bottom.php'; ?>

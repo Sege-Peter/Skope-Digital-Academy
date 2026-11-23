@@ -1,179 +1,143 @@
 <?php
-$pageTitle = 'Institutional Alert Command';
+/** Admin: send in-app notifications to everyone, a role, or one person; see the history. */
+$pageTitle = 'Notifications';
 require_once 'includes/header.php';
 
-// Auth check
-if ($user['role'] !== 'admin') {
-    header('Location: ../login');
-    exit;
-}
+$roles = ['all' => 'Everyone', 'student' => 'All students', 'tutor' => 'All tutors', 'admin' => 'All admins'];
 
-// 1. Handle Notification Deployment
-$message = '';
-$msg_type = 'success';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_notification'])) {
-    $title    = trim($_POST['title'] ?? '');
-    $content  = trim($_POST['message'] ?? '');
-    $role     = $_POST['user_role'] ?? 'all';
-    $target_id = !empty($_POST['target_user_id']) ? $_POST['target_user_id'] : null;
-
-    if (!empty($title) && !empty($content)) {
-        try {
-            $stmt = $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$title, $content, $role, $target_id]);
-            $message = "Platform broadcast deployed successfully to " . ($role === 'all' ? "the entire community" : "all " . ucfirst($role) . "s") . ".";
-        } catch (Exception $e) { 
-            $message = "Protocol Error: " . $e->getMessage(); 
-            $msg_type = 'danger';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    ax_post_guard();
+    $act = $_POST['action'] ?? '';
+    if ($act === 'send') {
+        $title   = trim((string)($_POST['title'] ?? ''));
+        $content = trim((string)($_POST['message'] ?? ''));
+        $aud     = (string)($_POST['audience'] ?? 'all');
+        if ($title === '' || $content === '') { ax_flash('err', 'Add a title and a message.'); ax_back(); }
+        if ($aud === 'user') {
+            $tid = (int)($_POST['target_user_id'] ?? 0);
+            $st = $pdo->prepare("SELECT id, name FROM users WHERE id = ?");
+            $st->execute([$tid]);
+            $target = $st->fetch();
+            if (!$target) { ax_flash('err', 'Choose who should get this notification.'); ax_back(); }
+            // user_role stays NULL so only this person sees it (the portals show role-wide rows to everyone in that role).
+            $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, NULL, ?)")
+                ->execute([mb_substr($title, 0, 255), $content, $tid]);
+            ax_flash('ok', 'Notification sent to ' . $target['name'] . '.');
+        } else {
+            if (!isset($roles[$aud])) $aud = 'all';
+            $pdo->prepare("INSERT INTO notifications (title, message, user_role, target_user_id) VALUES (?, ?, ?, NULL)")
+                ->execute([mb_substr($title, 0, 255), $content, $aud]);
+            ax_flash('ok', 'Notification sent to ' . strtolower($roles[$aud]) . '.');
         }
-    } else { 
-        $message = "Protocol Warning: Communication title and content are required."; 
-        $msg_type = 'warning';
+        ax_back();
     }
+    if ($act === 'delete') {
+        $pdo->prepare("DELETE FROM notifications WHERE id = ?")->execute([(int)($_POST['notif_id'] ?? 0)]);
+        ax_flash('ok', 'Notification deleted – people no longer see it.');
+        ax_back();
+    }
+    ax_back();
 }
 
-// 2. Handle Deletion
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_notif'])) {
-    $notif_id = (int)$_POST['notif_id'];
-    try {
-        $pdo->prepare("DELETE FROM notifications WHERE id = ?")->execute([$notif_id]);
-        $message = "Intelligence archive purged successfully.";
-    } catch (Exception $e) { 
-        $message = "Protocol Error: " . $e->getMessage(); 
-        $msg_type = 'danger';
-    }
+/* audience buckets: role broadcasts vs. messages to one person (target set) */
+$aud = ['all' => 0, 'everyone' => 0, 'student' => 0, 'tutor' => 0, 'admin' => 0, 'direct' => 0];
+foreach ($pdo->query("SELECT CASE WHEN target_user_id IS NOT NULL THEN 'direct' WHEN user_role = 'all' OR user_role IS NULL THEN 'everyone' ELSE user_role END b, COUNT(*) n FROM notifications GROUP BY b")->fetchAll() as $r) {
+    $aud[$r['b']] = (int)$r['n']; $aud['all'] += (int)$r['n'];
 }
+$tab = array_key_exists($_GET['tab'] ?? '', $aud) ? $_GET['tab'] : 'all';
+$cond = [
+    'all' => '1=1', 'everyone' => "n.target_user_id IS NULL AND (n.user_role = 'all' OR n.user_role IS NULL)",
+    'student' => "n.target_user_id IS NULL AND n.user_role = 'student'", 'tutor' => "n.target_user_id IS NULL AND n.user_role = 'tutor'",
+    'admin' => "n.target_user_id IS NULL AND n.user_role = 'admin'", 'direct' => 'n.target_user_id IS NOT NULL',
+][$tab];
+$rows = $pdo->query("SELECT n.*, u.name AS target_name, u.role AS target_role FROM notifications n LEFT JOIN users u ON u.id = n.target_user_id
+                     WHERE $cond ORDER BY n.created_at DESC, n.id DESC LIMIT 200")->fetchAll();
+$week = (int)ax_scalar($pdo, "SELECT COUNT(*) FROM notifications WHERE created_at >= NOW() - INTERVAL 7 DAY");
+$directUnread = (int)ax_scalar($pdo, "SELECT COUNT(*) FROM notifications WHERE target_user_id IS NOT NULL AND read_status = 0");
+$people = $pdo->query("SELECT id, name, email, role FROM users WHERE status <> 'suspended' ORDER BY role, name")->fetchAll();
+$reach = [];
+foreach ($pdo->query("SELECT role, COUNT(*) n FROM users WHERE status = 'active' GROUP BY role")->fetchAll() as $r) $reach[$r['role']] = (int)$r['n'];
+$reach['all'] = array_sum($reach);
+$preUser = (int)($_GET['to'] ?? 0);
 
-// 3. Fetch Sent History
-try {
-    $notifications = $pdo->query("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 20")->fetchAll();
-} catch (Exception $e) { $notifications = []; }
+require_once 'includes/sidebar.php';
+$actions = '<a class="ax-btn ghost" href="announcements"><i class="fas fa-bullhorn"></i> Announcements</a>';
 ?>
-
-<?php require_once 'includes/sidebar.php'; ?>
-
+<style>
+  .main-content { min-width: 0; }
+  .nt-msg { font-size: .8rem; color: var(--text-dim); line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+  .nt-aud { display: inline-flex; gap: 6px; align-items: center; }
+  @media (max-width: 760px) { .nt-msg { text-align: left; } }
+</style>
 <main class="main-content">
-    <header class="admin-header">
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <button class="nav-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div>
-                <h1 style="font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px;">Platform <span>Broadcasting</span></h1>
-                <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Alert Command • Skope Digital Academy</p>
-            </div>
+    <?php ax_header('Notifications', '', 'In-app alerts for learners, tutors and admins', $actions); ?>
+    <div class="ax-body">
+        <?php ax_alerts(); ?>
+        <div class="ax-stats">
+            <?= ax_stat('bell', number_format($aud['all']), 'Sent in total', $week . ' this week') ?>
+            <?= ax_stat('tower-broadcast', number_format($aud['all'] - $aud['direct']), 'Broadcasts', 'To everyone or a whole role', 'violet') ?>
+            <?= ax_stat('user', number_format($aud['direct']), 'To one person', 'Includes automatic alerts', 'green') ?>
+            <?= ax_stat('envelope', number_format($directUnread), 'Unread personal alerts', 'Read state is tracked for personal alerts only', 'amber') ?>
         </div>
-        
-        <button class="btn-premium" onclick="document.querySelector('.premium-card form').scrollIntoView({behavior:'smooth'})">
-            <i class="fas fa-satellite-dish"></i> New Alert
-        </button>
-    </header>
 
-    <div class="admin-body">
-        <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 40px; align-items: start;">
-            <!-- Broadcast Deployer -->
-            <div class="premium-card" style="padding: 0; overflow: hidden; position: sticky; top: 100px;">
-                <div style="padding: 24px 32px; border-bottom: 1.5px solid var(--border-light);">
-                    <h3 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.3px;">Broadcast Deployer</h3>
-                    <p style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Direct Community Engagement</p>
+        <div class="ax-grid">
+            <section class="ax-panel ax-span-4">
+                <div class="ax-panel-h"><div><h2><i class="fas fa-paper-plane"></i> Send a notification</h2><p>Appears in the bell menu of everyone in the audience.</p></div></div>
+                <form method="post" class="ax-panel-b ax-form" id="sendForm" data-confirm="Send this notification now?">
+                    <?= ax_csrf() ?><input type="hidden" name="action" value="send">
+                    <div class="ax-field"><label for="n-aud">Send to</label>
+                        <select id="n-aud" name="audience">
+                            <?php foreach ($roles as $k => $l): ?><option value="<?= $k ?>"><?= $l ?> (<?= (int)($reach[$k] ?? 0) ?> active)</option><?php endforeach; ?>
+                            <option value="user" <?= $preUser ? 'selected' : '' ?>>One person…</option>
+                        </select></div>
+                    <div class="ax-field" id="n-user-wrap" <?= $preUser ? '' : 'hidden' ?>><label for="n-user">Person</label>
+                        <select id="n-user" name="target_user_id"><option value="">Choose a person…</option>
+                            <?php $g = null; foreach ($people as $pp): if ($g !== $pp['role']) { if ($g !== null) echo '</optgroup>'; $g = $pp['role']; echo '<optgroup label="' . e(ucfirst($g)) . 's">'; } ?>
+                            <option value="<?= (int)$pp['id'] ?>" <?= $preUser === (int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['name']) ?> – <?= e($pp['email']) ?></option>
+                            <?php endforeach; if ($g !== null) echo '</optgroup>'; ?>
+                        </select></div>
+                    <div class="ax-field"><label for="n-title">Title</label><input id="n-title" type="text" name="title" required maxlength="255" placeholder="e.g. Scheduled maintenance tonight"></div>
+                    <div class="ax-field"><label for="n-msg">Message</label><textarea id="n-msg" name="message" required rows="6" placeholder="Keep it short and clear."></textarea></div>
+                    <div class="ax-form-actions"><button class="ax-btn block"><i class="fas fa-paper-plane"></i> Send notification</button></div>
+                </form>
+            </section>
+
+            <section class="ax-panel ax-span-8">
+                <div class="ax-panel-h">
+                    <nav class="ax-tabs" aria-label="Audience">
+                        <?php foreach (['all' => 'All', 'everyone' => 'Everyone', 'student' => 'Students', 'tutor' => 'Tutors', 'admin' => 'Admins', 'direct' => 'One person'] as $k => $l): ?>
+                        <a href="notifications<?= $k === 'all' ? '' : '?tab=' . $k ?>" class="<?= $tab === $k ? 'on' : '' ?>"><?= $l ?> <span class="n"><?= $aud[$k] ?></span></a><?php endforeach; ?>
+                    </nav>
+                    <div class="ax-search"><i class="fas fa-search"></i><input type="search" placeholder="Filter history…" data-filter-table="ntTable" aria-label="Filter notifications"></div>
                 </div>
-                <div style="padding: 32px;">
-                    <form method="POST" style="display: flex; flex-direction: column; gap: 24px;">
-                        <input type="hidden" name="send_notification" value="1">
-                        
-                        <div>
-                            <label style="display:block;font-size:0.65rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Intelligence Title</label>
-                            <input type="text" name="title" class="form-control" placeholder="e.g. Scheduled System Optimization" required style="background: var(--bg-main); border: 1.5px solid var(--border); font-weight: 700;">
-                        </div>
-
-                        <div>
-                            <label style="display:block;font-size:0.65rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Broadcast Segment</label>
-                            <select name="user_role" class="form-control" style="background: var(--bg-main); border: 1.5px solid var(--border); font-weight: 700; height: 50px;">
-                                <option value="all">🌐 ALL STAKEHOLDERS</option>
-                                <option value="student">🎓 SCHOLARS ONLY</option>
-                                <option value="tutor">👨‍🏫 FACULTY MEMBERS</option>
-                                <option value="admin">🏢 ADMINISTRATION ONLY</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label style="display:block;font-size:0.65rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Targeted Intelligence</label>
-                            <textarea name="message" class="form-control" style="min-height: 180px; background: var(--bg-main); border: 1.5px solid var(--border); font-weight: 600; line-height: 1.6; resize: none;" placeholder="Draft high-priority communication..." required></textarea>
-                        </div>
-
-                        <button type="submit" class="btn-premium" style="justify-content: center; width: 100%; height: 54px; font-size: 0.95rem;">
-                            <i class="fas fa-paper-plane"></i> DEPLOY BROADCAST
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Intelligence Archive -->
-            <div class="premium-card" style="padding: 0; overflow: hidden;">
-                <div style="padding: 24px 32px; border-bottom: 1.5px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3 style="font-size: 1.1rem; font-weight: 900; letter-spacing: -0.3px;">Intelligence Archive</h3>
-                        <p style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Strategic Communications Log</p>
-                    </div>
-                    <div class="badge-premium" style="background: var(--bg-main); color: var(--text-muted); border: 1.5px solid var(--border-light);">LATEST 20 DEPLOYMENTS</div>
-                </div>
-
-                <div style="display: flex; flex-direction: column;">
-                    <?php foreach($notifications as $n): ?>
-                    <div style="padding: 32px; border-bottom: 1.5px solid var(--border-light); transition: 0.3s; position: relative;" class="history-item">
-                        <div style="display: flex; gap: 24px; align-items: flex-start;">
-                            <div class="avatar-sm" style="width: 44px; height: 44px; flex-shrink: 0; background: var(--bg-main); border: 1.5px solid var(--border-light); color: var(--primary);">
-                                <?php if($n['user_role'] === 'all'): ?><i class="fas fa-globe"></i>
-                                <?php elseif($n['user_role'] === 'student'): ?><i class="fas fa-graduation-cap"></i>
-                                <?php else: ?><i class="fas fa-id-badge"></i><?php endif; ?>
-                            </div>
-                            <div style="flex: 1;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <h4 style="font-size: 1rem; font-weight: 900; color: var(--text-main); margin: 0;"><?= htmlspecialchars($n['title']) ?></h4>
-                                    <span style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;"><?= date('M j, H:i', strtotime($n['created_at'])) ?></span>
-                                </div>
-                                <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.7; font-weight: 600;">
-                                    <?= nl2br(htmlspecialchars($n['message'])) ?>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
-                                    <div class="badge-premium" style="font-size: 0.6rem; background: var(--bg-main); color: var(--text-muted);">TARGET: <?= strtoupper($n['user_role']) ?></div>
-                                    <form method="POST" onsubmit="return SDA.confirmAction('Purge this intelligence artifact from institutional archives?', () => { this.submit(); })">
-                                        <input type="hidden" name="delete_notif" value="1">
-                                        <input type="hidden" name="notif_id" value="<?= $n['id'] ?>">
-                                        <button type="submit" class="avatar-sm" style="width: 32px; height: 32px; background: transparent; border: none; color: var(--danger); cursor: pointer; opacity: 0.5; transition: 0.3s;" onmouseover="this.style.opacity=1">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-
-                    <?php if(empty($notifications)): ?>
-                        <div style="text-align: center; padding: 100px 32px;">
-                            <div class="avatar-sm" style="width: 80px; height: 80px; margin: 0 auto 24px; background: var(--bg-main); color: var(--text-muted); font-size: 2rem;"><i class="fas fa-satellite-dish"></i></div>
-                            <h4 style="font-size: 1rem; font-weight: 900; color: var(--text-main);">No Intelligence Archived</h4>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-top: 8px;">Institutional broadcast history is currently empty.</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
+                <?php if (!$rows): ?>
+                    <div class="ax-empty"><i class="fas fa-bell-slash"></i><b>Nothing sent yet</b>Notifications you send appear here.</div>
+                <?php else: ?>
+                <div class="ax-table-wrap"><table class="ax-table cards" id="ntTable">
+                    <thead><tr><th>Notification</th><th>Audience</th><th>Sent</th><th>Read</th><th></th></tr></thead>
+                    <tbody><?php foreach ($rows as $n): ?>
+                    <tr>
+                        <td data-label=""><div><b class="strong"><?= e($n['title']) ?></b><div class="nt-msg"><?= e($n['message']) ?></div></div></td>
+                        <td data-label="Audience"><?php if ($n['target_user_id']): ?>
+                            <span class="nt-aud"><i class="fas fa-user" style="color:var(--primary)"></i><?= $n['target_name'] !== null ? '<a href="user-profile?id=' . (int)$n['target_user_id'] . '">' . e($n['target_name']) . '</a>' : '<span class="muted">Deleted user</span>' ?></span>
+                        <?php else: ?><span class="ax-pill <?= ['student' => 'info', 'tutor' => 'violet', 'admin' => 'bad'][$n['user_role']] ?? '' ?>"><?= e($roles[$n['user_role'] ?? 'all'] ?? 'Everyone') ?></span><?php endif; ?></td>
+                        <td data-label="Sent" class="num"><div><?= ax_date($n['created_at'], 'M j, Y') ?><div class="muted"><?= ax_date($n['created_at'], 'g:i a') ?></div></div></td>
+                        <td data-label="Read"><?= $n['target_user_id'] ? ($n['read_status'] ? '<span class="ax-pill ok">Read</span>' : '<span class="ax-pill warn">Unread</span>') : '<span class="muted" title="Broadcasts share one read flag, so reads aren\'t tracked per person">Not tracked</span>' ?></td>
+                        <td data-label="" class="actions"><form method="post" data-confirm="Delete “<?= e($n['title']) ?>”? It disappears for everyone who received it." data-danger><?= ax_csrf() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="notif_id" value="<?= (int)$n['id'] ?>"><button class="ax-btn danger sm icon" title="Delete" aria-label="Delete"><i class="fas fa-trash"></i></button></form></td>
+                    </tr><?php endforeach; ?></tbody>
+                </table></div>
+                <?php endif; ?>
+            </section>
         </div>
     </div>
 </main>
-
 <script src="../assets/js/main.js"></script>
+<?php ax_footer_js(); ?>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        <?php if($message): ?>
-            SDA.showToast("<?= $message ?>", "<?= $msg_type ?>");
-        <?php endif; ?>
-    });
-
-    function toggleSidebar() {
-        document.getElementById('dashSidebar').classList.toggle('open');
-        document.getElementById('sidebarOverlay').classList.toggle('open');
-    }
+(function(){
+  var a = document.getElementById('n-aud'), w = document.getElementById('n-user-wrap'), u = document.getElementById('n-user');
+  function sync(){ var one = a.value === 'user'; w.hidden = !one; u.required = one; }
+  a.addEventListener('change', sync); sync();
+})();
 </script>
 </body></html>

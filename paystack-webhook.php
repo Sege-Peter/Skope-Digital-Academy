@@ -5,6 +5,8 @@
 require_once 'includes/db.php';
 require_once 'includes/paystack.php';
 require_once 'includes/learning.php';
+require_once 'includes/coupons.php';
+require_once 'includes/notify.php';
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') exit;
@@ -50,21 +52,40 @@ if ($event->event === 'charge.success') {
             if ($course) {
                 [$mode, $cohort_id] = resolve_mode_choice($pdo, $course, $metadata->learning_mode ?? null, $metadata->cohort_id ?? null);
                 $due = amount_due($course, $mode, get_enrollment($pdo, (int)$user_id, (int)$item_id));
+                $cp = !empty($metadata->coupon) ? coupon_check($pdo, (string)$metadata->coupon, (int)$user_id, 'course', (int)$item_id, $due) : null;
+                $cp = ($cp && $cp['ok']) ? $cp : null;
+                if ($cp) $due = $cp['final'];
                 $ok = $amount + 0.001 >= $due;
-                $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at, learning_mode, cohort_id) VALUES (?, ?, ?, ?, ?, ?, 'course', IF(? = 'verified', NOW(), NULL), ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, verified_at, learning_mode, cohort_id, coupon_id, discount) VALUES (?, ?, ?, ?, ?, ?, 'course', IF(? = 'verified', NOW(), NULL), ?, ?, ?, ?)");
                 $status = $ok ? 'verified' : 'pending';
-                $stmt->execute([$user_id, $item_id, $amount, $status, "Paystack Webhook Ref: " . $reference . ($ok ? '' : " – paid $amount, due $due; needs review"), $reference, $status, $mode, $cohort_id]);
-                if ($ok) enroll_student($pdo, (int)$user_id, $course, $mode, $cohort_id, $amount);
+                $stmt->execute([$user_id, $item_id, $amount, $status, "Paystack Webhook Ref: " . $reference . ($ok ? '' : " – paid $amount, due $due; needs review"), $reference, $status, $mode, $cohort_id,
+                                $cp ? (int)$cp['coupon']['id'] : null, $cp ? $cp['discount'] : 0]);
+                $payment_id = (int)$pdo->lastInsertId();
+                if ($ok) {
+                    enroll_student($pdo, (int)$user_id, $course, $mode, $cohort_id, $amount);
+                    coupon_redeem_payment($pdo, $payment_id);
+                    sda_notify_enrolled($pdo, (int)$user_id, $course, $mode, $cohort_id, $amount, (string)$reference);
+                }
             }
         } elseif ($type === 'certificate' && $item_id) {
             require_once 'includes/progress.php';
             $cs = $pdo->prepare("SELECT * FROM certificates WHERE id = ? AND student_id = ?");
             $cs->execute([(int)$item_id, $user_id]);
             if ($cert = $cs->fetch()) {
-                $ok = $amount + 0.001 >= (float)$cert['fee'];
-                $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, certificate_id, verified_at) VALUES (?, ?, ?, ?, ?, ?, 'certificate', ?, IF(? = 'verified', NOW(), NULL))")
-                    ->execute([$user_id, $cert['course_id'], $amount, $ok ? 'verified' : 'pending', "Certificate fee – Paystack Webhook Ref: " . $reference, $reference, $cert['id'], $ok ? 'verified' : 'pending']);
-                if ($ok) unlock_certificate($pdo, (int)$cert['id'], $amount);
+                $fee = (float)$cert['fee'];
+                $cp = !empty($metadata->coupon) && $cert['status'] === 'pending'
+                    ? coupon_check($pdo, (string)$metadata->coupon, (int)$user_id, 'certificate', $cert['course_id'] ? (int)$cert['course_id'] : null, $fee) : null;
+                $cp = ($cp && $cp['ok']) ? $cp : null;
+                $off = $cp ? $cp['discount'] : 0.0;
+                $ok = $amount + $off + 0.001 >= $fee;
+                $pdo->prepare("INSERT INTO payments (student_id, course_id, amount, status, transaction_message, paystack_reference, payment_type, certificate_id, verified_at, coupon_id, discount) VALUES (?, ?, ?, ?, ?, ?, 'certificate', ?, IF(? = 'verified', NOW(), NULL), ?, ?)")
+                    ->execute([$user_id, $cert['course_id'], $amount, $ok ? 'verified' : 'pending', "Certificate fee – Paystack Webhook Ref: " . $reference, $reference, $cert['id'], $ok ? 'verified' : 'pending',
+                               $cp ? (int)$cp['coupon']['id'] : null, $off]);
+                $payment_id = (int)$pdo->lastInsertId();
+                if ($ok) {
+                    unlock_certificate($pdo, (int)$cert['id'], $amount + $off);
+                    coupon_redeem_payment($pdo, $payment_id);
+                }
             }
         } elseif ($type === 'registration') {
             // Record the payment
@@ -74,6 +95,7 @@ if ($event->event === 'charge.success') {
             // Activate the user
             $stmt = $pdo->prepare("UPDATE users SET status = 'active' WHERE id = ?");
             $stmt->execute([$user_id]);
+            if ($user_id) sda_notify_activated((int)$user_id, $amount, (string)$reference);
         } elseif ($type === 'donation') {
             // Record the donation
             $msg = "Donation from " . ($email);

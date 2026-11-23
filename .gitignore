@@ -1,0 +1,5 @@
+includes/private/
+# Learners' private uploads (payment proofs, ID documents, project submissions) never go to the public repo
+uploads/proofs/
+uploads/id_docs/
+uploads/projects/

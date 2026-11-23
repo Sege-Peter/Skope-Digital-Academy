@@ -13,7 +13,7 @@ header('Content-Type: application/json');
 // Auth check
 if (!isLoggedIn() || currentUser()['role'] !== 'tutor') {
     header('Content-Type: application/json');
-    die(json_encode(['success' => false, 'error' => 'Faculty Authorization Required']));
+    die(json_encode(['success' => false, 'error' => 'Please sign in as a tutor.']));
 }
 
 $tutor  = currentUser();

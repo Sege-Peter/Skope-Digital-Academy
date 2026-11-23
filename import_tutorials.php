@@ -38,6 +38,11 @@ function fm_parse(string $raw): array {
 $owner = $pdo->query("SELECT id FROM users WHERE role = 'admin' AND status = 'active' ORDER BY id LIMIT 1")->fetchColumn()
       ?: $pdo->query("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1")->fetchColumn();
 if (!$owner) exit("No admin user to own the tutorials.\n");
+// Library content whose owner account was deleted is handed to the current admin owner.
+if (!$dry) {
+    $pdo->prepare("UPDATE courses c LEFT JOIN users u ON u.id = c.tutor_id SET c.tutor_id = ?
+                   WHERE c.source IN ('tutorial','course') AND u.id IS NULL")->execute([$owner]);
+}
 
 $catIds = [];
 foreach ($pdo->query("SELECT id, name FROM categories")->fetchAll() as $c) $catIds[strtolower($c['name'])] = (int)$c['id'];
@@ -173,6 +178,42 @@ foreach ($sources as [$dir, $kind]) {
         $pdo->prepare("UPDATE courses SET total_lessons = (SELECT COUNT(*) FROM lessons WHERE course_id = ?),
                               duration_hours = ROUND((SELECT COALESCE(SUM(duration_mins),0) FROM lessons WHERE course_id = ?) / 60, 1)
                        WHERE id = ?")->execute([$courseId, $courseId, $courseId]);
+    }
+    // Peer-graded project (content/courses/<slug>/project.md, format in content/courses/README.md)
+    if ($kind === 'course' && is_file("$dir/project.md")) {
+        require_once __DIR__ . '/includes/projects.php';
+        [$pmeta, $pbody] = fm_parse(file_get_contents("$dir/project.md"));
+        $rubric = [];
+        if (preg_match('/^```rubric[ \t]*\n(.*?)^```[ \t]*$/ms', $pbody, $rm)) {
+            $rubric = project_parse_rubric($rm[1]);
+            $pbody = trim(str_replace($rm[0], '', $pbody));
+        }
+        if (!$rubric || empty($pmeta['title'])) {
+            $changes[] = 'project.md skipped (needs a title and a ```rubric block)';
+        } elseif ($courseId) {
+            $pRow = ['title' => mb_substr($pmeta['title'], 0, 200), 'brief' => $pbody, 'rubric' => json_encode($rubric, JSON_UNESCAPED_UNICODE)];
+            $pSet = ['pass_pct' => max(1, min(100, (int)($pmeta['pass_pct'] ?? 70))), 'reviews_required' => max(1, min(10, (int)($pmeta['reviews_required'] ?? 3))),
+                     'allow_file' => isset($pmeta['allow_file']) ? (int)!in_array(strtolower($pmeta['allow_file']), ['0', 'no', 'false'], true) : 1];
+            $ps = $pdo->prepare("SELECT * FROM course_projects WHERE course_id = ?");
+            $ps->execute([$courseId]);
+            $old = $ps->fetch();
+            if (!$old) {
+                $changes[] = 'project added';
+                if (!$dry) $pdo->prepare("INSERT INTO course_projects (course_id, title, brief, rubric, pass_pct, reviews_required, allow_file) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                    ->execute([$courseId, $pRow['title'], $pRow['brief'], $pRow['rubric'], $pSet['pass_pct'], $pSet['reviews_required'], $pSet['allow_file']]);
+            } else {
+                // Settings an admin changed in Peer Projects are kept; text and rubric follow the file.
+                $want = $old['settings_updated_at'] ? $pRow : $pRow + $pSet;
+                $diff = array_filter($want, fn($v, $k) => (string)$old[$k] !== (string)$v, ARRAY_FILTER_USE_BOTH);
+                if ($diff) {
+                    $changes[] = 'project updated (' . implode(', ', array_keys($diff)) . ')';
+                    if (!$dry) {
+                        $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($diff)));
+                        $pdo->prepare("UPDATE course_projects SET $set, updated_at = NOW() WHERE id = ?")->execute([...array_values($diff), $old['id']]);
+                    }
+                }
+            }
+        }
     }
     if ($added) $changes[] = "$added lesson(s) added";
     if ($updated) $changes[] = "$updated updated";

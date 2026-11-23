@@ -55,6 +55,7 @@ http_response_code($cert ? 200 : 404);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <base href="<?= e(sda_base_href()) ?>">
 <title><?= $cert ? e($title) . ' – Certificate – ' . e($cert['student_name']) : 'Certificate not found' ?> – Skope Digital Academy</title>
+    <?php require_once __DIR__ . '/includes/seo.php'; sda_seo(['title' => 'Verify a Certificate', 'path' => sda_seo_current_path(), 'description' => 'Check that a Skope Digital Academy certificate is genuine using its verification code.', 'noindex' => !empty($_GET['code'])]); ?>
 <meta name="robots" content="noindex">
 <?php if ($cert): ?>
 <meta property="og:title" content="<?= e($cert['student_name']) ?> earned a certificate in <?= e($title) ?>">
@@ -119,6 +120,18 @@ http_response_code($cert ? 200 : 404);
   .missing { max-width: 560px; margin: 60px auto; background: #fff; border-radius: 16px; padding: 32px; text-align: center; box-shadow: 0 20px 40px -24px rgba(15,23,42,.4); }
   .missing form { display: flex; gap: 8px; margin-top: 18px; }
   .missing input { flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid #cbd5e1; font: 600 1rem 'Inter', sans-serif; text-transform: uppercase; }
+
+  /* Sticky top bar (full-width background behind the centred row) + phone fixes */
+  .bar { position: sticky; top: 0; z-index: 20; background: rgba(233,238,245,.94); backdrop-filter: blur(8px);
+         box-shadow: 0 0 0 100vmax rgba(233,238,245,.94); clip-path: inset(0 -100vmax); }
+  .missing { width: calc(100% - 32px); }
+  .missing input { min-width: 0; }
+  @media (max-width: 480px) {
+    .missing { margin-top: 32px; padding: 26px 18px; }
+    .missing h1 { font-size: 1.6rem; }
+    .missing form { flex-direction: column; }
+    .missing .btn { justify-content: center; padding: 12px 16px; }
+  }
 
   @page { size: A4 landscape; margin: 0; }
   @media print {

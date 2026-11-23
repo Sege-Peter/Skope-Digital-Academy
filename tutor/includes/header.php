@@ -1,160 +1,98 @@
 <?php
+/**
+ * Tutor portal layout – opens the page.
+ *
+ * Pages set (all optional) before including this file:
+ *   $pageTitle   page <h1> and <title>
+ *   $pageSub     plain-text line under the title
+ *   $pageActions raw HTML buttons shown beside the title
+ *   $pageCrumb   ['href' => ..., 'label' => ...] back link above the title
+ *   $hideHead    true to skip the standard title block (the dashboard draws its own)
+ * Close the page with includes/footer.php.
+ */
 ob_start(); // pages may redirect after the header has started output
-require_once __DIR__ . '/../../includes/db.php';
-require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/tutor_data.php';
 
-// Access control: Tutor only
 requireRole('tutor');
 
 $tutor = currentUser();
-$user  = $tutor; // Shared variable for sidebar compatibility
-$current_page = basename($_SERVER['PHP_SELF']); // Used by sidebar for active state
+$user  = $tutor; // shared variable name used by older includes
+$current_page = basename($_SERVER['PHP_SELF']);
+$tid = (int)$tutor['id'];
+
+// Fresh name/avatar for the sidebar (the session copy can be stale after a profile edit)
+try {
+    $tpMe = $pdo->prepare("SELECT name, email, avatar FROM users WHERE id = ?");
+    $tpMe->execute([$tid]);
+    $tpMe = $tpMe->fetch() ?: [];
+    if ($tpMe) { $tutor['name'] = $tpMe['name']; $tutor['avatar'] = $tpMe['avatar']; $tutor['email'] = $tpMe['email']; }
+} catch (Throwable $e) { /* keep session values */ }
+
+// Sidebar counters (real numbers only)
+$navCounts = ['grading' => 0, 'messages' => 0, 'alerts' => 0];
+try {
+    $navCounts['grading']  = td_pending_submission_count($pdo, $tid);
+    $navCounts['messages'] = td_unread_messages($pdo, $tid, 1)['count'];
+    $navCounts['alerts']   = td_unread_notifications($pdo, $tid);
+} catch (Throwable $e) { error_log('tutor nav counts: ' . $e->getMessage()); }
+
+$pageTitle = $pageTitle ?? 'Tutor portal';
+$tpFlash = td_take_flash();
+$cssVer = @filemtime(__DIR__ . '/../../assets/css/tutor-layout.css') ?: 1;
+$jsVer  = @filemtime(__DIR__ . '/../../assets/js/tutor.js') ?: 1;
+$impersonating = isset($_SESSION['admin_impersonator_id']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $pageTitle ?? 'Tutor Portal' ?> – Skope Digital Academy</title>
-
-    <!-- Fonts & Icons -->
+    <title><?= e($pageTitle) ?> – Tutor portal – Skope Digital Academy</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <!-- Base Styles (CSS Variables + components) -->
-    <link rel="stylesheet" href="../assets/css/main.css">
-    <link rel="stylesheet" href="../assets/css/admin.css">
-    <link rel="stylesheet" href="../assets/css/tutor-layout.css">
-
-    <?php require_once 'global-styles.php'; ?>
-
+    <link rel="stylesheet" href="../assets/css/tutor-layout.css?v=<?= (int)$cssVer ?>">
     <link rel="icon" type="image/png" href="../assets/images/Skope Digital  logo.png">
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('dashSidebar');
-        const overlay = document.getElementById('sidebarOverlay');
-
-        // Unified Sidebar Logic
-        window.toggleSidebar = function() {
-            if (!sidebar) return;
-            const isOpen = sidebar.classList.toggle('open');
-            if (overlay) overlay.classList.toggle('open', isOpen);
-            
-            // Update Body State
-            if (isOpen) {
-                document.body.style.overflow = 'hidden';
-                document.body.classList.add('sidebar-active');
-            } else {
-                document.body.style.overflow = '';
-                document.body.classList.remove('sidebar-active');
-            }
-        };
-
-        // SDAC Professional Notification System
-        window.SDAC = {
-            showToast: function(msg, type = 'success') {
-                const container = document.getElementById('toast-container');
-                if(!container) return;
-                
-                const toast = document.createElement('div');
-                toast.className = `sdac-toast ${type}`;
-                
-                const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' || type === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle');
-                
-                toast.innerHTML = `
-                    <div class="toast-icon-wrap"><i class="fas ${icon}"></i></div>
-                    <div class="toast-body">${msg}</div>
-                `;
-                
-                container.appendChild(toast);
-                
-                // Entrance animation
-                requestAnimationFrame(() => toast.classList.add('visible'));
-
-                // Auto-removal
-                setTimeout(() => {
-                    toast.classList.add('fade-out');
-                    setTimeout(() => toast.remove(), 500);
-                }, 4500);
-            }
-        };
-
-        // Close protocols
-        if (overlay) {
-            overlay.addEventListener('click', toggleSidebar);
-        }
-
-        // Handle Escape Key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
-                toggleSidebar();
-            }
-        });
-    });
-    </script>
-    <style>
-        #toast-container {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            pointer-events: none;
-        }
-        .sdac-toast {
-            min-width: 320px;
-            max-width: 450px;
-            background: white;
-            border-radius: 20px;
-            padding: 16px;
-            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            pointer-events: auto;
-            transform: translateX(120%);
-            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
-            border: 1px solid #f1f5f9;
-        }
-        .sdac-toast.visible { transform: translateX(0); }
-        .sdac-toast.fade-out { transform: translateX(120%); opacity: 0; }
-        
-        .toast-icon-wrap {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-        .sdac-toast.success { border-left: 5px solid var(--success); }
-        .sdac-toast.success .toast-icon-wrap { background: #ECFDF5; color: #10B981; }
-        
-        .sdac-toast.danger, .sdac-toast.error { border-left: 5px solid var(--danger); }
-        .sdac-toast.danger .toast-icon-wrap, .sdac-toast.error .toast-icon-wrap { background: #FEF2F2; color: #EF4444; }
-        
-        .toast-body {
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: #1e293b;
-            line-height: 1.4;
-        }
-
-        @media (max-width: 640px) {
-            #toast-container { top: auto; bottom: 24px; left: 16px; right: 16px; }
-            .sdac-toast { min-width: 0; width: 100%; transform: translateY(150%); }
-            .sdac-toast.visible { transform: translateY(0); }
-            .sdac-toast.fade-out { transform: translateY(150%); }
-        }
-    </style>
+    <script src="../assets/js/tutor.js?v=<?= (int)$jsVer ?>" defer></script>
 </head>
-<body class="dashboard-body">
-    <div id="toast-container"></div>
+<body class="dashboard-body<?= $impersonating ? ' tp-impersonating' : '' ?>">
+<?php if (isset($_SESSION['admin_impersonator_id'])): ?>
+    <div style="background:#ef4444;color:#fff;text-align:center;padding:10px 12px;font-weight:800;font-size:.85rem;z-index:10000;position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;box-shadow:0 4px 12px rgba(239,68,68,.3)">
+        <span><i class="fas fa-user-secret"></i> Viewing the tutor portal as <?= htmlspecialchars($_SESSION['user_name'] ?? '') ?></span>
+        <a href="../impersonate?action=stop" style="background:#fff;color:#ef4444;padding:4px 14px;border-radius:8px;text-decoration:none;font-size:.75rem;font-weight:700">Back to admin</a>
+    </div>
+    <div style="height:44px"></div>
+<?php endif; ?>
+<div id="toast-container" aria-live="polite"></div>
 
+<?php require __DIR__ . '/sidebar.php'; ?>
 
+<div class="tp-main">
+    <header class="tp-appbar">
+        <button type="button" class="tp-iconbtn" data-tp-menu aria-label="Open menu" aria-controls="tpSide" aria-expanded="false"><i class="fas fa-bars"></i></button>
+        <span class="tp-appbar-title"><?= e($pageTitle) ?></span>
+        <a class="tp-iconbtn" href="notifications" aria-label="Notifications<?= $navCounts['alerts'] ? ' (' . (int)$navCounts['alerts'] . ' unread)' : '' ?>">
+            <i class="fas fa-bell"></i><?php if ($navCounts['alerts']): ?><span class="tp-count tp-dot"><?= (int)min(99, $navCounts['alerts']) ?></span><?php endif; ?>
+        </a>
+    </header>
+
+    <main class="tp-content" id="main">
+<?php if (empty($hideHead)): ?>
+        <div class="tp-pagehead">
+            <div>
+                <?php if (!empty($pageCrumb)): ?>
+                    <a class="tp-crumb" href="<?= e($pageCrumb['href']) ?>"><i class="fas fa-arrow-left"></i> <?= e($pageCrumb['label']) ?></a>
+                <?php endif; ?>
+                <h1><?= e($pageTitle) ?></h1>
+                <?php if (!empty($pageSub)): ?><p class="tp-sub"><?= e($pageSub) ?></p><?php endif; ?>
+            </div>
+            <?php if (!empty($pageActions)): ?><div class="tp-actions"><?= $pageActions ?></div><?php endif; ?>
+        </div>
+<?php endif; ?>
+<?php if ($tpFlash): ?>
+        <div class="tp-alert <?= $tpFlash['type'] === 'ok' ? 'ok' : ($tpFlash['type'] === 'info' ? 'info' : 'err') ?>" role="status">
+            <i class="fas <?= $tpFlash['type'] === 'ok' ? 'fa-circle-check' : ($tpFlash['type'] === 'info' ? 'fa-circle-info' : 'fa-circle-exclamation') ?>"></i>
+            <div><?= e($tpFlash['msg']) ?></div>
+        </div>
+<?php endif; ?>

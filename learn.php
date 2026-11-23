@@ -12,6 +12,7 @@ require_once 'includes/auth.php';
 require_once 'includes/learning.php';
 require_once 'includes/lesson_render.php';
 require_once 'includes/progress.php';
+require_once 'includes/projects.php';
 
 $user = isLoggedIn() ? currentUser() : null;
 $q = trim($_GET['q'] ?? '');
@@ -34,6 +35,13 @@ if (!empty($_GET['c'])) {
     $course = $st->fetch() ?: null;
 }
 
+/* ── Learning Lab home (/lab): the non-programming skills courses ─────────── */
+if (!empty($_GET['labhome'])) {
+    $labMode = 'home';
+    include 'includes/lab_view.php';
+    exit;
+}
+
 /* ── Tutorials home / search ──────────────────────────────────────────── */
 if (!$course && empty($_GET['c']) && empty($_GET['course'])) {
     $all = $pdo->query("SELECT c.*, cat.name AS category_name,
@@ -43,7 +51,9 @@ if (!$course && empty($_GET['c']) && empty($_GET['course'])) {
                         WHERE c.status = 'published'
                         ORDER BY (c.source = 'tutorial') DESC, c.tutorial_order, c.is_featured DESC, c.title")->fetchAll();
     $open = array_values(array_filter($all, fn($c) => $c['is_open_tutorial'] && $c['lesson_count'] > 0));
-    $freeCourses = array_values(array_filter($all, fn($c) => $c['source'] === 'course' && $c['lesson_count'] > 0));
+    // Only programming courses here; the other skills courses live in the Learning Lab (/lab)
+    $freeCourses = array_values(array_filter($all, fn($c) => $c['source'] === 'course' && $c['lesson_count'] > 0 && !is_lab_course($c)));
+    $labCount = count(array_filter($all, fn($c) => $c['source'] === 'course' && $c['lesson_count'] > 0 && is_lab_course($c)));
     usort($freeCourses, fn($a, $b) => $a['tutorial_order'] <=> $b['tutorial_order']);
     $previews = array_values(array_filter($all, fn($c) => !$c['is_open_tutorial'] && $c['source'] !== 'course' && $c['preview_count'] > 0));
 
@@ -105,7 +115,7 @@ if (!$course && empty($_GET['c']) && empty($_GET['course'])) {
       <?php endif; ?>
 
         <?php if ($freeCourses): $defFee = (float)setting('certificate_fee'); ?>
-        <h2 class="lr-section-title">Free skills courses <span class="lr-muted" style="font:500 .95rem Inter,sans-serif">– register free, learn at your own pace or on a weekly track, earn a certificate</span></h2>
+        <h2 class="lr-section-title">Free coding courses <span class="lr-muted" style="font:500 .95rem Inter,sans-serif">– register free, learn at your own pace or on a weekly track, earn a certificate</span></h2>
         <div class="lr-grid lr-free-grid">
           <?php foreach ($freeCourses as $c): $cf = certificate_fee_for($c); ?>
           <a class="lr-card" href="course-details?id=<?= (int)$c['id'] ?>">
@@ -116,6 +126,14 @@ if (!$course && empty($_GET['c']) && empty($_GET['course'])) {
           </a>
           <?php endforeach; ?>
         </div>
+        <?php endif; ?>
+
+        <?php if (!empty($labCount)): ?>
+        <a class="lr-card" href="lab" style="display:flex;align-items:center;gap:16px;margin:8px 0 28px;border-left:4px solid #7c5cfc">
+          <i class="fas fa-flask" style="font-size:1.6rem;color:#7c5cfc"></i>
+          <span style="flex:1"><strong style="display:block">Looking for career, business or design skills?</strong><span class="lr-muted"><?= (int)$labCount ?> free skills courses (CV writing, bookkeeping, digital marketing and more) are in the Learning Lab.</span></span>
+          <span class="lr-btn lr-btn-ghost">Open the Learning Lab <i class="fas fa-arrow-right"></i></span>
+        </a>
         <?php endif; ?>
 
         <h2 class="lr-section-title">Tutorials</h2>
@@ -209,6 +227,18 @@ if (!$course || ($course['status'] !== 'published' && !$is_staff)) {
 }
 $course_id = (int)$course['id'];
 
+// Programming stays in /learn; other skills courses open in the Learning Lab (/lab). Fix the address if needed.
+$isLab = is_lab_course($course);
+$root = $isLab ? 'lab' : 'learn';
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['c']) && (!empty($_GET['lab']) !== $isLab)) {
+    $path = $root . '/' . $course['slug']
+          . (!empty($_GET['l']) && preg_match('/^[a-z0-9-]+$/', $_GET['l']) ? '/' . $_GET['l'] : '')
+          . (in_array($_GET['view'] ?? '', ['leaderboard', 'project'], true) ? '/' . $_GET['view'] : '');
+    $keep = array_diff_key($_GET, ['c' => 1, 'l' => 1, 'lab' => 1, 'view' => 1]);
+    header('Location: ' . sda_base_href() . $path . ($keep ? '?' . http_build_query($keep) : ''), true, 301);
+    exit;
+}
+
 $student_id = ($user && $user['role'] === 'student') ? (int)$user['id'] : null;
 $enrollment = $student_id ? get_enrollment($pdo, $student_id, $course_id) : null;
 $enrolled = $enrollment && in_array($enrollment['status'], ['active', 'completed'], true);
@@ -253,6 +283,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['course']) && !empty($c
 $free_self_paced = in_array('self_paced', course_modes($course), true) && course_price($course, 'self_paced') <= 0;
 $here = $active ? learn_url($course, $active) : learn_url($course);
 
+$view = in_array($_GET['view'] ?? '', ['leaderboard', 'project'], true) ? $_GET['view'] : 'lesson';
+$project = project_for_course($pdo, $course_id);
+$projUrl = $root . '/' . $course['slug'] . '/project';
+
+/* POST: course project (submit, review, flag) */
+if ($view === 'project' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    require 'includes/project_post.php';
+    exit;
+}
+
 /* POST: mark complete / start tracking a free tutorial */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$student_id || !verifyCsrf()) { header('Location: ' . sda_base_href() . 'login'); exit; }
@@ -282,7 +322,6 @@ $ctx = [
 $isLibrary = !empty($active['source_key']);
 
 // Learning engine data for signed-in students: level, rank, certificate, review, queued celebrations.
-$view = ($_GET['view'] ?? '') === 'leaderboard' ? 'leaderboard' : 'lesson';
 $meLevel = null; $myRank = null; $board = []; $myCert = null; $myReview = null; $flash = null;
 if ($student_id) {
     $x = $pdo->prepare("SELECT xp FROM users WHERE id = ?");
@@ -310,9 +349,17 @@ $track = ($student_id && $active && $active['can_read'] && $view === 'lesson' &&
     'completed' => ($active['progress_status'] ?? '') === 'completed', 'next' => $next ? learn_url($course, $next) : null,
 ] : null;
 $tutName = $course['tutorial_short'] ?: $course['title'];
-$pageTitle = $active ? $active['title'] . ' – ' . ($course['source'] === 'tutorial' ? $tutName . ' Tutorial' : $course['title']) : $course['title'];
+// Course project: learner state (chip in the sidebar, project page).
+$pstate = ($project && $student_id && $enrolled) ? project_learner_state($pdo, $project, $student_id) : null;
+if ($view === 'project') project_sweep($pdo);
+$pageTitle = $view === 'project' ? 'Course project – ' . $course['title'] : ($active ? $active['title'] . ' – ' . ($course['source'] === 'tutorial' ? $tutName . ' Tutorial' : $course['title']) : $course['title']);
 $metaDescription = $course['description'] ? mb_strimwidth($course['description'], 0, 155, '…') : null;
 $activeTab = $course_id;
+if ($isLab) {   // Learning Lab layout for non-programming courses (same data and engine)
+    $labMode = 'course';
+    include 'includes/lab_view.php';
+    exit;
+}
 include 'includes/learn-top.php';
 ?>
 <div class="lr-wrap">
@@ -333,11 +380,16 @@ include 'includes/learn-top.php';
         }
         $icon = ($l['progress_status'] ?? '') === 'completed' ? 'fa-circle-check' : ($l['can_read'] ? '' : 'fa-lock');
     ?>
-      <a class="lr-item<?= $active && $l['id'] == $active['id'] ? ' on' : '' ?><?= $l['can_read'] ? '' : ' locked' ?>" href="<?= e(learn_url($course, $l)) ?>" <?= $l['can_read'] ? '' : 'title="' . e($l['why']) . '"' ?><?= $active && $l['id'] == $active['id'] ? ' aria-current="page"' : '' ?>>
+      <a class="lr-item<?= $view === 'lesson' && $active && $l['id'] == $active['id'] ? ' on' : '' ?><?= $l['can_read'] ? '' : ' locked' ?>" href="<?= e(learn_url($course, $l)) ?>" <?= $l['can_read'] ? '' : 'title="' . e($l['why']) . '"' ?><?= $active && $l['id'] == $active['id'] ? ' aria-current="page"' : '' ?>>
         <span><?= e($l['title']) ?><?= !empty($l['is_preview']) && empty($course['is_open_tutorial']) ? ' <span class="lr-pill preview">Preview</span>' : '' ?></span>
         <?php if ($icon): ?><i class="fas <?= $icon ?>"></i><?php endif; ?>
       </a>
     <?php endforeach; ?>
+
+    <?php if ($project): $chip = $pstate['chip'] ?? ['Peer graded', '']; ?>
+      <div class="lr-module"><i class="fas fa-diagram-project"></i> Final project</div>
+      <a class="lr-item pj-side<?= $view === 'project' ? ' on' : '' ?>" href="<?= e($projUrl) ?>"<?= $view === 'project' ? ' aria-current="page"' : '' ?>><span>Course project</span><span class="pj-chip <?= e($chip[1]) ?>"><?= e($chip[0]) ?></span></a>
+    <?php endif; ?>
 
     <section class="lr-mini-board" aria-label="Leaderboard">
       <div class="lr-module"><i class="fas fa-ranking-star"></i> Leaderboard</div>
@@ -358,7 +410,7 @@ include 'includes/learn-top.php';
   </nav>
 
   <main class="lr-main">
-    <div class="lr-crumbs"><a href="learn">Tutorials</a> › <a href="<?= e(learn_url($course)) ?>"><?= e($course['title']) ?></a><?= $view === 'leaderboard' ? ' › Leaderboard' : ($active ? ' › ' . e($active['title']) : '') ?></div>
+    <div class="lr-crumbs"><a href="learn">Tutorials</a> › <a href="<?= e(learn_url($course)) ?>"><?= e($course['title']) ?></a><?= $view === 'leaderboard' ? ' › Leaderboard' : ($view === 'project' ? ' › Course project' : ($active ? ' › ' . e($active['title']) : '')) ?></div>
     <?php if ($view === 'leaderboard'): $period = ($_GET['period'] ?? '') === 'week' ? 'week' : 'all'; ?>
       <h1><i class="fas fa-ranking-star" style="color:#f59e0b"></i> Leaderboard</h1>
       <p class="lr-muted" style="margin-top:-8px">Everyone learning <strong><?= e($course['title']) ?></strong>, ranked by XP earned in this course. Earn XP by reading lessons, solving exercises and passing quizzes.</p>
@@ -398,6 +450,8 @@ include 'includes/learn-top.php';
           <p class="lr-muted" style="font-size:.82rem;margin-top:12px">Names are shown as first name and last initial. You can hide yourself from leaderboards on your achievements page.</p>
         <?php endif; ?>
       <?php endif; ?>
+    <?php elseif ($view === 'project'): ?>
+      <?php include 'includes/project_view.php'; ?>
     <?php elseif (!$active): ?>
       <h1><?= e($course['title']) ?></h1>
       <p>Lessons for this tutorial are on the way.</p>
@@ -419,6 +473,8 @@ include 'includes/learn-top.php';
             <a class="lr-btn lr-btn-accent" href="certificate?code=<?= e(rawurlencode($myCert)) ?>" target="_blank" rel="noopener"><i class="fas fa-certificate"></i> View certificate</a>
           <?php endif; ?>
         </div>
+      <?php elseif ($enrolled && !$courseDone && $done === count($lessons) && count($lessons) > 0 && $project && $pstate && (!course_has_quiz($pdo, $course_id) || (int)best_quiz_pct($pdo, $student_id, $course_id) >= QUIZ_PASS_PCT)): ?>
+        <div class="lr-notice info"><i class="fas fa-diagram-project"></i><div><strong>Almost there!</strong>You've finished every lesson<?= course_has_quiz($pdo, $course_id) ? ' and passed the quiz' : '' ?>. Pass the <a href="<?= e($projUrl) ?>">course project</a> to complete the course and earn your certificate.</div></div>
       <?php elseif ($enrolled && !$courseDone && $done === count($lessons) && count($lessons) > 0 && course_has_quiz($pdo, $course_id)): ?>
         <div class="lr-notice info"><i class="fas fa-flag-checkered"></i><div><strong>Almost there!</strong>You've finished every lesson. Score <?= QUIZ_PASS_PCT ?>% or more on the final quiz to earn your certificate.</div></div>
       <?php elseif (isset($_GET['finished'])): ?>
@@ -483,6 +539,15 @@ include 'includes/learn-top.php';
             <a class="lr-btn lr-btn-accent" href="enroll?id=<?= $course_id ?>">Enroll for quizzes &amp; certificate</a>
           <?php endif; ?>
         </div>
+
+        <?php if ($project && !$next): $pc = $pstate['chip'] ?? null; ?>
+          <aside class="pj-callout">
+            <i class="fas fa-diagram-project"></i>
+            <div><strong>Final step: the course project</strong><span><?= e($project['title']) ?> – submit your work, review <?= (int)$project['reviews_required'] ?> classmates and score <?= (int)$project['pass_pct'] ?>% or more to complete the course and earn your certificate.</span>
+              <?php if ($pc): ?><span class="pj-chip <?= e($pc[1]) ?>" style="margin-top:6px"><?= e($pc[0]) ?></span><?php endif; ?></div>
+            <a class="lr-btn lr-btn-accent" href="<?= e($projUrl) ?>">Open the project <i class="fas fa-arrow-right"></i></a>
+          </aside>
+        <?php endif; ?>
 
         <?php if ($canReview && (!$next || $courseDone || isset($_GET['review']))): ?>
           <section class="lr-review" id="review" data-course="<?= $course_id ?>" data-csrf="<?= e(csrfToken()) ?>">

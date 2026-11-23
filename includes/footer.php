@@ -1,138 +1,158 @@
-<footer class="footer" style="background: #0D1117; border-top: 1px solid rgba(255,255,255,0.05); padding: 120px 0 60px; color: #94a3b8; position: relative; overflow: hidden;">
-    <!-- Ambient Background Glow -->
-    <div style="position: absolute; bottom: -10%; right: -5%; width: 40%; height: 60%; background: radial-gradient(circle, rgba(0, 174, 239, 0.05) 0%, transparent 70%); pointer-events: none;"></div>
-    <div style="position: absolute; top: -10%; left: -5%; width: 30%; height: 50%; background: radial-gradient(circle, rgba(247, 148, 29, 0.03) 0%, transparent 70%); pointer-events: none;"></div>
+<?php
+// Public site footer. Contact details: phone from Admin > Settings > General (support phone), emails fixed below.
+if (!function_exists('setting')) require_once __DIR__ . '/learning.php';
+$ftPhone = trim(setting('support_phone')) ?: '0742 380 183';
+$ftEmails = ['info@skopedigital.co.ke', 'skopedigitalacademy@gmail.com'];
+$ftDigits = preg_replace('/\D+/', '', $ftPhone);
+$ftWa = str_starts_with($ftDigits, '0') ? '254' . substr($ftDigits, 1) : $ftDigits;   // Kenyan 07.. -> 2547..
+$ftTel = '+' . $ftWa;
+$ftFacebook = 'https://www.facebook.com/profile.php?id=100090014799182';
+$ftH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+?>
+<footer class="sf" role="contentinfo">
+    <div class="sf-glow sf-glow-a" aria-hidden="true"></div>
+    <div class="sf-glow sf-glow-b" aria-hidden="true"></div>
 
-    <div class="container" style="position: relative; z-index: 2;">
-        <div class="grid-4" style="gap: 80px; margin-bottom: 100px;">
-            <div style="grid-column: span 1.5;">
-                <a href="./" style="display: inline-block; margin-bottom: 32px; text-decoration: none;">
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <img src="assets/images/Skope Digital  logo.png" alt="Skope Digital" style="height: 54px; filter: brightness(0) invert(1);">
-                        <div style="line-height: 1.1;">
-                            <div style="font-family: 'Poppins', sans-serif; font-weight: 800; font-size: 1.2rem; color: #fff; letter-spacing: -0.5px;">SKOPE <span style="color:#eab308">DIGITAL</span></div>
-                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">ACADEMY</div>
-                        </div>
-                    </div>
+    <div class="container sf-inner">
+        <div class="sf-grid">
+            <!-- Brand -->
+            <div class="sf-brand">
+                <a href="./" class="sf-logo" aria-label="Skope Digital Academy home">
+                    <img src="assets/images/Skope Digital  logo.png" alt="" width="52" height="52">
+                    <span><b>SKOPE <em>DIGITAL</em></b><small>Academy</small></span>
                 </a>
-                <p style="color: #64748b; font-size: 1rem; line-height: 1.8; margin-bottom: 40px; max-width: 380px;">Pioneering the next generation of digital mastery through AI-driven learning paths and industry-recognized certifications.</p>
-                <div style="display: flex; gap: 16px;">
-                    <a href="#" class="footer-social-link"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="footer-social-link"><i class="fab fa-twitter"></i></a>
-                    <a href="#" class="footer-social-link"><i class="fab fa-instagram"></i></a>
-                    <a href="#" class="footer-social-link"><i class="fab fa-linkedin-in"></i></a>
+                <p class="sf-about">Practical coding and digital skills for Kenya and East Africa: free tutorials, self-paced or weekly classes, and certificates you can verify.</p>
+                <div class="sf-social" aria-label="Contact and social links">
+                    <a href="<?= $ftH($ftFacebook) ?>" target="_blank" rel="noopener" title="Facebook" aria-label="Skope Digital Academy on Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://wa.me/<?= $ftH($ftWa) ?>" target="_blank" rel="noopener" title="WhatsApp" aria-label="Chat on WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                    <a href="tel:<?= $ftH($ftTel) ?>" title="Call" aria-label="Call us"><i class="fas fa-phone"></i></a>
+                    <a href="mailto:<?= $ftH($ftEmails[0]) ?>" title="Email" aria-label="Email us"><i class="fas fa-envelope"></i></a>
                 </div>
             </div>
-            
-            <div>
-                <h4 class="footer-heading">Quick Links</h4>
-                <ul class="footer-links">
+
+            <!-- Quick links -->
+            <nav class="sf-col" aria-labelledby="sf-h-quick">
+                <h4 class="sf-h" id="sf-h-quick">Quick Links</h4>
+                <ul class="sf-links">
                     <li><a href="./">Home</a></li>
                     <li><a href="about">About Academy</a></li>
                     <li><a href="courses">Explore Courses</a></li>
                     <li><a href="scholarships">Scholarships</a></li>
                     <li><a href="contact">Support Center</a></li>
                 </ul>
-            </div>
+            </nav>
 
-            <div>
-                <h4 class="footer-heading">Connect</h4>
-                <ul class="footer-links">
-                    <li style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 20px;">
-                        <i class="fas fa-phone-alt" style="color: #eab308; margin-top: 4px;"></i>
-                        <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px;">Phone Support</div>
-                            <div style="color: #f8fafc; font-weight: 700;">0742380183</div>
-                        </div>
+            <!-- Learn -->
+            <nav class="sf-col" aria-labelledby="sf-h-learn">
+                <h4 class="sf-h" id="sf-h-learn">Learn</h4>
+                <ul class="sf-links">
+                    <li><a href="learn">Free Coding Tutorials</a></li>
+                    <li><a href="courses">Skills Courses</a></li>
+                    <li><a href="register">Create a Free Account</a></li>
+                    <li><a href="register?role=tutor">Teach With Us</a></li>
+                    <li><a href="verify">Verify a Certificate</a></li>
+                </ul>
+            </nav>
+
+            <!-- Contact -->
+            <div class="sf-col sf-contact">
+                <h4 class="sf-h">Get in Touch</h4>
+                <ul class="sf-cards">
+                    <li>
+                        <span class="sf-ic"><i class="fas fa-phone"></i></span>
+                        <div><small>Phone &amp; WhatsApp</small><a href="tel:<?= $ftH($ftTel) ?>"><?= $ftH($ftPhone) ?></a></div>
                     </li>
-                    <li style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 20px;">
-                        <i class="fas fa-envelope" style="color: #eab308; margin-top: 4px;"></i>
-                        <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px;">Email Inquiry</div>
-                            <div style="color: #f8fafc; font-weight: 700;">info@skopedigital.ac.ke</div>
-                        </div>
+                    <li>
+                        <span class="sf-ic"><i class="fas fa-envelope"></i></span>
+                        <div><small>Email</small><?php foreach ($ftEmails as $e): ?><a href="mailto:<?= $ftH($e) ?>"><?= str_replace('@', '<wbr>@', $ftH($e)) ?></a><?php endforeach; ?></div>
                     </li>
-                    <li style="display: flex; gap: 12px; align-items: flex-start;">
-                        <i class="fas fa-map-marker-alt" style="color: #eab308; margin-top: 4px;"></i>
-                        <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px;">Main Campus</div>
-                            <div style="color: #f8fafc; font-weight: 700;">Kisumu, Kenya</div>
-                        </div>
+                    <li>
+                        <span class="sf-ic"><i class="fas fa-location-dot"></i></span>
+                        <div><small>Location</small><span class="sf-v">Kisumu, Kenya</span><span class="sf-note">Learn online from anywhere</span></div>
                     </li>
                 </ul>
             </div>
-
-            <div>
-                <h4 class="footer-heading">Academy Hours</h4>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; padding: 24px;">
-                    <div style="margin-bottom: 16px;">
-                        <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.5; margin-bottom: 4px;">Mon - Fri & Sunday</div>
-                        <div style="color: #f8fafc; font-weight: 700; font-size: 1.1rem;">08:00 - 18:00</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; color: #ef4444;">
-                        <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
-                        <span style="font-weight: 800; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Saturdays: Closed</span>
-                    </div>
-                </div>
-            </div>
         </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; flex-wrap: wrap; gap: 20px;">
-            <p style="font-size: 0.88rem; color: #475569;">&copy; <?= date('Y') ?> Skope Digital Academy. All Rights Reserved.</p>
-            <div style="display: flex; align-items: center; gap: 24px;">
-                <a href="privacy" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Privacy Policy</a>
-                <a href="terms" style="color: #475569; text-decoration: none; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#475569'">Terms of Service</a>
-            </div>
+
+        <div class="sf-bottom">
+            <p>&copy; <?= date('Y') ?> Skope Digital Academy. All rights reserved.</p>
+            <nav class="sf-legal" aria-label="Legal">
+                <a href="privacy">Privacy Policy</a>
+                <a href="terms">Terms of Service</a>
+            </nav>
+            <p class="sf-credit">Powered by <a href="https://skopedesigns.co.ke" target="_blank" rel="noopener">Skope Designs</a></p>
         </div>
     </div>
 </footer>
 
 <style>
-.footer-heading {
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 800;
-    margin-bottom: 32px;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 2px;
+.sf { --sf-bg: #0b1017; --sf-line: rgba(255,255,255,.07); --sf-text: #94a3b8; --sf-dim: #64748b; --sf-white: #f8fafc; --sf-gold: #eab308; --sf-cyan: #00bfff;
+      position: relative; overflow: hidden; background: var(--sf-bg); color: var(--sf-text); border-top: 1px solid var(--sf-line);
+      padding: clamp(56px, 8vw, 96px) 0 0; font-size: .95rem; line-height: 1.6; }
+.sf-glow { position: absolute; pointer-events: none; border-radius: 50%; filter: blur(10px); }
+.sf-glow-a { width: 520px; height: 520px; right: -180px; bottom: -220px; background: radial-gradient(circle, rgba(0,174,239,.10), transparent 65%); }
+.sf-glow-b { width: 420px; height: 420px; left: -160px; top: -200px; background: radial-gradient(circle, rgba(247,148,29,.07), transparent 65%); }
+.sf-inner { position: relative; z-index: 1; }
+.sf-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .75fr) minmax(0, .9fr) minmax(0, 1.45fr); gap: clamp(28px, 4vw, 56px); padding-bottom: clamp(40px, 6vw, 64px); }
+
+/* Brand */
+.sf-logo { display: inline-flex; align-items: center; gap: 14px; text-decoration: none; margin-bottom: 20px; }
+.sf-logo img { width: 52px; height: 52px; object-fit: contain; filter: brightness(0) invert(1); }
+.sf-logo b { display: block; font: 800 1.2rem/1.1 'Poppins', sans-serif; color: #fff; letter-spacing: -.3px; }
+.sf-logo em { font-style: normal; color: var(--sf-gold); }
+.sf-logo small { display: block; font-size: .64rem; font-weight: 700; letter-spacing: .32em; text-transform: uppercase; color: var(--sf-dim); margin-top: 3px; }
+.sf-about { margin: 0 0 24px; max-width: 360px; color: var(--sf-dim); line-height: 1.75; }
+.sf-social { display: flex; gap: 10px; flex-wrap: wrap; }
+.sf-social a { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--sf-text); text-decoration: none;
+               background: rgba(255,255,255,.04); border: 1px solid var(--sf-line); transition: background .2s, color .2s, transform .2s, border-color .2s; }
+.sf-social a:hover, .sf-social a:focus-visible { background: var(--sf-gold); border-color: var(--sf-gold); color: #0b1017; transform: translateY(-3px); outline: none; }
+
+/* Columns */
+.sf-h { margin: 6px 0 18px; font: 800 .78rem 'Poppins', sans-serif; letter-spacing: .18em; text-transform: uppercase; color: #fff; }
+.sf-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.sf-links a { color: var(--sf-text); text-decoration: none; font-weight: 500; transition: color .2s, padding-left .2s; display: inline-block; }
+.sf-links a:hover, .sf-links a:focus-visible { color: var(--sf-gold); padding-left: 4px; outline: none; }
+
+/* Contact cards: every row uses the same icon box, so all values line up */
+.sf-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.sf-cards li { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: start; }
+.sf-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: .88rem; color: var(--sf-gold);
+         background: rgba(234,179,8,.09); border: 1px solid rgba(234,179,8,.18); }
+.sf-cards small { display: block; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sf-dim); margin: 1px 0 3px; }
+.sf-cards a, .sf-cards .sf-v { display: block; color: var(--sf-white); font-weight: 700; text-decoration: none; font-size: .93rem; line-height: 1.5;
+                               overflow-wrap: break-word; }
+.sf-cards a + a { margin-top: 2px; }
+.sf-cards a:hover, .sf-cards a:focus-visible { color: var(--sf-gold); outline: none; }
+.sf-note { display: block; font-size: .82rem; color: var(--sf-dim); }
+
+/* Bottom bar */
+.sf-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px 28px; flex-wrap: wrap;
+             border-top: 1px solid var(--sf-line); padding: 22px 0 26px; font-size: .84rem; color: #556274; }
+.sf-bottom p { margin: 0; }
+.sf-legal { display: flex; gap: 22px; flex-wrap: wrap; }
+.sf-legal a, .sf-credit a { color: var(--sf-text); text-decoration: none; font-weight: 600; transition: color .2s; }
+.sf-legal a:hover, .sf-credit a:hover { color: var(--sf-gold); }
+.sf-credit a { color: #cbd5e1; }
+
+/* Tablet: brand + contact on top, links below */
+@media (max-width: 1024px) {
+    .sf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sf-brand { grid-column: 1 / -1; }
+    .sf-about { max-width: 560px; margin-bottom: 18px; }
+    .sf-contact { grid-column: 1 / -1; }
+    .sf-contact .sf-cards { grid-template-columns: minmax(0, .8fr) minmax(0, 1.3fr) minmax(0, .9fr); }
 }
-.footer-links {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+/* Phone: single column, links side by side */
+@media (max-width: 640px) {
+    .sf { font-size: .92rem; }
+    .sf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 20px; }
+    .sf-brand { display: block; }
+    .sf-about { margin-bottom: 20px; }
+    .sf-contact { grid-column: 1 / -1; }
+    .sf-contact .sf-cards { grid-template-columns: 1fr; }
+    .sf-bottom { flex-direction: column; align-items: flex-start; gap: 10px; }
 }
-.footer-links a {
-    color: #94a3b8;
-    text-decoration: none;
-    font-size: 1rem;
-    font-weight: 500;
-    transition: 0.3s;
-    display: inline-block;
-}
-.footer-links a:hover {
-    color: #eab308;
-    transform: translateX(5px);
-}
-.footer-social-link {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #94a3b8;
-    transition: 0.3s;
-    text-decoration: none;
-}
-.footer-social-link:hover {
-    background: #eab308;
-    color: #fff;
-    transform: translateY(-5px);
-    box-shadow: 0 10px 15px rgba(234, 179, 8, 0.2);
+@media (max-width: 360px) {
+    .sf-grid { grid-template-columns: 1fr; }
 }
 </style>
-

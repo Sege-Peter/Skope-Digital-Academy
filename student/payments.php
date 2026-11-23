@@ -1,12 +1,12 @@
 <?php
-$pageTitle = 'Billing & Payment Ledger';
+$pageTitle = 'Payments';
 require_once 'includes/header.php';
 
 try {
-    // 1. Fetch payment history
+    // 1. Fetch payment history (LEFT JOIN so registration/certificate payments without a course still show)
     $stmt = $pdo->prepare("SELECT p.*, c.title as course_title, c.thumbnail as course_thumb
                            FROM payments p
-                           JOIN courses c ON p.course_id = c.id
+                           LEFT JOIN courses c ON p.course_id = c.id
                            WHERE p.student_id = ?
                            ORDER BY p.created_at DESC");
     $stmt->execute([$student['id']]);
@@ -15,83 +15,86 @@ try {
     // 2. Counts
     $pending_count = count(array_filter($payments, fn($p) => $p['status'] === 'pending'));
     $verified_count = count(array_filter($payments, fn($p) => $p['status'] === 'verified'));
+    $total_paid = array_sum(array_map(fn($p) => $p['status'] === 'verified' ? (float)$p['amount'] : 0, $payments));
 
-} catch (Exception $e) { $payments = []; $pending_count = $verified_count = 0; }
+} catch (Exception $e) { $payments = []; $pending_count = $verified_count = 0; $total_paid = 0; }
+
+$type_labels = ['course' => 'Course', 'registration' => 'Registration', 'donation' => 'Donation', 'certificate' => 'Certificate'];
+$status_map  = ['verified' => ['green', 'Paid'], 'pending' => ['yellow', 'Being checked'], 'failed' => ['red', 'Failed']];
 
 require_once 'includes/layout-top.php';
 ?>
 
-<header class="portal-header" style="margin-bottom: 24px;">
-    <div class="greeting">
-        <h1 style="font-size: 1.85rem; font-weight: 800; margin: 0;">Billing & Ledger</h1>
-        <p style="color: var(--text-dim); margin-top: 4px;">Track your curriculum investments and course acquisitions.</p>
-    </div>
-    <div>
-        <a href="../courses" class="btn-premium" style="display: flex; gap: 8px; align-items: center; padding: 12px 24px; border-radius: 12px;"><i class="fas fa-plus"></i> New Enrollment</a>
-    </div>
-</header>
-
-<div class="grid-3" style="margin-bottom: 32px;">
-    <div class="card" style="display: flex; align-items: center; gap: 20px;">
-        <div style="width: 50px; height: 50px; background: #f1f5f9; color: var(--text-main); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-receipt"></i></div>
-        <div>
-            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Total Invoices</span>
-            <strong style="font-size: 1.5rem; font-weight: 800;"><?= count($payments) ?></strong>
-        </div>
-    </div>
-    <div class="card" style="display: flex; align-items: center; gap: 20px;">
-        <div style="width: 50px; height: 50px; background: #FFF9E7; color: #D97706; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-clock"></i></div>
-        <div>
-            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">In Audit</span>
-            <strong style="font-size: 1.5rem; font-weight: 800;"><?= $pending_count ?></strong>
-        </div>
-    </div>
-    <div class="card" style="display: flex; align-items: center; gap: 20px;">
-        <div style="width: 50px; height: 50px; background: #ECFDF5; color: #059669; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;"><i class="fas fa-check-circle"></i></div>
-        <div>
-            <span style="display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase;">Verified</span>
-            <strong style="font-size: 1.5rem; font-weight: 800;"><?= $verified_count ?></strong>
-        </div>
-    </div>
+<div class="sp-page-head">
+    <div><h1>Payments</h1><p>Your payment history and the status of each payment.</p></div>
+    <div class="sp-actions"><a href="../courses" class="sp-btn"><i class="fas fa-plus"></i> Join a course</a></div>
 </div>
 
-<div class="ledger-stack">
-    <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 20px;">Transaction History</h3>
-    
-    <?php if(!empty($payments)): ?>
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-        <?php foreach($payments as $p): ?>
-        <div class="card" style="padding: 16px 24px; display: flex; align-items: center; gap: 24px; border: 1px solid var(--border); border-radius: 16px; transition: 0.2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-            <img src="../<?= $p['course_thumb'] ?: 'assets/images/course-placeholder.jpg' ?>" style="width: 60px; height: 40px; border-radius: 8px; object-fit: cover;">
-            
-            <div style="flex: 1;">
-                <div style="font-weight: 800; font-size: 0.9rem;"><?= htmlspecialchars($p['course_title']) ?></div>
-                <div style="font-size: 0.7rem; color: var(--text-dim);">Tx ID: #<?= str_pad($p['id'], 6, '0', STR_PAD_LEFT) ?> • <?= date('M j, Y', strtotime($p['created_at'])) ?></div>
-            </div>
+<section class="sp-grid cols-4 sp-section">
+    <div class="sp-stat"><span class="sp-stat-icon"><i class="fas fa-receipt"></i></span><div><strong><?= count($payments) ?></strong><span>Payments</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon yellow"><i class="fas fa-clock"></i></span><div><strong><?= $pending_count ?></strong><span>Being checked</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon green"><i class="fas fa-circle-check"></i></span><div><strong><?= $verified_count ?></strong><span>Paid</span></div></div>
+    <div class="sp-stat"><span class="sp-stat-icon violet"><i class="fas fa-wallet"></i></span><div><strong>KES <?= number_format($total_paid) ?></strong><span>Total paid</span></div></div>
+</section>
 
-            <div style="text-align: right;">
-                <div style="font-weight: 900; font-size: 1rem; color: var(--text-main);">KES <?= number_format($p['amount']) ?></div>
-                <span style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; background: <?= $p['status'] == 'verified' ? '#ECFDF5' : ($p['status'] == 'pending' ? '#FFF9E7' : '#FEF2F2') ?>; color: <?= $p['status'] == 'verified' ? '#059669' : ($p['status'] == 'pending' ? '#D97706' : '#ef4444') ?>;">
-                    <?= $p['status'] ?>
-                </span>
-            </div>
-        </div>
-        <?php endforeach; ?>
+<section class="sp-section">
+    <div class="sp-section-head"><div><h2>Payment history</h2><p>Newest first</p></div></div>
+
+    <?php if (!empty($payments)): ?>
+        <div class="sp-table-wrap">
+            <table class="sp-table">
+                <thead>
+                    <tr><th>Item</th><th>Reference</th><th>Date</th><th style="text-align: right;">Amount</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                <?php foreach ($payments as $p):
+                    [$badge, $label] = $status_map[$p['status']] ?? ['gray', ucfirst((string)$p['status'])];
+                    $type = $type_labels[$p['payment_type'] ?? 'course'] ?? 'Payment';
+                    $item = $p['course_title'] ?: $type . ' fee';
+                ?>
+                    <tr>
+                        <td>
+                            <div class="sp-row" style="flex-wrap: nowrap; min-width: 220px;">
+                                <span class="sp-ico gray" style="width: 52px; height: 36px; overflow: hidden;">
+                                    <?php if (!empty($p['course_thumb'])): ?>
+                                        <img src="../uploads/courses/<?= htmlspecialchars($p['course_thumb']) ?>" alt="" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.replaceWith(Object.assign(document.createElement('i'), {className: 'fas fa-receipt'}))">
+                                    <?php else: ?>
+                                        <i class="fas fa-receipt"></i>
+                                    <?php endif; ?>
+                                </span>
+                                <div style="min-width: 0;">
+                                    <strong style="display: block; font-size: .88rem;"><?= htmlspecialchars($item) ?></strong>
+                                    <span class="sp-muted" style="font-size: .75rem;"><?= htmlspecialchars($type) ?></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="white-space: nowrap;">
+                            #<?= str_pad((string)(int)$p['id'], 6, '0', STR_PAD_LEFT) ?>
+                            <?php if (!empty($p['paystack_reference'])): ?><div class="sp-muted" style="font-size: .72rem;"><?= htmlspecialchars($p['paystack_reference']) ?></div><?php endif; ?>
+                        </td>
+                        <td style="white-space: nowrap;"><?= !empty($p['created_at']) ? date('j M Y', strtotime($p['created_at'])) : '' ?></td>
+                        <td style="text-align: right; white-space: nowrap; font-weight: 700;">KES <?= number_format((float)$p['amount']) ?></td>
+                        <td><span class="sp-badge <?= $badge ?>"><?= htmlspecialchars($label) ?></span></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     <?php else: ?>
-        <div class="card" style="text-align: center; padding: 60px 40px; border-style: dashed;">
-            <i class="fas fa-receipt" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 20px; display: block;"></i>
-            <h3 style="font-weight: 800;">No Financial Records</h3>
-            <p style="color: var(--text-dim);">You haven't made any curriculum investments yet.</p>
+        <div class="sp-empty">
+            <div class="sp-ico"><i class="fas fa-receipt"></i></div>
+            <h3>No payments yet</h3>
+            <p>When you pay for a course, registration or certificate, it will show up here.</p>
+            <a href="../courses" class="sp-btn">Browse courses</a>
         </div>
     <?php endif; ?>
-</div>
+</section>
 
-<div style="margin-top: 40px; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 16px; padding: 20px; display: flex; gap: 16px; align-items: flex-start;">
-    <i class="fas fa-shield-alt" style="color: var(--primary); font-size: 1.25rem;"></i>
+<div class="sp-alert">
+    <i class="fas fa-shield-halved" style="margin-top: 3px;"></i>
     <div>
-        <h4 style="margin: 0; font-size: 0.9rem; font-weight: 800; color: #0284c7;">Secure Payments</h4>
-        <p style="margin: 4px 0 0; font-size: 0.8rem; color: #0369a1; line-height: 1.5;">All manual payment proofs are reviewed by our financial compliance team within 2-4 hours. For billing support, please contact the Help Desk.</p>
+        <strong>About manual payments</strong><br>
+        If you sent proof of payment, our team usually checks it within 2 to 4 hours. Questions about a payment? <a href="support" class="sp-link" style="font-size: inherit;">Contact support</a>.
     </div>
 </div>
 
