@@ -36,6 +36,13 @@ function axai_snapshot(PDO $pdo): string
     ];
     $top = $rows("SELECT c.title, COUNT(e.id) n FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id WHERE c.status = 'published' GROUP BY c.id ORDER BY n DESC LIMIT 6");
     if ($top) $lines[] = 'Most-enrolled published courses: ' . implode('; ', array_map(fn($r) => $r['title'] . ' (' . (int)$r['n'] . ')', $top));
+    try {
+        $lines[] = 'Website visits, last 30 days: ' . (int)$n("SELECT COUNT(DISTINCT day, visitor) FROM site_visits WHERE day >= CURDATE() - INTERVAL 29 DAY") . ' (page views: ' . (int)$n("SELECT COUNT(*) FROM site_visits WHERE day >= CURDATE() - INTERVAL 29 DAY") . ')';
+        $src = $rows("SELECT source, COUNT(DISTINCT day, visitor) n FROM site_visits WHERE day >= CURDATE() - INTERVAL 29 DAY GROUP BY source ORDER BY n DESC LIMIT 5");
+        if ($src) $lines[] = 'Top traffic sources (30 days): ' . implode('; ', array_map(fn($r) => $r['source'] . ' ' . (int)$r['n'], $src));
+        $zs = $rows("SELECT q, COUNT(*) n FROM search_log WHERE results = 0 AND day >= CURDATE() - INTERVAL 89 DAY GROUP BY q ORDER BY n DESC LIMIT 8");
+        if ($zs) $lines[] = 'Searches with no matching course (90 days): ' . implode('; ', array_map(fn($r) => '"' . $r['q'] . '" ×' . (int)$r['n'], $zs));
+    } catch (Throwable $e) {}
     $jobs = $rows("SELECT title, deadline FROM job_vacancies WHERE status = 'open' ORDER BY sort_order LIMIT 8");
     if ($jobs) $lines[] = 'Open positions: ' . implode('; ', array_map(fn($r) => $r['title'] . ($r['deadline'] ? ' (closes ' . date('j M Y', strtotime($r['deadline'])) . ')' : ''), $jobs));
     return implode("\n", $lines);
@@ -181,6 +188,8 @@ require_once 'includes/sidebar.php';
     var CSRF = <?= json_encode(csrfToken()) ?>, HIST = <?= json_encode(array_values($chat), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
     var INITIAL = <?= json_encode(mb_strtoupper(mb_substr($first, 0, 1))) ?>;
     var log = document.getElementById('aiLog'), inp = document.getElementById('aiIn'), send = document.getElementById('aiSend'), busy = false;
+    var PRE = <?= json_encode(mb_substr((string)($_GET['p'] ?? ''), 0, 2000), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+    if (PRE) setTimeout(function () { inp.value = PRE; size(); inp.focus(); }, 0);   // e.g. "Plan a course" from Analytics
 
     function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     function inline(s) {

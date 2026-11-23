@@ -46,5 +46,6 @@ function sda_pwa_head(): void
     var s=document.createElement('script');s.src=<?= json_encode(sda_pwa_url('assets/js/splash.js') . '?v=1') ?>;s.dataset.logo=<?= json_encode(sda_pwa_url('assets/pwa/icon-192.png')) ?>;document.head.appendChild(s);
     setTimeout(function(){r.classList.remove('sda-splash')},5000);})();</script>
     <script src="<?= $u('assets/js/pwa.js') ?>?v=2" data-scope="<?= htmlspecialchars($scope, ENT_QUOTES) ?>" data-sw="<?= $u('sw.js') ?>" data-icon="<?= $u('assets/pwa/icon-192.png') ?>" defer></script>
+    <script src="<?= $u('assets/js/stats.js') ?>?v=1" data-hit="<?= $u('hit') ?>" defer></script>
     <?php
 }

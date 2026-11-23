@@ -14,6 +14,7 @@ $axCounts = [
 $axMenu = [
     'Overview' => [
         ['index.php', './', 'th-large', 'Dashboard'],
+        ['analytics.php', 'analytics', 'chart-pie', 'Analytics'],
         ['ai-assistant.php', 'ai-assistant', 'wand-magic-sparkles', 'AI Assistant'],
     ],
     'Learning' => [

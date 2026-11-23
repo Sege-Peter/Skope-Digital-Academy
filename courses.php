@@ -36,6 +36,7 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $courses = $stmt->fetchAll();
+    if ($search !== '') { require_once __DIR__ . '/includes/site_stats.php'; sda_stats_search($pdo, $search, 'courses', count($courses)); }
     // Price filter/sort use the live price (sale, cheapest track), which SQL can't see.
     if ($price_f !== 'all') {
         $courses = array_values(array_filter($courses, fn($c) => ($price_f === 'free') === (course_from_price($c) <= 0)));

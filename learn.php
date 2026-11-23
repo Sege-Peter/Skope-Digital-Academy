@@ -73,6 +73,8 @@ if (!$course && empty($_GET['c']) && empty($_GET['course'])) {
             $r['snippet'] = mb_substr($text, max(0, ($pos === false ? 0 : $pos) - 60), 170);
             $results[] = $r;
         }
+        require_once __DIR__ . '/includes/site_stats.php';
+        sda_stats_search($pdo, $q, 'tutorials', count($results));
     }
 
     $palette = ['html' => ['#e34c26', 'fa-html5', 'fab'], 'css' => ['#2965f1', 'fa-css3-alt', 'fab'], 'javascript' => ['#d4a900', 'fa-js', 'fab'],
