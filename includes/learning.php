@@ -95,6 +95,7 @@ const SDA_SETTING_DEFAULTS = [
     'certificate_fee'        => '0',     // default certificate fee (KES); courses can override
     'sequential_lessons'     => '1',     // 1 = a lesson opens only after the previous one is completed (self-paced too)
     'site_url'               => '',      // public address used in emailed links, e.g. https://academy.example.com
+    'maintenance_mode'       => '0',     // 1 = visitors see the maintenance page; admins keep full access
     'paystack_enabled'       => '1',     // card / Paystack checkout (needs its keys)
     'mpesa_provider'         => 'auto',  // auto | daraja | cyzora
     'daraja_enabled'         => '1',     // Safaricom Daraja STK push (needs its keys)

@@ -33,6 +33,13 @@ $pages = [
     503 => ['Service Unavailable', 'Back in a moment', 'We\'re doing a quick update to make the academy better. Please check back in a few minutes.', 'gear'],
 ];
 [$status, $title, $lead, $art] = $pages[$code];
+$maint = isset($sda_maint) && is_array($sda_maint);
+if ($maint) {
+    $status = 'Under Maintenance';
+    $title = "We're making the academy better";
+    $lead = $sda_maint['message'] !== '' ? $sda_maint['message'] : "We're doing some scheduled maintenance. Your courses, progress and certificates are safe.";
+    $art = 'gear';
+}
 $retry = in_array($code, [429, 500, 503], true);
 ?>
 <!DOCTYPE html>
@@ -50,23 +57,26 @@ $retry = in_array($code, [429, 500, 503], true);
   :root { --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --cyan: #00BFFF; --blue: #0080FF; --orange: #FF8C00; }
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; }
-  body { min-height: 100vh; display: flex; flex-direction: column; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #334155;
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #334155;
          background: radial-gradient(800px 480px at 15% -10%, rgba(0,191,255,.14), transparent 60%), radial-gradient(700px 480px at 110% 110%, rgba(255,140,0,.12), transparent 60%), #f7f9fc; }
   body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .5;
                  background-image: radial-gradient(rgba(15,23,42,.08) 1px, transparent 1px); background-size: 22px 22px; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
-  header { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 20px clamp(16px, 4vw, 40px); }
+  header { position: relative; display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 2.4vh, 20px) clamp(16px, 4vw, 40px); }
   .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 800 1rem Poppins, sans-serif; color: var(--ink); }
   .brand img { width: 36px; height: 36px; border-radius: 10px; background: #fff; box-shadow: 0 6px 14px -8px rgba(15,23,42,.4); }
   .brand em { font-style: normal; color: var(--orange); }
   header a.small { font-weight: 600; font-size: .9rem; color: var(--muted); text-decoration: none; }
-  main { position: relative; flex: 1; display: grid; place-items: center; grid-template-columns: minmax(0, 1fr); padding: 10px 16px 40px; }
+  main { position: relative; flex: 1; display: grid; place-items: center; grid-template-columns: minmax(0, 1fr); padding: 0 16px clamp(8px, 2vh, 24px); }
   .wrap { width: 100%; max-width: 560px; text-align: center; }
-  .art { width: 200px; height: 200px; margin: 0 auto 6px; }
-  .code { font: 900 clamp(4.5rem, 16vw, 7.5rem)/1 Poppins, sans-serif; letter-spacing: -4px; margin: 0;
+  .art { width: clamp(92px, 22vh, 200px); height: clamp(92px, 22vh, 200px); margin: 0 auto clamp(0px, .8vh, 6px); }
+  .code { font: 900 clamp(3rem, min(16vw, 13vh), 7.5rem)/1 Poppins, sans-serif; letter-spacing: -4px; margin: 0;
           background: linear-gradient(120deg, var(--cyan), var(--blue) 50%, var(--orange)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  h1 { font: 800 clamp(1.35rem, 4.5vw, 1.8rem)/1.25 Poppins, sans-serif; color: var(--ink); margin: 10px 0 10px; }
-  .lead { margin: 0 auto 22px; max-width: 430px; line-height: 1.65; color: var(--muted); }
-  .term { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; margin: 0 0 26px; padding: 9px 14px; border-radius: 10px; background: #0b1220; color: #cbd5e1;
+  h1 { font: 800 clamp(1.2rem, min(4.5vw, 3.6vh), 1.8rem)/1.25 Poppins, sans-serif; color: var(--ink); margin: clamp(4px, 1.2vh, 10px) 0; }
+  .lead { margin: 0 auto clamp(10px, 2.6vh, 22px); max-width: 440px; line-height: 1.6; color: var(--muted); }
+  .until { display: inline-flex; align-items: center; gap: 8px; margin: calc(-1 * clamp(4px, 1.4vh, 12px)) 0 clamp(10px, 2.4vh, 20px); padding: 6px 12px; border-radius: 99px; background: #ecfdf5; color: #065f46; font-size: .88rem; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .35; transform: scale(.8) } 50% { opacity: 1; transform: scale(1.2) } }
+  .term { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; margin: 0 0 clamp(12px, 3vh, 26px); padding: 9px 14px; border-radius: 10px; background: #0b1220; color: #cbd5e1;
           font: 500 .8rem 'JetBrains Mono', ui-monospace, monospace; box-shadow: 0 10px 24px -14px rgba(11,18,32,.6); }
   .term .dots { display: inline-flex; gap: 4px; } .term .dots i { width: 7px; height: 7px; border-radius: 50%; background: #334155; display: block; }
   .term .dots i:nth-child(1) { background: #f87171; } .term .dots i:nth-child(2) { background: #fbbf24; } .term .dots i:nth-child(3) { background: #34d399; }
@@ -76,7 +86,7 @@ $retry = in_array($code, [429, 500, 503], true);
   .term .m { color: #7dd3fc; } .term .s { color: #fb923c; font-weight: 600; }
   .term .cur { width: 7px; height: 14px; background: #7dd3fc; display: inline-block; animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0 } }
-  form.search { display: flex; gap: 8px; max-width: 420px; margin: 0 auto 18px; }
+  form.search { display: flex; gap: 8px; max-width: 420px; margin: 0 auto clamp(8px, 2vh, 18px); }
   form.search input { flex: 1; min-width: 0; height: 48px; padding: 0 16px; border: 1.5px solid #cbd5e1; border-radius: 12px; font: 500 16px Inter, sans-serif; color: var(--ink); background: #fff; outline: none; }
   form.search input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(0,128,255,.14); }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 20px; border-radius: 12px; border: 0; cursor: pointer;
@@ -85,10 +95,10 @@ $retry = in_array($code, [429, 500, 503], true);
   .btn.primary { background: linear-gradient(135deg, var(--cyan), var(--blue)); color: #fff; box-shadow: 0 12px 24px -12px rgba(0,128,255,.8); }
   .btn.ghost { background: #fff; color: var(--ink); border: 1.5px solid var(--line); }
   .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-  .links { display: flex; gap: 8px 18px; justify-content: center; flex-wrap: wrap; margin-top: 22px; font-size: .9rem; }
+  .links { display: flex; gap: 8px 18px; justify-content: center; flex-wrap: wrap; margin-top: clamp(10px, 2.6vh, 22px); font-size: .9rem; }
   .links a { color: var(--blue); text-decoration: none; font-weight: 600; }
   .links a:hover { text-decoration: underline; }
-  footer { position: relative; text-align: center; padding: 18px 16px 24px; font-size: .8rem; color: #94a3b8; }
+  footer { position: relative; text-align: center; padding: clamp(6px, 1.6vh, 18px) 16px clamp(10px, 2.4vh, 24px); font-size: .8rem; color: #94a3b8; }
   footer a { color: var(--muted); text-decoration: none; font-weight: 600; }
   /* illustration motion */
   .spin { transform-origin: 100px 100px; animation: spin 14s linear infinite; }
@@ -105,13 +115,25 @@ $retry = in_array($code, [429, 500, 503], true);
   @keyframes shake { 0%,86%,100% { transform: rotate(0) } 90% { transform: rotate(-6deg) } 94% { transform: rotate(6deg) } }
   @keyframes spark { 0%,100% { opacity: .2 } 50% { opacity: 1 } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
-  @media (max-width: 480px) { .art { width: 160px; height: 160px; } form.search { flex-direction: column; } .btn { width: 100%; } .actions { flex-direction: column; } }
+  @media (max-width: 480px) { .art { width: 160px; height: 160px; } .btn { width: 100%; } form.search .btn { width: auto; padding: 0 16px; } .actions { flex-direction: column; } }
+
+  /* Fit on one screen: nothing gets squashed, extras drop away on short screens */
+  .btn, form.search input, form.search button { flex-shrink: 0; }
+  .btn { height: clamp(42px, 6vh, 48px); }
+  form.search input { height: clamp(42px, 6vh, 48px); }
+  @media (max-height: 760px) { .links { display: none; } }
+  @media (max-height: 760px) and (max-width: 480px) {
+    form.search { flex-direction: row; } form.search .btn { width: auto; padding: 0 16px; }
+    .actions { flex-direction: row; } .actions .btn { width: auto; flex: 1; }
+  }
+  @media (max-height: 640px) { .term { display: none; } footer { font-size: .72rem; } }
+  @media (max-height: 520px) { .art { display: none; } }
 </style>
 </head>
 <body>
 <header>
   <a class="brand" href="<?= $base ?>"><img src="<?= $base ?>assets/pwa/icon-192.png" alt=""> SKOPE <em>DIGITAL</em></a>
-  <a class="small" href="<?= $base ?>contact">Need help?</a>
+  <?php if (!empty($maint)): ?><a class="small" href="<?= $base ?>login">Staff sign in</a><?php else: ?><a class="small" href="<?= $base ?>contact">Need help?</a><?php endif; ?>
 </header>
 
 <main>
@@ -148,6 +170,7 @@ $retry = in_array($code, [429, 500, 503], true);
     <p class="code"><?= $code ?></p>
     <h1><?= $h($title) ?></h1>
     <p class="lead"><?= $h($lead) ?></p>
+    <?php if (!empty($maint) && $sda_maint['until'] !== ''): ?><p class="until"><span class="pulse"></span> Back by <b><?= $h($sda_maint['until']) ?></b></p><?php endif; ?>
     <div class="term" aria-label="Request details"><span class="dots"><i></i><i></i><i></i></span><span class="p"><span class="m"><?= $h($method) ?></span> <?= $h(mb_substr($path, 0, 48)) ?> → <span class="s"><?= $code ?> <?= $h($status) ?></span></span><span class="cur"></span></div>
 
     <?php if ($code === 404): ?>

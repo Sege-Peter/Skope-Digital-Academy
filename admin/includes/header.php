@@ -66,6 +66,9 @@ if (time() - (int)setting('cron_last_run') > 900 && is_file(__DIR__ . '/../../in
 <?php require_once __DIR__ . '/../../includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="dashboard-body">
+<?php if (setting('maintenance_mode') === '1'): ?>
+<a href="settings#general" title="Visitors and learners see the maintenance page. Click to turn it off." style="position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:9999;display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:#f97316;color:#fff;font:700 13px Inter,system-ui,sans-serif;text-decoration:none;box-shadow:0 10px 24px -10px rgba(249,115,22,.8)"><i class="fas fa-screwdriver-wrench"></i> Maintenance mode is ON · Turn off</a>
+<?php endif; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

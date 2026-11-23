@@ -68,3 +68,42 @@ if (!defined('GEMINI_MODEL')) {
     unset($sdaModel);
 }
 defined('GEMINI_API_URL') || define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent?key=' . GEMINI_API_KEY);
+
+// ── Maintenance mode (Admin > Settings > General) ─────────────────────────────────────────
+// Visitors see the "Back in a moment" page. Admins (signed in) keep using everything, and the
+// sign-in pages, payment confirmations (Paystack, Daraja, Cyzora), cron and health checks keep working.
+if (PHP_SAPI !== 'cli' && !defined('SDA_MAINTENANCE_CHECKED')) {
+    define('SDA_MAINTENANCE_CHECKED', true);
+    $sdaM = [];
+    try { $sdaM = $pdo->query("SELECT setting_key, setting_value FROM platform_settings WHERE setting_key IN ('maintenance_mode','maintenance_message','maintenance_until')")->fetchAll(PDO::FETCH_KEY_PAIR); } catch (Throwable $e) {}
+    if (($sdaM['maintenance_mode'] ?? '0') === '1') {
+        $sdaApp = str_replace('\\', '/', realpath(__DIR__ . '/..') ?: '');
+        $sdaScript = str_replace('\\', '/', realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? '')) ?: '');
+        $sdaRel = ltrim(substr($sdaScript, strlen($sdaApp)), '/');
+        $sdaOpen = str_starts_with($sdaRel, 'admin/') || in_array($sdaRel, [
+            'login.php', 'logout.php', 'two-factor.php', 'google-auth.php', 'forgot-password.php', 'reset-password.php', 'force_password_change.php',
+            'impersonate.php', 'paystack-webhook.php', 'verify-payment.php', 'mpesa-callback.php', 'cyzora-webhook.php', 'healthz.php', 'cron.php', 'error.php',
+        ], true);
+        if (!$sdaOpen) {
+            $sdaAdmin = false;
+            if (!empty($_COOKIE[session_name()])) {
+                require_once __DIR__ . '/auth.php';          // starts the session the normal way
+                $sdaAdmin = ($_SESSION['role'] ?? '') === 'admin' || !empty($_SESSION['admin_impersonator_id']);
+            }
+            if (!$sdaAdmin) {
+                $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+                if (!headers_sent()) { http_response_code(503); header('Retry-After: 600'); }
+                if (str_contains($accept, 'application/json') && !str_contains($accept, 'text/html')) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['ok' => false, 'error' => 'maintenance', 'message' => 'The academy is being updated. Please try again shortly.']);
+                    exit;
+                }
+                $sda_error_code = 503;
+                $sda_maint = ['message' => trim((string)($sdaM['maintenance_message'] ?? '')), 'until' => trim((string)($sdaM['maintenance_until'] ?? ''))];
+                include __DIR__ . '/../error.php';
+                exit;
+            }
+        }
+    }
+    unset($sdaM);
+}
