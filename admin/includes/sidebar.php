@@ -9,6 +9,7 @@ $axCounts = [
     'courses'       => ax_scalar($pdo, "SELECT COUNT(*) FROM courses WHERE status = 'pending'"),
     'scholarships'  => ax_scalar($pdo, "SELECT COUNT(*) FROM scholarship_applications WHERE status = 'pending'"),
     'projects'      => ax_scalar($pdo, "SELECT COUNT(*) FROM project_submissions WHERE status IN ('flagged','staff_review')"),
+    'careers'       => (function () use ($pdo) { try { return (int)$pdo->query("SELECT COUNT(*) FROM job_applications WHERE status = 'submitted'")->fetchColumn(); } catch (Throwable $e) { return 0; } })(),
 ];
 $axMenu = [
     'Overview' => [
@@ -46,7 +47,7 @@ $axMenu = [
     ],
     'System' => [
         ['announcements.php', 'announcements', 'bullhorn', 'Announcements'],
-        ['careers.php', 'careers', 'briefcase', 'Careers'],
+        ['careers.php', 'careers', 'briefcase', 'Careers', 'careers'],
         ['notifications.php', 'notifications', 'bell', 'Notifications'],
         ['email-notifications.php', 'email-notifications', 'envelope-open-text', 'Email Notifications'],
         ['activity.php', 'activity', 'clock-rotate-left', 'Activity Log'],
@@ -54,7 +55,7 @@ $axMenu = [
     ],
 ];
 // Pages that belong to a menu entry without having their own link.
-$axAlias = ['course_details.php' => 'courses.php', 'user-profile.php' => 'users.php'];
+$axAlias = ['course_details.php' => 'courses.php', 'user-profile.php' => 'users.php', 'career-applications.php' => 'careers.php', 'career-application.php' => 'careers.php', 'career-assessment.php' => 'careers.php'];
 $axActive = $axAlias[$current_page] ?? $current_page;
 ?>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>

@@ -7,14 +7,10 @@ $user = isLoggedIn() ? currentUser() : null;
 $jobs = [];
 try { sda_careers_ensure($pdo); $jobs = sda_open_vacancies($pdo); } catch (Throwable $e) { error_log('careers: ' . $e->getMessage()); }
 $applyEmail = sda_careers_email();
-$applyLink = sda_careers_link();
 $withDeadline = array_filter(array_column($jobs, 'deadline'));
 $deadlines = array_values(array_unique($withDeadline));
 $sharedDeadline = count($deadlines) === 1 && count($withDeadline) === count($jobs) ? $deadlines[0] : null;
 
-function cr_apply_href(string $title, string $email, string $link): string {
-    return $link !== '' ? $link : 'mailto:' . $email . '?subject=' . rawurlencode('Application: ' . $title);
-}
 function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
 ?>
 <!DOCTYPE html>
@@ -151,7 +147,7 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
         <div class="cr-head">
             <span class="cr-kick"><i class="fas fa-layer-group"></i> Available Positions</span>
             <h2>Current <span>Openings</span></h2>
-            <p>Open a role to see its key responsibilities, then apply using the channel below.</p>
+            <p>Open a role to see its key responsibilities, then apply online. Shortlisting is based on a role-specific online assessment.</p>
         </div>
         <?php if (!$jobs): ?>
             <div class="cr-empty"><i class="fas fa-hourglass-half"></i><h3>No open positions right now</h3>
@@ -180,7 +176,7 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
                     <?php if ($reqs): ?><h4>Requirements</h4><ul class="cr-list"><?php foreach ($reqs as $l): ?><li><i class="fas fa-star"></i><span><?= e($l) ?></span></li><?php endforeach; ?></ul><?php endif; ?>
                 </details>
                 <?php endif; ?>
-                <div class="cr-job-foot"><a class="cr-btn pri" href="<?= e(cr_apply_href($j['title'], $applyEmail, $applyLink)) ?>"<?= $applyLink ? ' target="_blank" rel="noopener"' : '' ?>><i class="fas fa-paper-plane"></i> Apply for this role</a></div>
+                <div class="cr-job-foot"><a class="cr-btn pri" href="careers-apply?job=<?= (int)$j['id'] ?>"><i class="fas fa-paper-plane"></i> Apply for this role</a></div>
             </article>
             <?php endforeach; ?>
         </div>
@@ -204,21 +200,18 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
             </div>
             <div class="cr-box apply">
                 <h3><i class="fas fa-paper-plane"></i> How to apply</h3>
-                <p>Interested and qualified candidates should send:</p>
+                <p>Apply online with the button on each role. Have ready:</p>
                 <ul class="cr-list">
                     <li><i class="fas fa-file-lines"></i><span>An updated Curriculum Vitae (CV).</span></li>
-                    <li><i class="fas fa-envelope-open-text"></i><span>A cover letter stating the position you are applying for.</span></li>
+                    <li><i class="fas fa-envelope-open-text"></i><span>A cover letter for the position you are applying for.</span></li>
                     <li><i class="fas fa-graduation-cap"></i><span>Relevant academic and professional qualifications.</span></li>
                     <li><i class="fas fa-folder-open"></i><span>A portfolio or supporting documents, where applicable.</span></li>
                 </ul>
                 <div class="cr-how">
-                    <?php if ($applyLink): ?>
-                        <div><b>Apply online</b><a href="<?= e($applyLink) ?>" target="_blank" rel="noopener"><?= e(preg_replace('#^https://#i', '', $applyLink)) ?></a></div>
-                        <div><b>Or email</b><a href="mailto:<?= e($applyEmail) ?>"><?= e($applyEmail) ?></a></div>
-                    <?php else: ?>
-                        <div><b>Email</b><a href="mailto:<?= e($applyEmail) ?>"><?= e($applyEmail) ?></a></div>
-                        <div><b>Subject</b><span>Application: <i>position title</i></span></div>
-                    <?php endif; ?>
+                    <div><b>Step 1</b><span>Submit the online application with your CV.</span></div>
+                    <div><b>Step 2</b><span>Complete the timed online assessment sent to your email.</span></div>
+                    <div><b>Step 3</b><span>Shortlisted candidates are invited to interview.</span></div>
+                    <div><b>Questions</b><a href="mailto:<?= e($applyEmail) ?>"><?= e($applyEmail) ?></a></div>
                     <?php if ($sharedDeadline): ?><div><b>Deadline</b><span style="color:#c2410c;font-weight:700"><?= e(cr_date($sharedDeadline)) ?></span></div>
                     <?php elseif ($deadlines): ?><div><b>Deadline</b><span>See the closing date on each role.</span></div><?php endif; ?>
                 </div>
