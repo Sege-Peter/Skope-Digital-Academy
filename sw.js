@@ -4,13 +4,13 @@
  * - Static files (CSS, JS, images, fonts): served from cache, refreshed in the background.
  * Bump VERSION when shipping changes to the precached files.
  */
-const VERSION = 'sda-v2';
+const VERSION = 'sda-v3';
 const STATIC_CACHE = VERSION + '-static';
 const PAGE_CACHE = VERSION + '-pages';
 const SCOPE = self.registration.scope;                      // e.g. https://skopedigital.co.ke/
 const OFFLINE_URL = new URL('offline.html', SCOPE).href;
 const PRECACHE = ['offline.html', 'manifest.webmanifest', 'assets/pwa/icon-192.png', 'assets/pwa/icon-512.png'].map((p) => new URL(p, SCOPE).href);
-const PRIVATE = /\/(admin|tutor|student|api|lab\/api)\/|\/(login|register|logout|google-auth|checkout|enroll|verify-payment|paystack-webhook|certificate-pay|forgot-password|reset-password|force_password_change|email-preferences|calendar-feed|cron|impersonate|sitemap\.xml)(\?|$|\/)/;
+const PRIVATE = /\/(admin|tutor|student|api|lab\/api)\/|\/(login|register|logout|google-auth|checkout|enroll|enroll-me|two-factor|mpesa-pay|mpesa-callback|cyzora-webhook|healthz|verify-payment|paystack-webhook|certificate-pay|forgot-password|reset-password|force_password_change|email-preferences|calendar-feed|cron|impersonate|sitemap\.xml)(\?|$|\/)/;
 const STATIC_HOSTS = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net'];
 
 self.addEventListener('install', (event) => {

@@ -3,8 +3,11 @@
  * Paystack Payment Gateway Integration
  */
 
-define('PAYSTACK_PUBLIC_KEY', 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
-define('PAYSTACK_SECRET_KEY', 'sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/learning.php';   // setting()
+// Keys: Admin > Settings > Payments wins; the values below are the old test keys kept as a fallback.
+if (!defined('PAYSTACK_PUBLIC_KEY')) define('PAYSTACK_PUBLIC_KEY', setting('paystack_public_key') ?: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
+if (!defined('PAYSTACK_SECRET_KEY')) define('PAYSTACK_SECRET_KEY', setting('paystack_secret_key') ?: 'sk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
 
 /**
  * Initialize Paystack Transaction

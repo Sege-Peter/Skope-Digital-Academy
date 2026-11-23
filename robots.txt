@@ -12,6 +12,11 @@ Disallow: /enroll
 Disallow: /certificate-pay
 Disallow: /verify-payment
 Disallow: /paystack-webhook
+Disallow: /mpesa-pay
+Disallow: /mpesa-callback
+Disallow: /cyzora-webhook
+Disallow: /two-factor
+Disallow: /enroll-me
 Disallow: /google-auth
 Disallow: /cron
 Disallow: /calendar-feed

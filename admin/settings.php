@@ -10,7 +10,20 @@ $fields = [
     'support_email'     => ['Support email', 'email', 'Where learners can write for help.', 'general'],
     'support_phone'     => ['Support phone', 'text', 'Shown to learners who need to call.', 'general'],
     'paystack_public_key' => ['Paystack public key', 'text', 'Starts with pk_test_ or pk_live_.', 'payments'],
+    'paystack_enabled'  => ['Card payments (Paystack) on', 'bool', 'Shows "Pay by card" at checkout. Needs both Paystack keys.', 'payments'],
     'paystack_secret_key' => ['Paystack secret key', 'secret', 'Starts with sk_test_ or sk_live_. Never share it.', 'payments'],
+    'mpesa_provider'    => ['M-Pesa provider', 'select:auto,daraja,cyzora', 'auto = Daraja when its keys are set, otherwise Cyzora.', 'payments'],
+    'daraja_enabled'    => ['M-Pesa via Safaricom Daraja on', 'bool', 'STK push: the learner gets a PIN prompt on their phone.', 'payments'],
+    'daraja_env'        => ['Daraja environment', 'select:sandbox,live', 'Use sandbox with the test credentials from developer.safaricom.co.ke, live once your app is approved.', 'payments'],
+    'daraja_type'       => ['Daraja account type', 'select:paybill,till', 'Paybill, or Till (Buy Goods).', 'payments'],
+    'daraja_shortcode'  => ['Daraja business shortcode', 'text', 'The Paybill number, or the store number (head office) for a Till. Sandbox: 174379.', 'payments'],
+    'daraja_till'       => ['Till number (Buy Goods only)', 'text', 'Only when the till number differs from the shortcode above.', 'payments'],
+    'daraja_consumer_key' => ['Daraja consumer key', 'secret', 'From your app on developer.safaricom.co.ke.', 'payments'],
+    'daraja_consumer_secret' => ['Daraja consumer secret', 'secret', 'From your app on developer.safaricom.co.ke.', 'payments'],
+    'daraja_passkey'    => ['Daraja passkey (Lipa na M-Pesa)', 'secret', 'Sent by Safaricom when Lipa na M-Pesa Online is enabled. Sandbox passkey is on the Daraja test credentials page.', 'payments'],
+    'cyzora_enabled'    => ['M-Pesa via Cyzora on', 'bool', 'STK push through Cyzora (cyzora.co.ke).', 'payments'],
+    'cyzora_secret_key' => ['Cyzora secret key', 'secret', 'Starts with sk_test_ or sk_live_ (app.cyzora.co.ke > Developers).', 'payments'],
+    'cyzora_webhook_secret' => ['Cyzora webhook secret', 'secret', 'Starts with whsec_. Shown when you add the webhook address on app.cyzora.co.ke > Webhooks.', 'payments'],
     'mail_from_name'    => ['Sender name', 'text', 'The name people see on emails from the academy.', 'email'],
     'mail_from_address' => ['Sender address', 'email', 'e.g. no-reply@yourdomain.com', 'email'],
     'smtp_host'         => ['SMTP server', 'text', 'e.g. mail.yourdomain.com. Leave empty to use the server\'s built-in mail.', 'email'],
@@ -25,7 +38,7 @@ $fields = [
 ];
 $sections = [
     'general'  => ['General', 'building-columns', 'Basic details about the academy.'],
-    'payments' => ['Payments', 'credit-card', 'Paystack keys for card and M-Pesa checkout.'],
+    'payments' => ['Payments', 'credit-card', 'Card (Paystack) and M-Pesa (Safaricom Daraja or Cyzora) checkout. Keys are entered here, never in code.'],
     'email'    => ['Email', 'envelope', 'How the academy sends email (password resets, welcome emails, receipts).'],
     'signin'   => ['Sign-in', 'right-to-bracket', '"Continue with Google" on the sign-in and sign-up pages.'],
     'ai'       => ['AI', 'wand-magic-sparkles', 'Google Gemini powers the AI helpers.'],
@@ -69,6 +82,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($key === 'google_client_id' && $v !== '' && !preg_match('/^[\w-]+\.apps\.googleusercontent\.com$/', $v)) { ax_flash('err', 'The Google Client ID should end in .apps.googleusercontent.com.'); ax_back(); }
         if ($key === 'paystack_public_key' && $v !== '' && !preg_match('/^pk_(test|live)_\w+$/', $v)) { ax_flash('err', 'The Paystack public key should start with pk_test_ or pk_live_.'); ax_back(); }
         if ($key === 'paystack_secret_key' && !preg_match('/^sk_(test|live)_\w+$/', $v)) { ax_flash('err', 'The Paystack secret key should start with sk_test_ or sk_live_.'); ax_back(); }
+        if ($key === 'cyzora_secret_key' && !preg_match('/^sk_(test|live)_[\w-]+$/', $v)) { ax_flash('err', 'The Cyzora secret key should start with sk_test_ or sk_live_.'); ax_back(); }
+        if ($key === 'cyzora_webhook_secret' && !preg_match('/^whsec_[\w-]+$/', $v)) { ax_flash('err', 'The Cyzora webhook secret should start with whsec_.'); ax_back(); }
+        if ($key === 'daraja_shortcode' && $v !== '' && !preg_match('/^\d{5,7}$/', $v)) { ax_flash('err', 'The Daraja shortcode should be 5 to 7 digits.'); ax_back(); }
+        if ($key === 'daraja_till' && $v !== '' && !preg_match('/^\d{5,8}$/', $v)) { ax_flash('err', 'The till number should be digits only.'); ax_back(); }
+        if (str_starts_with($key, 'daraja_')) save_setting($pdo, 'daraja_token_cache', '');   // new credentials: get a fresh token
         save_setting($pdo, $key, $v);
         $changed++;
     }
@@ -88,11 +106,11 @@ $fileConst = function (string $file, string $name): string {
     return ($src && preg_match("/define\(\s*'" . preg_quote($name, '/') . "'\s*,\s*'([^']*)'/", $src, $m)) ? $m[1] : '';
 };
 $liveKeys = [
-    'paystack_public_key' => $fileConst('paystack.php', 'PAYSTACK_PUBLIC_KEY'),
-    'paystack_secret_key' => $fileConst('paystack.php', 'PAYSTACK_SECRET_KEY'),
+    'paystack_public_key' => (require_once __DIR__ . '/../includes/paystack.php') ? PAYSTACK_PUBLIC_KEY : '',
+    'paystack_secret_key' => PAYSTACK_SECRET_KEY,
     'gemini_api_key'      => defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '',
 ];
-$liveModel = preg_match('~models/([\w.-]+):~', $fileConst('ai_config.php', 'GEMINI_API_URL'), $mm) ? $mm[1] : '';
+$liveModel = defined('GEMINI_MODEL') ? GEMINI_MODEL : '';
 $payMode = str_starts_with($liveKeys['paystack_secret_key'], 'sk_live_') ? 'Live' : ($liveKeys['paystack_secret_key'] ? 'Test' : 'Not set');
 
 /* Security check-up (read-only, real values) */
@@ -162,8 +180,15 @@ require_once 'includes/sidebar.php';
                     </div>
                     <form method="post" class="ax-panel-b ax-form" autocomplete="off">
                         <?= ax_csrf() ?><input type="hidden" name="section" value="<?= $sk ?>">
-                        <?php if ($sk === 'payments' || $sk === 'ai'): ?>
-                        <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $sk === 'payments' ? 'Checkout currently reads its keys' : 'The AI helpers currently read their key' ?> from <span class="ax-code"><?= $sk === 'payments' ? 'includes/paystack.php' : 'this setting, or includes/private/config.php' ?></span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
+                        <?php if ($sk === 'payments'): require_once __DIR__ . '/../includes/payments.php'; $mp = sda_mpesa_provider(); ?>
+                        <div class="st-note"><i class="fas fa-circle-info"></i><div>
+                            <b>Checkout right now:</b> card (Paystack) <?= sda_paystack_on() ? '<b style="color:var(--success)">on</b> · ' . e($payMode) . ' keys ' . e($last4($liveKeys['paystack_public_key'])) : '<b>off</b>' ?>;
+                            M-Pesa <?= $mp ? '<b style="color:var(--success)">on via ' . ($mp === 'daraja' ? 'Safaricom Daraja (' . e(setting('daraja_env')) . ')' : 'Cyzora' . (str_starts_with(setting('cyzora_secret_key'), 'sk_test_') ? ' (test key)' : '')) . '</b>' : '<b>off</b> (add Daraja or Cyzora keys below)' ?>.
+                            <br>Daraja sends its result back automatically. For Cyzora, add this webhook address on app.cyzora.co.ke &gt; Webhooks, then paste the whsec_ secret below: <span class="ax-code"><?= e(sda_pay_public_url('cyzora-webhook')) ?></span>
+                            <br>Secret fields stay hidden: leave one empty to keep what is saved.
+                        </div></div>
+                        <?php elseif ($sk === 'ai'): ?>
+                        <div class="st-note"><i class="fas fa-circle-info"></i><div>The AI helpers read their key from <span class="ax-code">this setting, or includes/private/config.php</span><?php if ($sk === 'payments'): ?> (in use: public <?= e($last4($liveKeys['paystack_public_key']) ?: '—') ?>, secret <?= e($last4($liveKeys['paystack_secret_key']) ?: '—') ?>)<?php else: ?> (in use: key <?= e($last4($liveKeys['gemini_api_key']) ?: '—') ?><?= $liveModel ? ', model ' . e($liveModel) : '' ?>)<?php endif; ?>. Keys saved here are stored for the switch-over to admin-managed keys.</div></div>
                         <?php elseif ($sk === 'email'): ?>
                         <div class="st-note"><i class="fas fa-circle-info"></i><div><?= $val('smtp_host') !== '' && $val('smtp_username') !== '' && $val('smtp_password') !== '' ? 'Emails are sent through <b>' . e($val('smtp_host')) . '</b> as ' . e($val('smtp_username')) . '.' : 'SMTP is not complete, so emails fall back to the server’s built-in mail (often lands in spam or fails). For Gmail use smtp.gmail.com, port 587, TLS.' ?></div></div>
                         <?php elseif ($sk === 'signin'): ?>
