@@ -96,6 +96,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
     <?php if ($closeTxt): ?><div class="g-close"><i class="fas fa-calendar-xmark"></i><span>Applications close on <b><?= $e($closeTxt) ?></b> at 11:59 pm (East Africa Time)</span></div><?php endif; ?>
     <div class="g-acts">
         <a href="careers#openings" class="g-btn pri"><i class="fas fa-briefcase"></i> View open positions</a>
+        <a href="careers-practice" class="g-btn ghost"><i class="fas fa-flask"></i> Try the practice test</a>
         <button type="button" class="g-btn ghost" onclick="window.print()"><i class="fas fa-print"></i> Print or save as PDF</button>
     </div>
 </div></section>
@@ -152,6 +153,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
                 <li><i class="fas fa-wifi"></i><span><b>Have a stable internet connection</b> and enough data or bundles for <?= $mins ?> minutes.</span></li>
                 <li><i class="fas fa-volume-xmark"></i><span><b>Find a quiet place</b> where you won't be disturbed for <?= $mins ?> minutes.</span></li>
                 <li><i class="fas fa-bell-slash"></i><span><b>Close all other tabs and apps, and turn off notifications</b> (WhatsApp, email, chat, antivirus pop-ups). A pop-up that takes focus away from the test can count as a warning.</span></li>
+                <li><i class="fas fa-flask"></i><span><b>Take the free practice test first.</b> The <a href="careers-practice">5-minute practice test</a> works exactly like the real one – full screen, timer, warnings – but nothing is recorded. Try it as many times as you like.</span></li>
                 <li><i class="fas fa-book-open"></i><span><b>Read the start page carefully.</b> The timer begins only when you tick the agreement box and press Start, so you can read everything first.</span></li>
             </ul>
         </section>

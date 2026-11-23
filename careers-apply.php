@@ -201,6 +201,7 @@ $resp = sda_lines($job['responsibilities']);
                 <div class="ap-todo">
                     <div><i class="fas fa-envelope-open-text"></i><span><b>Check your email</b>We've sent your private assessment link<?= $sentTo ? ' to <b style="display:inline">' . $e($sentTo) . '</b>' : '' ?>. It can take a few minutes – check your spam or promotions folder too.</span></div>
                     <div><i class="fas fa-laptop"></i><span><b>Plan <?= (int)$job['assess_minutes'] ?> quiet minutes</b>Take it on a laptop or desktop, in one sitting. Your link works for <?= SDA_AX_INVITE_DAYS ?> days, so start whenever you're ready.</span></div>
+                    <div><i class="fas fa-flask" style="background:#fff7ed;color:#c2410c"></i><span><b>Practise first (optional)</b>Try the <a href="careers-practice" style="color:#0284c7;font-weight:700">5-minute practice test</a> to get used to the full-screen test and warnings. Nothing is recorded.</span></div>
                     <div><i class="fas fa-rotate"></i><span><b>No email?</b>Fill in the form again with the same email address and we'll resend your link.</span></div>
                 </div>
                 <?php else: ?>
@@ -273,7 +274,8 @@ $resp = sda_lines($job['responsibilities']);
                     <li><i class="fas fa-2"></i><span>Shortlisted candidates are invited to interview.</span></li>
                     <?php endif; ?>
                 </ul>
-                <a href="careers-guide" target="_blank" rel="noopener" style="display:inline-flex;gap:8px;align-items:center;margin-top:14px;font-weight:700;color:#0284c7;text-decoration:none;font-size:.88rem"><i class="fas fa-book-open"></i> Full rules &amp; instructions</a>
+                <a href="careers-guide" target="_blank" rel="noopener" style="display:flex;gap:8px;align-items:center;margin-top:14px;font-weight:700;color:#0284c7;text-decoration:none;font-size:.88rem"><i class="fas fa-book-open"></i> Full rules &amp; instructions</a>
+                <?php if ($assess): ?><a href="careers-practice" target="_blank" rel="noopener" style="display:flex;gap:8px;align-items:center;margin-top:8px;font-weight:700;color:#c2410c;text-decoration:none;font-size:.88rem"><i class="fas fa-flask"></i> Try the 5-minute practice test</a><?php endif; ?>
             </div>
         </aside>
     </div>

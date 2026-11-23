@@ -129,7 +129,8 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
             <div class="cr-tag">Learn Smart. Achieve More.</div>
             <div class="cr-cta">
                 <a href="#openings" class="cr-btn pri"><i class="fas fa-list-check"></i> <?= $jobs ? 'View open positions' : 'Current openings' ?></a>
-                <a href="careers-guide" class="cr-btn ghost"><i class="fas fa-book-open"></i> Applicant rules &amp; instructions</a>
+                <a href="careers-guide" class="cr-btn ghost"><i class="fas fa-book-open"></i> Applicant rules</a>
+                <a href="careers-practice" class="cr-btn ghost"><i class="fas fa-flask"></i> Try a practice test</a>
             </div>
         </div>
         <div class="cr-art">
@@ -209,7 +210,7 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
                 </ul>
                 <div class="cr-how">
                     <div><b>Step 1</b><span>Submit the online application with your CV.</span></div>
-                    <div><b>Step 2</b><span>Complete the timed online assessment sent to your email.</span></div>
+                    <div><b>Step 2</b><span>Complete the timed online assessment sent to your email. <a href="careers-practice">Try the 5-minute practice test</a> first.</span></div>
                     <div><b>Step 3</b><span>Shortlisted candidates are invited to interview.</span></div>
                     <div><b>Questions</b><a href="mailto:<?= e($applyEmail) ?>"><?= e($applyEmail) ?></a></div>
                     <?php if ($sharedDeadline): ?><div><b>Deadline</b><span style="color:#c2410c;font-weight:700"><?= e(cr_date($sharedDeadline)) ?></span></div>
