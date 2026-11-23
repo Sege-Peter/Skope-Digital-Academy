@@ -589,6 +589,6 @@ include 'includes/learn-top.php';
 <div class="lr-celebrate" id="celebrate" hidden></div>
 <div class="lr-xp-toast" id="xpToast" role="status" aria-live="polite"></div>
 <script>window.SDA_TRACK = <?= json_encode($track, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_FLASH = <?= json_encode($flash, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_LEVEL = <?= json_encode($meLevel) ?>;</script>
-<script src="assets/js/learn.js?v=8"></script>
+<script src="assets/js/learn.js?v=9"></script>
 </body>
 </html>

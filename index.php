@@ -802,6 +802,24 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 </section>
 
 <!-- ══════════════════════════════════
+     JOIN BANNER
+══════════════════════════════════ -->
+<section class="join-banner-sec">
+  <div class="container">
+    <a class="join-banner" href="<?= $user ? 'courses' : 'register' ?>" aria-label="<?= $user ? 'Browse courses' : 'Join Skope Digital Academy today' ?>">
+      <picture><source type="image/webp" srcset="assets/images/promo/join-banner-1600.webp 1600w, assets/images/promo/join-banner-900.webp 900w" sizes="(max-width: 900px) 100vw, 1200px"><img src="assets/images/promo/join-banner-1600.jpg" alt="Skope Digital Academy: Build skills for a digital future. Expert-led training, hands-on projects and flexible online learning. Join today at skopedigital.co.ke." class="" loading="lazy" decoding="async"></picture>
+    </a>
+  </div>
+</section>
+<style>
+.join-banner-sec { padding: 10px 0 70px; background: #fff; }
+.join-banner { display: block; border-radius: 24px; overflow: hidden; box-shadow: 0 30px 60px -34px rgba(15,23,42,.45); transition: transform .25s, box-shadow .25s; }
+.join-banner:hover { transform: translateY(-3px); box-shadow: 0 36px 70px -34px rgba(0,128,255,.5); }
+.join-banner img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+@media (max-width: 600px) { .join-banner-sec { padding: 0 0 48px; } .join-banner { border-radius: 16px; } }
+</style>
+
+<!-- ══════════════════════════════════
      SUPPORT OUR LEARNERS (CTA)
 ══════════════════════════════════ -->
 <section class="section" style="background: linear-gradient(135deg, #003274ff 0%, #0c1f40 100%); color: white; overflow: hidden; position: relative;">

@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
-    <link rel="stylesheet" href="assets/css/auth.css?v=10">
+    <link rel="stylesheet" href="assets/css/auth.css?v=11">
 </head>
 <body>
 <div class="auth">
@@ -107,9 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </ul>
         </div>
         <div class="auth-visual" aria-hidden="true">
-            <img class="photo" src="assets/images/elearning%20aesthetic.jpeg" alt="">
-            <div class="float-card cert"><span class="fi"><i class="fas fa-award"></i></span><span><b>Certificate earned</b><small>HTML Tutorial · just now</small></span></div>
-            <div class="float-card progress"><span class="fi"><i class="fab fa-python"></i></span><span style="flex:1"><b>Continue learning</b><small>Python · Lesson 12 of 24</small><span class="bar"><span></span></span></span></div>
+            <picture><source type="image/webp" srcset="assets/images/promo/study-session.webp"><img src="assets/images/promo/study-session.jpg" alt="" class="photo"></picture>
         </div>
         <div class="auth-trust"><span><i class="fas fa-book-open"></i> 6 free tutorials</span><span><i class="fas fa-code"></i> Live code editor</span><span><i class="fas fa-location-dot"></i> Kisumu, Kenya</span></div>
     </aside>

@@ -574,3 +574,6 @@ body.lr-body { overflow-x: clip; }   /* clip (not hidden) keeps the sticky top b
 .lr-gate { display: flex; gap: 10px; align-items: flex-start; flex: 1 1 100%; padding: 12px 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: .92rem; line-height: 1.5; }
 .lr-gate i { margin-top: 3px; color: #ea580c; }
 #lrCompleteForm[hidden] { display: none; }
+
+/* Lesson quizzes: questions can't be highlighted or copied */
+.lr-quiz { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

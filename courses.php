@@ -478,6 +478,10 @@ body { background: #F8FAFC; color: #1E293B; font-family: 'Inter', sans-serif; }
 
     <!-- ── MAIN ── -->
     <main>
+      <?php if (!$user): ?>
+      <a class="courses-promo" href="register" aria-label="Join Skope Digital Academy today"><picture><source type="image/webp" srcset="assets/images/promo/courses-banner-1600.webp 1600w, assets/images/promo/courses-banner-900.webp 900w" sizes="(max-width: 900px) 100vw, 1200px"><img src="assets/images/promo/courses-banner-1600.jpg" alt="Build skills for a digital future at Skope Digital Academy: expert mentors, quality courses, certified and flexible online learning. Join today." class="" loading="lazy" decoding="async"></picture></a>
+      <style>.courses-promo{display:block;margin:0 0 22px;border-radius:20px;overflow:hidden;box-shadow:0 20px 44px -30px rgba(15,23,42,.45);transition:transform .2s}.courses-promo:hover{transform:translateY(-2px)}.courses-promo img{display:block;width:100%;height:auto;aspect-ratio:16/9}@media(max-width:600px){.courses-promo{border-radius:14px}}</style>
+      <?php endif; ?>
       <!-- Mobile Filter + Result Count Row -->
       <div class="results-header">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">

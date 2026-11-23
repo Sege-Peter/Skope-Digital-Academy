@@ -178,14 +178,14 @@ function sendMessage() {
     formData.append('query', text);
     formData.append('context', <?= json_encode($mentor_context, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>);
 
-    fetch('../includes/ai_controller', { method: 'POST', body: formData })
+    fetch('ai-mentor', { method: 'POST', body: formData, credentials: 'same-origin', headers: { 'X-CSRF-Token': <?= json_encode(csrfToken()) ?> } })
         .then(res => res.json())
         .then(data => {
             document.getElementById('typing-indicator').remove();
             if(data.success) {
                 appendMessage(data.response, 'mentor');
             } else {
-                appendMessage("Sorry, something went wrong. Error: " + (data.error || 'System Timeout'), 'mentor');
+                appendMessage(data.error || 'Sorry, the mentor could not answer. Please try again.', 'mentor');
             }
         })
         .catch(() => {

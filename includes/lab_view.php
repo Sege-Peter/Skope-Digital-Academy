@@ -38,7 +38,7 @@ $labTitle = $labMode === 'home' ? 'Learning Lab' : ($pageTitle ?? 'Learning Lab'
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
-<link rel="stylesheet" href="assets/css/learn.css?v=8">
+<link rel="stylesheet" href="assets/css/learn.css?v=9">
 <link rel="stylesheet" href="assets/css/lab.css?v=<?= @filemtime(__DIR__ . '/../assets/css/lab.css') ?>">
 <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
 <?php require_once __DIR__ . '/pwa.php'; sda_pwa_head(); ?>
@@ -93,7 +93,7 @@ $labTitle = $labMode === 'home' ? 'Learning Lab' : ($pageTitle ?? 'Learning Lab'
     $going = array_values(array_filter($labCourses, fn($c) => isset($mine[(int)$c['id']]) && $mine[(int)$c['id']]['status'] === 'active'));
 ?>
 <main class="lab-home">
-  <section class="lab-hero">
+  <section class="lab-hero lab-hero-has-art">
     <div>
       <span class="lab-kicker"><i class="fas fa-flask"></i> Free · Practical · Certificate</span>
       <h1>Skills you can use <span>this week.</span></h1>
@@ -105,6 +105,7 @@ $labTitle = $labMode === 'home' ? 'Learning Lab' : ($pageTitle ?? 'Learning Lab'
         <span><i class="fas fa-award"></i> Certificate</span>
       </div>
     </div>
+    <a class="lab-hero-art" href="<?= !empty($labUser) ? 'courses' : 'register' ?>" aria-label="Join Skope Digital Academy"><picture><source type="image/webp" srcset="assets/images/promo/lab-promo.webp"><img src="assets/images/promo/lab-promo.jpg" alt="Build skills for a digital future with Skope Digital Academy: expert mentors, quality courses, certified and flexible online learning." class="" loading="lazy" decoding="async"></picture></a>
   </section>
 
   <?php if ($going): ?>
@@ -435,7 +436,7 @@ $canWrite = $student_id && $active && $active['can_read'] && ($enrolled || !empt
 <div class="lr-xp-toast" id="xpToast" role="status" aria-live="polite"></div>
 <script>window.SDA_TRACK = <?= json_encode($track, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_FLASH = <?= json_encode($flash, JSON_HEX_TAG | JSON_HEX_AMP) ?>; window.SDA_LEVEL = <?= json_encode($meLevel) ?>;
 window.LAB = <?= json_encode($canWrite && $view === 'lesson' && !$wantWorkbook ? ['endpoint' => 'api/lab', 'csrf' => csrfToken(), 'lesson' => (int)$active['id'], 'taskDone' => !empty($wb[(int)$active['id']]['task_done'])] : null, JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
-<script src="assets/js/learn.js?v=8"></script>
+<script src="assets/js/learn.js?v=9"></script>
 <script src="assets/js/lab.js?v=<?= @filemtime(__DIR__ . '/../assets/js/lab.js') ?>"></script>
 </body>
 </html>

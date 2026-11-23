@@ -72,7 +72,8 @@ if ($course && $_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['save_question'])) {
         $qid = (int)($_POST['quiz_id'] ?? 0);
         $question = trim((string)($_POST['question'] ?? ''));
-        $type = in_array($_POST['question_type'] ?? '', ['mcq', 'tf', 'text'], true) ? $_POST['question_type'] : 'mcq';
+        $type = in_array($_POST['question_type'] ?? '', ['mcq', 'tf', 'text', 'code'], true) ? $_POST['question_type'] : 'mcq';
+        if ($type === 'code') { require_once __DIR__ . '/../includes/exam.php'; sda_exam_ensure($pdo); }
         $points = max(1, (int)($_POST['points'] ?? 10));
         $options = [];
         $correct = '';
@@ -85,6 +86,12 @@ if ($course && $_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($type === 'tf') {
             $options = ['True', 'False'];
             $correct = ($_POST['correct_tf'] ?? 'True') === 'False' ? 'False' : 'True';
+        } elseif ($type === 'code') {
+            // Programming question: answered in the in-app editor; graded by the code it must contain
+            $lang = in_array($_POST['code_lang'] ?? '', ['html', 'css', 'javascript', 'python', 'php', 'sql'], true) ? $_POST['code_lang'] : 'javascript';
+            $options = ['lang' => $lang, 'starter' => mb_substr((string)($_POST['code_starter'] ?? ''), 0, 5000)];
+            $correct = trim((string)($_POST['code_keywords'] ?? ''));
+            if ($correct === '') $error = 'Enter the code a correct answer must contain (e.g. function, return, console.log).';
         } else {
             $correct = trim((string)($_POST['keywords'] ?? ''));
             if ($correct === '') $error = 'Enter the keywords a correct answer must contain.';
@@ -198,7 +205,7 @@ else:
             <?php else: foreach ($questions as $i => $q): $opts = json_decode((string)$q['options_json'], true) ?: []; ?>
                 <div class="tp-q">
                     <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-                        <span class="tp-pill info">Q<?= $i + 1 ?> · <?= ['mcq' => 'Multiple choice', 'tf' => 'True / false', 'text' => 'Short answer'][$q['type']] ?? 'Question' ?> · <?= (int)$q['points'] ?> pts</span>
+                        <span class="tp-pill info">Q<?= $i + 1 ?> · <?= ['mcq' => 'Multiple choice', 'tf' => 'True / false', 'text' => 'Short answer', 'code' => 'Programming · ' . strtoupper((string)($opts['lang'] ?? 'code'))][$q['type']] ?? 'Question' ?> · <?= (int)$q['points'] ?> pts</span>
                         <form method="post" action="quizzes?course_id=<?= $course_id ?>&quiz_id=<?= $active_quiz_id ?>" data-confirm="Delete this question?">
                             <input type="hidden" name="csrf_token" value="<?= e($csrf) ?>"><input type="hidden" name="quiz_id" value="<?= $active_quiz_id ?>"><input type="hidden" name="delete_question" value="<?= (int)$q['id'] ?>">
                             <button type="submit" class="tp-btn sm danger" aria-label="Delete question <?= $i + 1 ?>"><i class="fas fa-trash"></i> Delete</button>
@@ -207,6 +214,9 @@ else:
                     <h3><?= e($q['question']) ?></h3>
                     <?php if ($q['type'] === 'text'): ?>
                         <div class="tp-opt correct"><i class="fas fa-key"></i> Keywords: <?= e($q['correct_answer']) ?></div>
+                    <?php elseif ($q['type'] === 'code'): ?>
+                        <?php if (!empty($opts['starter'])): ?><pre style="margin:0 0 8px;padding:10px 12px;border-radius:10px;background:#0b1220;color:#e2e8f0;font:.82rem/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap"><?= e($opts['starter']) ?></pre><?php endif; ?>
+                        <div class="tp-opt correct"><i class="fas fa-code"></i> Must contain: <?= e($q['correct_answer']) ?></div>
                     <?php else: ?>
                         <div class="tp-opts">
                             <?php foreach ($opts as $o): $ok = (string)$o === (string)$q['correct_answer']; ?>
@@ -261,7 +271,7 @@ else:
                     <div class="tp-field"><label for="qq-text">Question</label><textarea id="qq-text" name="question" style="min-height:90px" required></textarea></div>
                     <div class="tp-form-row">
                         <div class="tp-field"><label for="qTypeSelect">Answer type</label>
-                            <select name="question_type" id="qTypeSelect"><option value="mcq">Multiple choice</option><option value="tf">True / false</option><option value="text">Short answer (keywords)</option></select></div>
+                            <select name="question_type" id="qTypeSelect"><option value="mcq">Multiple choice</option><option value="tf">True / false</option><option value="text">Short answer (keywords)</option><option value="code">Programming (code editor)</option></select></div>
                         <div class="tp-field"><label for="qq-pts">Points</label><input id="qq-pts" type="number" name="points" min="1" value="10"></div>
                     </div>
                     <div id="mcqFields" class="tp-form">
@@ -274,6 +284,13 @@ else:
                         <span class="tp-note">The answers are shuffled for learners.</span>
                     </div>
                     <div id="tfFields" class="tp-field" style="display:none"><label for="qq-tf">Correct answer</label><select id="qq-tf" name="correct_tf"><option>True</option><option>False</option></select></div>
+                    <div id="codeFields" class="tp-form" style="display:none">
+                        <div class="tp-form-row">
+                            <div class="tp-field"><label for="qq-lang">Language</label><select id="qq-lang" name="code_lang"><option value="javascript">JavaScript</option><option value="html">HTML</option><option value="css">CSS</option><option value="python">Python</option><option value="php">PHP</option><option value="sql">SQL</option></select></div>
+                        </div>
+                        <div class="tp-field"><label for="qq-starter">Starter code <span class="tp-hint">(optional, shown in the learner's editor)</span></label><textarea id="qq-starter" name="code_starter" style="min-height:90px;font-family:ui-monospace,Consolas,monospace" placeholder="function add(a, b) {&#10;  // your code&#10;}"></textarea></div>
+                        <div class="tp-field"><label for="qq-ck">Code a correct answer must contain</label><input id="qq-ck" type="text" name="code_keywords" placeholder="e.g. function, return, a + b"><span class="tp-hint">Comma-separated, matched exactly (case-sensitive). Learners answer in the built-in editor and can run HTML, CSS and JavaScript there.</span></div>
+                    </div>
                     <div id="textFields" class="tp-field" style="display:none"><label for="qq-kw">Keywords a correct answer must contain</label><input id="qq-kw" type="text" name="keywords" placeholder="e.g. variable, value, name"><span class="tp-hint">Separate keywords with commas.</span></div>
                     <div class="tp-modal-foot"><button type="button" class="tp-btn" data-close>Cancel</button><button type="submit" class="tp-btn primary"><i class="fas fa-check"></i> Add question</button></div>
                 </form>
@@ -287,6 +304,7 @@ else:
             document.getElementById('mcqFields').style.display = sel.value === 'mcq' ? '' : 'none';
             document.getElementById('tfFields').style.display = sel.value === 'tf' ? '' : 'none';
             document.getElementById('textFields').style.display = sel.value === 'text' ? '' : 'none';
+            document.getElementById('codeFields').style.display = sel.value === 'code' ? '' : 'none';
         });
         document.getElementById('aiGenerateBtn').addEventListener('click', async function () {
             if (!confirm('Add 5 multiple-choice questions written by the AI assistant to this quiz? Check them afterwards.')) return;

@@ -252,3 +252,8 @@
     });
   }
 })();
+
+/* Lesson quizzes: no copying or right-click on quiz questions (practice for the real tests) */
+['copy', 'cut', 'contextmenu', 'dragstart'].forEach((ev) => document.addEventListener(ev, (e) => {
+  if (e.target && e.target.closest && e.target.closest('.lr-quiz')) e.preventDefault();
+}, true));

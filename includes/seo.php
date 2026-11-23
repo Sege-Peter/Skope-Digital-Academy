@@ -8,7 +8,7 @@
  *       'description' => '…150–160 characters…',
  *       'path' => 'about',                             // canonical path, relative to the site root
  *       'type' => 'website',                           // og:type (article, website…)
- *       'image' => 'assets/images/og-image.jpg',       // optional share image (relative or absolute)
+ *       'image' => 'assets/images/og-image-2.jpg',       // optional share image (relative or absolute)
  *       'noindex' => false,                            // true for sign-in, checkout, thank-you…
  *       'breadcrumbs' => [['Courses', 'courses']],     // optional trail after Home
  *       'schema' => [ … ],                             // optional extra JSON-LD objects (Course, FAQPage…)
@@ -112,7 +112,7 @@ function sda_seo_org(): array
         'alternateName' => ['Skope Digital', 'SDA'],
         'url' => $base . '/',
         'logo' => ['@type' => 'ImageObject', 'url' => sda_seo_abs('assets/images/skope-logo-512.png'), 'width' => 512, 'height' => 512],
-        'image' => sda_seo_abs('assets/images/og-image.jpg'),
+        'image' => sda_seo_abs('assets/images/og-image-2.jpg'),
         'description' => 'Online academy in Kisumu, Kenya teaching coding and income skills through free tutorials, self-paced and structured courses, with verifiable certificates.',
         'email' => $c['email'],
         'telephone' => $c['phone_intl'],
@@ -136,7 +136,7 @@ function sda_seo(array $o): void
     if (mb_strlen($desc) > 160) $desc = rtrim(mb_substr($desc, 0, 157), " ,.;:-") . '…';
     $path = ltrim((string)($o['path'] ?? ''), '/');
     $url = $path === '' ? $base . '/' : sda_seo_abs($path);
-    $img = ['assets/images/og-image.jpg', 1200, 630];
+    $img = ['assets/images/og-image-2.jpg', 1200, 630];
     if (!empty($o['image'])) {
         $img = preg_match('#^https?://#i', (string)$o['image']) ? [(string)$o['image'], 0, 0] : (sda_seo_share_image((string)$o['image']) ?? $img);
     }

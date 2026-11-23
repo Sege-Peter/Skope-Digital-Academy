@@ -149,9 +149,8 @@ body { font-family: 'Inter', sans-serif; color: var(--ink-2); background: #fff; 
 
 .auth-visual { position: relative; margin-top: auto; max-width: 520px; padding: 0 0 26px 0; }
 .auth-visual .photo {
-    display: block; width: 100%; height: 210px; object-fit: cover; border-radius: 22px;
+    display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 22px;
     border: 1px solid rgba(255,255,255,.1); box-shadow: 0 30px 60px -30px rgba(0,0,0,.7);
-    filter: saturate(1.05) brightness(.92);
 }
 .float-card {
     position: absolute; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px;

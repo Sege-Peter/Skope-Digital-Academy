@@ -468,10 +468,10 @@ $lesson_kind = $is_quiz_lesson ? 'Quiz' : ($active_lesson['lesson_type'] === 'vi
         formData.append('query', q.value);
         formData.append('context', <?= json_encode('Classroom Mode. Lesson: ' . $active_lesson['title'] . '. Module Content: ' . mb_substr(strip_tags((string)$active_lesson['content']), 0, 500), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE) ?>);
 
-        fetch('../includes/ai_controller', { method: 'POST', body: formData })
+        fetch('ai-mentor', { method: 'POST', body: formData, credentials: 'same-origin', headers: { 'X-CSRF-Token': <?= json_encode(csrfToken()) ?> } })
             .then(res => res.json())
             .then(data => {
-                aiStatus.innerHTML = data.response || 'Sorry, I could not answer that. Please try again.';
+                aiStatus.textContent = data.response || data.error || 'Sorry, I could not answer that. Please try again.'; aiStatus.style.whiteSpace = 'pre-wrap';
                 chat.scrollTop = chat.scrollHeight;
             })
             .catch(() => { aiStatus.textContent = 'Sorry, the study helper is not available right now. Please try again.'; });

@@ -270,3 +270,10 @@ body.lab-body { margin: 0; font-family: var(--lab-font); background: var(--lab-b
   body.lab-body { background: #fff; }
   .lab-wb-entry, .lab-wb-stats div { break-inside: avoid; border-color: #ccc; }
 }
+
+/* Lab home hero with the promo poster */
+.lab-hero-has-art { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: center; }
+.lab-hero-art { display: block; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 50px -24px rgba(0,0,0,.6); transform: rotate(1.5deg); transition: transform .25s; }
+.lab-hero-art:hover { transform: rotate(0) scale(1.02); }
+.lab-hero-art img { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+@media (max-width: 900px) { .lab-hero-has-art { grid-template-columns: 1fr; } .lab-hero-art { max-width: 340px; transform: none; } }

@@ -244,10 +244,28 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
 
     <div class="sch-grid">
       <?php if(empty($scholarships)): ?>
-        <div style="grid-column: 1/-1; text-align: center; padding: 60px; background: #f8fafc; border-radius: 20px;">
-          <i class="fas fa-info-circle" style="font-size: 2rem; color: #94a3b8; margin-bottom: 16px;"></i>
-          <p style="color: #64748b;">No active scholarship cycles at the moment. Check back soon!</p>
+        <div class="sch-none">
+          <a class="sch-none-art" href="register" aria-label="Join Skope Digital Academy"><picture><source type="image/webp" srcset="assets/images/promo/scholarship-promo.webp"><img src="assets/images/promo/scholarship-promo.jpg" alt="A cheering learner at her laptop: Skope Digital Academy, build skills for a digital future. Join today." class="" loading="lazy" decoding="async"></picture></a>
+          <div class="sch-none-text">
+            <span class="sch-none-tag"><i class="fas fa-bell"></i> Next round coming</span>
+            <h3>No scholarship round is open right now</h3>
+            <p>New rounds are announced here and emailed to registered learners first. Create a free account so you hear about the next one, and start with the free tutorials today.</p>
+            <div class="sch-none-btns"><a class="btn-sch-primary" href="register"><i class="fas fa-user-plus"></i> Create a free account</a><a class="btn-sch-ghost" href="learn"><i class="fas fa-code"></i> Free tutorials</a></div>
+          </div>
         </div>
+        <style>
+          .sch-none { grid-column: 1 / -1; display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 36px; align-items: center; padding: 28px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 24px; text-align: left; }
+          .sch-none-art { display: block; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 44px -26px rgba(15,23,42,.5); }
+          .sch-none-art img { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+          .sch-none-tag { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 99px; background: #fff7ed; color: #c2410c; font-weight: 700; font-size: .8rem; }
+          .sch-none-text h3 { font: 800 1.6rem/1.25 Poppins, sans-serif; color: #0f172a; margin: 14px 0 10px; }
+          .sch-none-text p { color: #64748b; line-height: 1.7; margin: 0 0 20px; }
+          .sch-none-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+          .btn-sch-primary, .btn-sch-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 13px 20px; border-radius: 12px; font-weight: 700; text-decoration: none; }
+          .btn-sch-primary { background: linear-gradient(135deg, #FF8C00, #ff6a00); color: #fff; }
+          .btn-sch-ghost { background: #fff; color: #0f172a; border: 1.5px solid #e2e8f0; }
+          @media (max-width: 800px) { .sch-none { grid-template-columns: 1fr; padding: 18px; gap: 20px; } .sch-none-art { max-width: 380px; } .sch-none-text h3 { font-size: 1.3rem; } }
+        </style>
       <?php else: ?>
         <?php foreach($scholarships as $s): ?>
         <div class="sch-card" data-aos>
