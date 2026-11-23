@@ -16,6 +16,21 @@ defined('DB_CHARSET') || define('DB_CHARSET', 'utf8mb4');
 date_default_timezone_set('Africa/Nairobi');
 
 
+// A PHP crash (fatal error) shows the friendly 500 page instead of a blank screen. Details stay in the log.
+if (PHP_SAPI !== 'cli') {
+    register_shutdown_function(function () {
+        $e = error_get_last();
+        if (!$e || !in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true) || headers_sent()) return;
+        while (ob_get_level() > 0) @ob_end_clean();
+        $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+        if (str_contains($accept, 'application/json') && !str_contains($accept, 'text/html')) {
+            http_response_code(500); header('Content-Type: application/json'); echo json_encode(['ok' => false, 'error' => 'server_error']); return;
+        }
+        $sda_error_code = 500;
+        include __DIR__ . '/../error.php';
+    });
+}
+
 $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
 
 $options = [
@@ -32,6 +47,8 @@ try {
     // Don't expose credentials in production
     error_log('DB Connection failed: ' . $e->getMessage());
     if (PHP_SAPI !== 'cli' && !headers_sent()) http_response_code(503);   // monitors see the outage
+    $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+    if (PHP_SAPI !== 'cli' && str_contains($accept, 'text/html')) { $sda_error_code = 503; include __DIR__ . '/../error.php'; exit; }
     die(json_encode(['error' => 'Database connection failed. Please contact the administrator.']));
 }
 
