@@ -270,6 +270,9 @@ $secIcon = ['knowledge' => 'book-open', 'practical' => 'screwdriver-wrench', 'si
                 <li class="<?= $stage >= 2 ? 'done' : 'now' ?>"><i class="fas fa-<?= $stage >= 2 ? 'check' : 'magnifying-glass' ?>"></i><b>Evaluation</b>Our team reviews every answer, including your written work.</li>
                 <li class="<?= $stage >= 3 ? 'done' : '' ?>"><i class="fas fa-<?= $stage >= 3 ? 'check' : 'comments' ?>"></i><b>Interview</b>Shortlisted candidates are invited by email.</li>
             </ul>
+            <?php if (!empty($app['interview_at']) && strtotime($app['interview_at']) > time() - 7200): ?>
+            <div class="note amber" style="text-align:left;max-width:520px;margin:0 auto 14px"><i class="fas fa-calendar-check" style="margin-top:3px"></i><span><b>Your interview:</b> <?= $e(date('l, j F Y, g:i a', strtotime($app['interview_at']))) ?> (EAT) · <?= $e(SDA_INTERVIEW_MODES[$app['interview_mode']] ?? '') ?><?= $app['interview_place'] ? ' · ' . (preg_match('#^https?://#', $app['interview_place']) ? '<a href="' . $e($app['interview_place']) . '" target="_blank" rel="noopener">join link</a>' : $e($app['interview_place'])) : '' ?>. Full details are in your email.</span></div>
+            <?php endif; ?>
             <p class="muted" style="font-size:.86rem">We'll email you at <b><?= $e($app['email']) ?></b>. There's nothing else you need to do for now. You can close this page.</p></div>
 
     <?php else: [$sl] = sda_app_status_label($app['status']); ?>

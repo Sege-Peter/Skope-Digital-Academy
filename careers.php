@@ -10,6 +10,15 @@ $applyEmail = sda_careers_email();
 $withDeadline = array_filter(array_column($jobs, 'deadline'));
 $deadlines = array_values(array_unique($withDeadline));
 $sharedDeadline = count($deadlines) === 1 && count($withDeadline) === count($jobs) ? $deadlines[0] : null;
+/** "Closes today / tomorrow / in N days" for deadlines within two weeks (deadline = end of that day, Nairobi time). */
+function cr_left(?string $d): ?string {
+    if (!$d) return null;
+    $days = (int)round((strtotime($d) - strtotime(date('Y-m-d'))) / 86400);
+    if ($days < 0 || $days > 14) return null;
+    return $days === 0 ? 'Closes today at 11:59 pm' : ($days === 1 ? 'Closes tomorrow' : "Closes in $days days");
+}
+$soonest = $withDeadline ? min($withDeadline) : null;
+$banner = cr_left($soonest);
 
 function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
 ?>
@@ -120,6 +129,12 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
 <?php require_once 'includes/nav.php'; ?>
 
 <main class="cr">
+<?php if ($banner): ?>
+<div style="background:linear-gradient(90deg,#FF8C00,#f97316);color:#fff;text-align:center;padding:10px 16px;font-weight:700;font-size:.92rem">
+    <i class="fas fa-hourglass-half"></i> <?= e($banner) ?><?= $sharedDeadline ? ' – applications for all positions end on ' . e(date('l, j F', strtotime($sharedDeadline))) . '.' : '.' ?>
+    <a href="#openings" style="color:#fff;text-decoration:underline;margin-left:6px">Apply now</a>
+</div>
+<?php endif; ?>
 <section class="careers-hero">
     <div class="container cr-hero-grid">
         <div>
@@ -165,7 +180,7 @@ function cr_date(string $d): string { return date('j M Y', strtotime($d)); }
                             <?php if ($j['department']): ?><span class="cr-pill"><i class="fas fa-tag"></i> <?= e($j['department']) ?></span><?php endif; ?>
                             <span class="cr-pill"><i class="fas fa-briefcase"></i> <?= e($j['job_type']) ?></span>
                             <?php if ($j['location']): ?><span class="cr-pill"><i class="fas fa-location-dot"></i> <?= e($j['location']) ?></span><?php endif; ?>
-                            <?php if ($j['deadline']): ?><span class="cr-pill dl"><i class="fas fa-calendar-day"></i> Apply by <?= e(cr_date($j['deadline'])) ?></span><?php endif; ?>
+                            <?php if ($j['deadline']): $lf = cr_left($j['deadline']); ?><span class="cr-pill dl"><i class="fas fa-<?= $lf ? 'hourglass-half' : 'calendar-day' ?>"></i> <?= $lf ? e($lf) : 'Apply by ' . e(cr_date($j['deadline'])) ?></span><?php endif; ?>
                         </div>
                         <p class="sum"><?= e($j['summary']) ?></p>
                     </div>

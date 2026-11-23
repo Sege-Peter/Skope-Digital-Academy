@@ -9,7 +9,7 @@ $axCounts = [
     'courses'       => ax_scalar($pdo, "SELECT COUNT(*) FROM courses WHERE status = 'pending'"),
     'scholarships'  => ax_scalar($pdo, "SELECT COUNT(*) FROM scholarship_applications WHERE status = 'pending'"),
     'projects'      => ax_scalar($pdo, "SELECT COUNT(*) FROM project_submissions WHERE status IN ('flagged','staff_review')"),
-    'careers'       => (function () use ($pdo) { try { return (int)$pdo->query("SELECT COUNT(*) FROM job_applications WHERE status = 'submitted'")->fetchColumn(); } catch (Throwable $e) { return 0; } })(),
+    'careers'       => (function () use ($pdo) { try { return (int)$pdo->query("SELECT COUNT(*) FROM job_applications WHERE status = 'submitted' AND archived = 0")->fetchColumn(); } catch (Throwable $e) { return 0; } })(),
 ];
 $axMenu = [
     'Overview' => [

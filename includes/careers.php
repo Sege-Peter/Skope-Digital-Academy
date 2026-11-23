@@ -35,7 +35,7 @@ function sda_careers_ensure(PDO $pdo): void
     static $done = false;
     if ($done) return;
     $done = true;
-    if (setting('careers_schema') === '2') return;
+    if (setting('careers_schema') === '3') return;
     if ($pdo->inTransaction()) { $done = false; return; }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS job_vacancies (
@@ -72,6 +72,10 @@ function sda_careers_ensure(PDO $pdo): void
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
         UNIQUE KEY uq_job_email (job_id, email), UNIQUE KEY uq_token (token_hash), KEY idx_job_status (job_id, status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $acols = $pdo->query("SHOW COLUMNS FROM job_applications")->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('archived', $acols, true)) $pdo->exec("ALTER TABLE job_applications ADD archived TINYINT(1) NOT NULL DEFAULT 0,
+        ADD interview_at DATETIME NULL, ADD interview_mins INT NULL, ADD interview_mode VARCHAR(20) NULL, ADD interview_place VARCHAR(300) NULL,
+        ADD interview_note VARCHAR(1000) NULL, ADD KEY idx_interview (interview_at)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS job_answers (
         application_id INT NOT NULL, question_id INT NOT NULL,
         answer MEDIUMTEXT NULL, marks_awarded DECIMAL(6,2) NULL, feedback VARCHAR(500) NULL,
@@ -112,7 +116,7 @@ function sda_careers_ensure(PDO $pdo): void
         foreach (['practical', 'professional'] as $sec)
             $ins->execute([$job['id'], $sec, 'written', $set[$sec][0], null, null, $set[$sec][1], $set[$sec][2], $n += 10]);
     }
-    save_setting($pdo, 'careers_schema', '2');
+    save_setting($pdo, 'careers_schema', '3');
 }
 
 /* ── Small helpers ─────────────────────────────────────────────────────── */
@@ -326,6 +330,7 @@ function sda_ax_finalize(PDO $pdo, int $appId, string $reason): bool
     $f = $pdo->prepare("SELECT final_score FROM job_applications WHERE id = ?");
     $f->execute([$appId]);
     if ($f->fetchColumn() !== null) $pdo->prepare("UPDATE job_applications SET status = 'evaluated' WHERE id = ? AND status = 'submitted'")->execute([$appId]);
+    sda_careers_alert($pdo, $appId, 'submitted');
     return true;
 }
 
@@ -337,11 +342,98 @@ function sda_ax_close_overdue(PDO $pdo): void
 }
 
 /** Email the applicant a decision / update written by staff. */
-function sda_app_respond(PDO $pdo, array $app, string $subject, string $message, ?string &$err = null): bool
+function sda_app_respond(PDO $pdo, array $app, string $subject, string $message, ?string &$err = null, string $ics = ''): bool
 {
     require_once __DIR__ . '/mailer.php';
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     $html = '<p>Dear ' . $e($app['name']) . ',</p>' . nl2br($e($message), false)
         . '<p style="margin-top:22px">Kind regards,<br>Recruitment Team<br>Skope Digital Academy</p>';
-    return sda_mail($app['email'], $subject, $html, sda_careers_email(), $err, ['event' => 'career_response']);
+    return sda_mail($app['email'], $subject, $html, sda_careers_email(), $err, ['event' => 'career_response', 'ics' => $ics]);
+}
+
+/* ── Staff alerts ──────────────────────────────────────────────────────── */
+
+/** Who gets recruitment alerts: the addresses in Admin → Careers, or every active admin. */
+function sda_careers_alert_recipients(PDO $pdo): array
+{
+    $list = array_filter(array_map('trim', preg_split('/[,;\s]+/', setting('careers_notify_emails', ''))), fn($x) => filter_var($x, FILTER_VALIDATE_EMAIL));
+    if (!$list) $list = $pdo->query("SELECT email FROM users WHERE role = 'admin' AND status = 'active'")->fetchAll(PDO::FETCH_COLUMN);
+    return array_values(array_unique(array_map('strtolower', array_filter($list, fn($x) => filter_var($x, FILTER_VALIDATE_EMAIL)))));
+}
+
+/** Queue an email to staff: 'applied' (new application) or 'submitted' (assessment finished). Never blocks the applicant. */
+function sda_careers_alert(PDO $pdo, int $appId, string $kind): void
+{
+    try {
+        if (setting('careers_alerts', '1') === '0') return;
+        require_once __DIR__ . '/notify.php';
+        require_once __DIR__ . '/mailer.php';
+        $st = $pdo->prepare("SELECT a.*, j.title AS job_title FROM job_applications a JOIN job_vacancies j ON j.id = a.job_id WHERE a.id = ?");
+        $st->execute([$appId]);
+        $a = $st->fetch();
+        if (!$a) return;
+        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $base = rtrim(sda_mail_public_base(), '/');
+        $link = $base . '/admin/career-application?id=' . $appId;
+        $row = fn($k, $v) => '<tr><td style="padding:6px 14px 6px 0;color:#64748b;white-space:nowrap">' . $e($k) . '</td><td style="padding:6px 0;color:#0f172a;font-weight:600">' . $v . '</td></tr>';
+        if ($kind === 'applied') {
+            $subject = 'New application: ' . $a['name'] . ' – ' . $a['job_title'];
+            $intro = 'A new application has arrived for <b>' . $e($a['job_title']) . '</b>.';
+            $rows = $row('Applicant', $e($a['name'])) . $row('Email', $e($a['email'])) . $row('Phone', $e($a['phone'])) . ($a['town'] ? $row('Town', $e($a['town'])) : '')
+                  . $row('Next step', 'The applicant has been emailed their assessment link.');
+        } else {
+            $ends = ['submitted' => 'Submitted by the applicant', 'time_up' => 'Time ran out', 'violations' => 'Auto-submitted after ' . SDA_AX_MAX_STRIKES . ' warnings'];
+            $mark = $a['final_score'] !== null;
+            $subject = ($mark ? 'Assessment scored: ' : 'Assessment to mark: ') . $a['name'] . ' – ' . $a['job_title'];
+            $intro = $e($a['name']) . ' has finished the assessment for <b>' . $e($a['job_title']) . '</b>.' . ($mark ? '' : ' Their written answers are waiting for you to mark.');
+            $rows = $row('Auto-marked score', $a['auto_score'] !== null ? $e((float)$a['auto_score'] . ' / ' . (float)$a['max_score']) : '—')
+                  . ($mark ? $row('Final score', $e((float)$a['final_score'] . '%')) : '')
+                  . $row('How it ended', $e($ends[$a['end_reason'] ?? ''] ?? '—'))
+                  . $row('Warnings', (int)$a['violations'] ? '<span style="color:#c2410c">' . (int)$a['violations'] . ' of ' . SDA_AX_MAX_STRIKES . '</span>' : 'None');
+        }
+        $html = '<p>' . $intro . '</p><table style="border-collapse:collapse;font-size:14px;margin:8px 0 18px">' . $rows . '</table>'
+              . '<p><a href="' . $e($link) . '" style="background:#00BFFF;color:#fff;padding:11px 20px;border-radius:10px;text-decoration:none;font-weight:700;display:inline-block">'
+              . ($kind === 'applied' ? 'View application' : ($a['final_score'] !== null ? 'Review result' : 'Mark written answers')) . '</a></p>'
+              . '<p style="font-size:12px;color:#94a3b8">You get these alerts because you\'re on the recruitment team. Change who receives them in Admin → Careers.</p>';
+        foreach (sda_careers_alert_recipients($pdo) as $to)
+            sda_mail_enqueue('career_alert', $to, $subject, sda_mail_layout($subject, $html), ['dedupe' => 'career_' . $kind . '_' . $appId . '_' . md5($to)]);
+    } catch (Throwable $e) { error_log('[careers alert] ' . $e->getMessage()); }
+}
+
+/* ── Delete ────────────────────────────────────────────────────────────── */
+
+/** Permanently delete an application: answers, CV file and the record. */
+function sda_app_delete(PDO $pdo, int $appId): void
+{
+    $st = $pdo->prepare("SELECT cv_file FROM job_applications WHERE id = ?");
+    $st->execute([$appId]);
+    $cv = $st->fetchColumn();
+    if ($cv) { $f = sda_careers_dir() . '/' . basename($cv); if (is_file($f)) @unlink($f); }
+    $pdo->prepare("DELETE FROM job_answers WHERE application_id = ?")->execute([$appId]);
+    $pdo->prepare("DELETE FROM job_applications WHERE id = ?")->execute([$appId]);
+}
+
+/* ── Interviews ────────────────────────────────────────────────────────── */
+
+const SDA_INTERVIEW_MODES = ['in_person' => 'In person', 'video' => 'Video call', 'phone' => 'Phone call'];
+
+function sda_interview_text(array $a): string
+{
+    $when = date('l, j F Y \a\t g:i a', strtotime($a['interview_at'])) . ' (East Africa Time)';
+    $mode = SDA_INTERVIEW_MODES[$a['interview_mode'] ?? ''] ?? 'Interview';
+    $where = ['in_person' => 'Venue', 'video' => 'Video link', 'phone' => 'We will call you on'][$a['interview_mode'] ?? ''] ?? 'Details';
+    $place = $a['interview_mode'] === 'phone' && !$a['interview_place'] ? $a['phone'] : $a['interview_place'];
+    return "Date and time: $when\nDuration: about " . (int)($a['interview_mins'] ?: 45) . " minutes\nFormat: $mode\n$where: $place"
+        . ($a['interview_note'] ? "\n\n" . $a['interview_note'] : '');
+}
+
+function sda_interview_ics(array $a): string
+{
+    require_once __DIR__ . '/notify.php';
+    $start = strtotime($a['interview_at']);
+    return sda_ics([[
+        'uid' => 'interview-' . $a['id'] . '-' . $start, 'title' => 'Interview – ' . $a['job_title'] . ' (Skope Digital Academy)',
+        'start' => $start, 'end' => $start + 60 * (int)($a['interview_mins'] ?: 45),
+        'description' => sda_interview_text($a), 'url' => preg_match('#^https?://#', (string)$a['interview_place']) ? $a['interview_place'] : '', 'alarm' => 60,
+    ]], 'Skope Digital Academy');
 }

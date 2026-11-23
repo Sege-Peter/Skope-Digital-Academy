@@ -52,8 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($act === 'apply_channel') {
             $email = trim((string)($_POST['careers_apply_email'] ?? ''));
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { ax_flash('err', 'Enter a valid email address.'); ax_back(); }
+            $notify = array_filter(array_map('trim', preg_split('/[,;\s]+/', (string)($_POST['careers_notify_emails'] ?? ''))), 'strlen');
+            foreach ($notify as $n) if (!filter_var($n, FILTER_VALIDATE_EMAIL)) { ax_flash('err', '"' . $n . '" is not a valid email address.'); ax_back(); }
             save_setting($pdo, 'careers_apply_email', mb_substr($email, 0, 190));
-            ax_flash('ok', 'Recruitment email saved.');
+            save_setting($pdo, 'careers_notify_emails', mb_substr(implode(', ', array_unique($notify)), 0, 1000));
+            save_setting($pdo, 'careers_alerts', empty($_POST['careers_alerts']) ? '0' : '1');
+            ax_flash('ok', 'Recruitment email settings saved.');
         }
     } catch (Throwable $e) {
         error_log($e->getMessage());
@@ -63,8 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 sda_ax_close_overdue($pdo);
-$jobs = $pdo->query("SELECT j.*, (SELECT COUNT(*) FROM job_applications a WHERE a.job_id = j.id) AS apps,
-                            (SELECT COUNT(*) FROM job_applications a WHERE a.job_id = j.id AND a.status = 'submitted') AS to_grade,
+$jobs = $pdo->query("SELECT j.*, (SELECT COUNT(*) FROM job_applications a WHERE a.job_id = j.id AND a.archived = 0) AS apps,
+                            (SELECT COUNT(*) FROM job_applications a WHERE a.job_id = j.id AND a.status = 'submitted' AND a.archived = 0) AS to_grade,
+                            (SELECT COUNT(*) FROM job_applications a WHERE a.job_id = j.id) AS apps_all,
                             (SELECT COUNT(*) FROM job_questions q WHERE q.job_id = j.id) AS n_q,
                             (SELECT COALESCE(SUM(q.marks), 0) FROM job_questions q WHERE q.job_id = j.id) AS q_marks
                      FROM job_vacancies j ORDER BY j.status = 'closed', j.sort_order, j.id")->fetchAll();
@@ -74,6 +79,10 @@ $today = date('Y-m-d');
 $live = count(array_filter($jobs, fn($j) => $j['status'] === 'open' && (!$j['deadline'] || $j['deadline'] >= $today)));
 $expired = count(array_filter($jobs, fn($j) => $j['status'] === 'open' && $j['deadline'] && $j['deadline'] < $today));
 $applyEmail = sda_careers_email();
+$interviews = $pdo->query("SELECT a.id, a.name, a.email, a.phone, a.interview_at, a.interview_mins, a.interview_mode, a.interview_place, j.title AS job_title
+                           FROM job_applications a JOIN job_vacancies j ON j.id = a.job_id
+                           WHERE a.interview_at >= NOW() - INTERVAL 2 HOUR AND a.archived = 0 ORDER BY a.interview_at LIMIT 30")->fetchAll();
+$alertTo = sda_careers_alert_recipients($pdo);
 
 require_once 'includes/sidebar.php';
 ?>
@@ -98,7 +107,28 @@ require_once 'includes/sidebar.php';
             <?= ax_stat('briefcase', number_format($live), 'Live on the site', 'Open and before their deadline', 'green') ?>
             <?= ax_stat('inbox', number_format($totalApps), 'Applications', 'All positions', 'violet') ?>
             <?= ax_stat('pen-ruler', number_format($toGrade), 'To evaluate', 'Written answers waiting for marks', $toGrade ? 'amber' : '') ?>
+            <?= ax_stat('calendar-check', number_format(count($interviews)), 'Upcoming interviews', $interviews ? 'Next: ' . date('D j M, g:i a', strtotime($interviews[0]['interview_at'])) : 'None scheduled', $interviews ? 'green' : '') ?>
         </div>
+
+        <?php if ($interviews): ?>
+        <section class="ax-panel">
+            <div class="ax-panel-h"><div><h2><i class="fas fa-calendar-check"></i> Upcoming interviews</h2><p>Across all positions. Open a candidate to reschedule or cancel.</p></div></div>
+            <div class="ax-table-wrap"><table class="ax-table cards">
+                <thead><tr><th>When</th><th>Candidate</th><th>Position</th><th>Format</th><th></th></tr></thead>
+                <tbody>
+                <?php $lastDay = ''; foreach ($interviews as $iv): $ts = strtotime($iv['interview_at']); $day = date('Y-m-d', $ts); ?>
+                    <tr>
+                        <td data-label="When"><b><?= $day === date('Y-m-d') ? 'Today' : ($day === date('Y-m-d', strtotime('+1 day')) ? 'Tomorrow' : e(date('D j M', $ts))) ?></b><div style="font-size:.8rem;color:var(--text-muted)"><?= e(date('g:i a', $ts)) ?> · <?= (int)$iv['interview_mins'] ?> min</div></td>
+                        <td data-label="Candidate"><b><?= e($iv['name']) ?></b><div style="font-size:.78rem;color:var(--text-muted)"><?= e($iv['phone']) ?></div></td>
+                        <td data-label="Position"><?= e($iv['job_title']) ?></td>
+                        <td data-label="Format"><?= e(SDA_INTERVIEW_MODES[$iv['interview_mode']] ?? '') ?><?php if ($iv['interview_place']): ?><div style="font-size:.78rem;color:var(--text-muted)"><?= preg_match('#^https?://#', $iv['interview_place']) ? '<a href="' . e($iv['interview_place']) . '" target="_blank" rel="noopener">Join link</a>' : e(mb_strimwidth($iv['interview_place'], 0, 40, '…')) ?></div><?php endif; ?></td>
+                        <td class="actions" data-label=""><a class="ax-btn ghost sm" href="career-application?id=<?= (int)$iv['id'] ?>#interview"><i class="fas fa-eye"></i> Open</a></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table></div>
+        </section>
+        <?php endif; ?>
 
         <section class="ax-panel">
             <div class="ax-panel-h"><div><h2><i class="fas fa-briefcase"></i> Positions</h2><p>Open positions show on the Careers page in this order. A position hides itself after its deadline; close it to hide it sooner.</p></div>
@@ -129,7 +159,7 @@ require_once 'includes/sidebar.php';
                             <button type="button" class="ax-btn ghost sm" data-open="job-<?= (int)$j['id'] ?>"><i class="fas fa-pen"></i> Edit</button>
                             <form method="post"><?= ax_csrf() ?><input type="hidden" name="action" value="job_status"><input type="hidden" name="job_id" value="<?= (int)$j['id'] ?>"><input type="hidden" name="status" value="<?= $j['status'] === 'closed' ? 'open' : 'closed' ?>">
                                 <button class="ax-btn ghost sm"><i class="fas fa-<?= $j['status'] === 'closed' ? 'lock-open' : 'lock' ?>"></i> <?= $j['status'] === 'closed' ? 'Reopen' : 'Close' ?></button></form>
-                            <?php if (!$j['apps']): ?><form method="post" data-confirm="Delete the position &quot;<?= e($j['title']) ?>&quot;? This can't be undone." data-danger><?= ax_csrf() ?><input type="hidden" name="action" value="delete_job"><input type="hidden" name="job_id" value="<?= (int)$j['id'] ?>">
+                            <?php if (!$j['apps_all']): ?><form method="post" data-confirm="Delete the position &quot;<?= e($j['title']) ?>&quot;? This can't be undone." data-danger><?= ax_csrf() ?><input type="hidden" name="action" value="delete_job"><input type="hidden" name="job_id" value="<?= (int)$j['id'] ?>">
                                 <button class="ax-btn danger sm"><i class="fas fa-trash"></i> Delete</button></form><?php endif; ?>
                         </div>
                     </article>
@@ -140,13 +170,16 @@ require_once 'includes/sidebar.php';
         </section>
 
         <section class="ax-panel">
-            <div class="ax-panel-h"><div><h2><i class="fas fa-paper-plane"></i> Recruitment email</h2><p>Candidates apply online and get their assessment link by email. Replies to recruitment emails go to this address, and it's shown on the Careers page for questions.</p></div></div>
+            <div class="ax-panel-h"><div><h2><i class="fas fa-paper-plane"></i> Recruitment email &amp; alerts</h2><p>Candidates' replies go to the recruitment email, which is also shown on the Careers page. Staff alerts tell your team when an application arrives and when an assessment is ready to mark.</p></div></div>
             <div class="ax-panel-b">
                 <form method="post" class="ax-form">
                     <?= ax_csrf() ?><input type="hidden" name="action" value="apply_channel">
                     <div class="ax-row">
-                        <div class="ax-field"><label for="c-email">Recruitment email</label><input id="c-email" type="email" name="careers_apply_email" value="<?= e($applyEmail) ?>" required maxlength="190"></div>
+                        <div class="ax-field"><label for="c-email">Recruitment email (reply-to)</label><input id="c-email" type="email" name="careers_apply_email" value="<?= e($applyEmail) ?>" required maxlength="190"></div>
+                        <div class="ax-field"><label for="c-notify">Send staff alerts to</label><input id="c-notify" type="text" name="careers_notify_emails" value="<?= e(setting('careers_notify_emails', '')) ?>" maxlength="1000" placeholder="Leave blank to alert every admin">
+                            <div class="hint">Separate several addresses with commas. Now: <?= e(implode(', ', $alertTo) ?: 'nobody') ?></div></div>
                     </div>
+                    <label style="display:flex;gap:10px;align-items:center;font-size:.88rem;margin:0 0 14px"><input type="checkbox" name="careers_alerts" value="1" <?= setting('careers_alerts', '1') !== '0' ? 'checked' : '' ?>> Email staff when an application arrives and when an assessment is finished</label>
                     <div class="ax-form-actions"><button class="ax-btn"><i class="fas fa-floppy-disk"></i> Save</button></div>
                 </form>
             </div>

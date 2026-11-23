@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $open) {
                                $old['portfolio_url'] ?: null, sda_client_ip(), mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255)]);
                 $appId = (int)$pdo->lastInsertId();
                 sda_app_history($pdo, $appId, 'Application received');
+                sda_careers_alert($pdo, $appId, 'applied');
                 $app = ['id' => $appId, 'name' => $old['name'], 'email' => $email];
                 if ($assess) {
                     sda_app_send_invite($pdo, $app, $job['title'], (int)$job['assess_minutes']);

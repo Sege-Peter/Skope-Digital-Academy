@@ -58,6 +58,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 sda_app_history($pdo, $id, $line . ' (no email)');
                 ax_flash('ok', 'Status updated.');
             }
+        } elseif ($act === 'interview') {
+            $when = strtotime(str_replace('T', ' ', (string)($_POST['interview_at'] ?? '')));
+            $mode = array_key_exists($_POST['interview_mode'] ?? '', SDA_INTERVIEW_MODES) ? $_POST['interview_mode'] : 'in_person';
+            $place = mb_substr(trim((string)($_POST['interview_place'] ?? '')), 0, 300);
+            $mins = max(10, min(240, (int)($_POST['interview_mins'] ?? 45)));
+            $note = mb_substr(trim((string)($_POST['interview_note'] ?? '')), 0, 1000);
+            if (!$when || $when < time() - 3600) { ax_flash('err', 'Choose a date and time in the future.'); ax_back($self); }
+            if ($mode !== 'phone' && $place === '') { ax_flash('err', $mode === 'video' ? 'Add the video call link.' : 'Add the venue.'); ax_back($self); }
+            if ($mode === 'video' && !preg_match('#^https://#i', $place)) { ax_flash('err', 'The video link must start with https://'); ax_back($self); }
+            $resched = (bool)$app['interview_at'];
+            $pdo->prepare("UPDATE job_applications SET interview_at = ?, interview_mins = ?, interview_mode = ?, interview_place = ?, interview_note = ?, status = IF(status IN ('offered','rejected'), status, 'interview') WHERE id = ?")
+                ->execute([date('Y-m-d H:i:s', $when), $mins, $mode, $place ?: null, $note ?: null, $id]);
+            $line = ($resched ? 'Interview rescheduled' : 'Interview scheduled') . ' for ' . date('j M Y, g:i a', $when) . ' (' . SDA_INTERVIEW_MODES[$mode] . ') by ' . $user['name'];
+            if (!empty($_POST['send'])) {
+                $now = $load();
+                $msg = ($resched ? "Your interview for the {$app['job_title']} position has been rescheduled. The new details are below." : "Thank you for your application for the {$app['job_title']} position. We are pleased to invite you to an interview.")
+                     . "\n\n" . sda_interview_text($now)
+                     . ($mode === 'in_person' ? "\n\nPlease bring your national ID and your original academic and professional certificates." : '')
+                     . "\n\nPlease reply to this email to confirm that you will attend. A calendar invite is attached.";
+                $err = '';
+                $ok = sda_app_respond($pdo, $now, ($resched ? 'Interview rescheduled – ' : 'Interview invitation – ') . $app['job_title'], $msg, $err, sda_interview_ics($now));
+                sda_app_history($pdo, $id, $line . ($ok ? '; invitation emailed with calendar invite' : '; email FAILED: ' . $err));
+                ax_flash($ok ? 'ok' : 'err', $ok ? 'Interview saved and the invitation was emailed (with a calendar invite).' : 'Interview saved, but the email failed: ' . $err);
+            } else {
+                sda_app_history($pdo, $id, $line . ' (no email)');
+                ax_flash('ok', 'Interview saved.');
+            }
+        } elseif ($act === 'cancel_interview') {
+            $pdo->prepare("UPDATE job_applications SET interview_at = NULL WHERE id = ?")->execute([$id]);
+            $line = 'Interview cancelled by ' . $user['name'];
+            if (!empty($_POST['send']) && $app['interview_at']) {
+                $err = '';
+                $ok = sda_app_respond($pdo, $app, 'Interview cancelled – ' . $app['job_title'], "We're sorry, but your interview for the {$app['job_title']} position on " . date('l, j F Y \a\t g:i a', strtotime($app['interview_at'])) . " has been cancelled. We will contact you about next steps.", $err);
+                $line .= $ok ? '; applicant emailed' : '; email FAILED: ' . $err;
+            }
+            sda_app_history($pdo, $id, $line);
+            ax_flash('ok', 'Interview cancelled.');
+        } elseif ($act === 'archive') {
+            $to = empty($app['archived']) ? 1 : 0;
+            $pdo->prepare("UPDATE job_applications SET archived = ? WHERE id = ?")->execute([$to, $id]);
+            sda_app_history($pdo, $id, ($to ? 'Archived' : 'Restored from archive') . ' by ' . $user['name']);
+            ax_flash('ok', $to ? 'Application archived. It\'s hidden from the lists and counts but kept on record.' : 'Application restored.');
+        } elseif ($act === 'delete') {
+            sda_app_delete($pdo, $id);
+            try { $pdo->prepare("INSERT INTO audit_log (user_id, action, description, ip_address) VALUES (?, 'career_delete', ?, ?)")
+                    ->execute([$user['id'], 'Deleted application #' . $id . ' (' . $app['name'] . ', ' . $app['job_title'] . ')', $_SERVER['REMOTE_ADDR'] ?? '']); } catch (Throwable $e) {}
+            ax_flash('ok', 'Application permanently deleted, including the CV and answers.');
+            ax_back('career-applications?job=' . (int)$app['job_id']);
         } elseif ($act === 'notes') {
             $pdo->prepare("UPDATE job_applications SET staff_notes = ? WHERE id = ?")->execute([mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 5000), $id]);
             ax_flash('ok', 'Notes saved.');
@@ -145,7 +193,10 @@ require_once 'includes/sidebar.php';
 </style>
 <main class="main-content">
     <?php ax_header($app['name'], '', $app['job_title'] . ' · applied ' . ax_date($app['created_at']),
-        '<a class="ax-btn ghost" href="career-applications?job=' . (int)$app['job_id'] . '"><i class="fas fa-arrow-left"></i> All applicants</a>'); ?>
+        '<a class="ax-btn ghost" href="career-applications?job=' . (int)$app['job_id'] . '"><i class="fas fa-arrow-left"></i> All applicants</a> '
+        . '<form method="post" style="display:inline">' . ax_csrf() . '<input type="hidden" name="action" value="archive"><input type="hidden" name="id" value="' . $id . '"><button class="ax-btn ghost"><i class="fas fa-box-archive"></i> ' . (empty($app['archived']) ? 'Archive' : 'Restore') . '</button></form> '
+        . '<form method="post" style="display:inline" data-confirm="Permanently delete this application, including the CV, answers and history? This can\'t be undone." data-danger>' . ax_csrf() . '<input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $id . '"><button class="ax-btn danger"><i class="fas fa-trash"></i> Delete</button></form>'); ?>
+    <?php if (!empty($app['archived'])): ?><div style="margin:0 24px;padding:10px 14px;border-radius:12px;background:rgba(148,163,184,.15);font-size:.86rem"><i class="fas fa-box-archive"></i> This application is archived: it's hidden from lists, counts and exports. Use Restore to bring it back.</div><?php endif; ?>
     <div class="ax-body">
         <?php ax_alerts(); ?>
         <section class="ax-panel">
@@ -249,6 +300,35 @@ require_once 'includes/sidebar.php';
                     </div>
                 </section>
 
+                <section class="ax-panel" id="interview">
+                    <div class="ax-panel-h"><div><h2><i class="fas fa-calendar-check"></i> Interview</h2><p><?= $app['interview_at'] ? 'Scheduled. Change the details to reschedule.' : 'Schedule an interview and email the invitation with a calendar invite.' ?></p></div></div>
+                    <div class="ax-panel-b">
+                        <?php if ($app['interview_at']): $past = strtotime($app['interview_at']) < time(); ?>
+                        <div style="border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:14px;background:var(--surface-2)">
+                            <b style="font-size:1rem"><?= e(date('D j M Y, g:i a', strtotime($app['interview_at']))) ?></b> <?= $past ? '<span class="ax-pill">Past</span>' : '<span class="ax-pill ok">Upcoming</span>' ?>
+                            <div style="font-size:.84rem;color:var(--text-dim);margin-top:4px"><?= e(SDA_INTERVIEW_MODES[$app['interview_mode']] ?? '') ?> · <?= (int)$app['interview_mins'] ?> min<?= $app['interview_place'] ? ' · ' . (preg_match('#^https?://#', $app['interview_place']) ? '<a href="' . e($app['interview_place']) . '" target="_blank" rel="noopener">Join link</a>' : e($app['interview_place'])) : '' ?></div>
+                        </div>
+                        <?php endif; ?>
+                        <form method="post" class="ax-form" id="ivForm">
+                            <?= ax_csrf() ?><input type="hidden" name="action" value="interview"><input type="hidden" name="id" value="<?= $id ?>">
+                            <div class="ax-row">
+                                <div class="ax-field"><label for="iv-at">Date &amp; time</label><input id="iv-at" type="datetime-local" name="interview_at" required value="<?= $app['interview_at'] ? e(date('Y-m-d\TH:i', strtotime($app['interview_at']))) : '' ?>" min="<?= date('Y-m-d\TH:i') ?>"></div>
+                                <div class="ax-field"><label for="iv-m">Length</label><select id="iv-m" name="interview_mins"><?php foreach ([20, 30, 45, 60, 90] as $m): ?><option value="<?= $m ?>" <?= (int)($app['interview_mins'] ?: 45) === $m ? 'selected' : '' ?>><?= $m ?> min</option><?php endforeach; ?></select></div>
+                            </div>
+                            <div class="ax-field"><label for="iv-mode">Format</label><select id="iv-mode" name="interview_mode"><?php foreach (SDA_INTERVIEW_MODES as $k => $l): ?><option value="<?= $k ?>" <?= ($app['interview_mode'] ?? 'in_person') === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+                            <div class="ax-field"><label for="iv-p" id="iv-pl">Venue</label><input id="iv-p" name="interview_place" maxlength="300" value="<?= e($app['interview_place'] ?? '') ?>" placeholder="e.g. Skope Digital Academy office, Kisumu"></div>
+                            <div class="ax-field"><label for="iv-n">Note for the candidate (optional)</label><textarea id="iv-n" name="interview_note" rows="2" maxlength="1000" placeholder="e.g. Ask for Mary at reception. Bring a short portfolio."><?= e($app['interview_note'] ?? '') ?></textarea></div>
+                            <label style="display:flex;gap:8px;align-items:center;font-size:.85rem;margin-bottom:12px"><input type="checkbox" name="send" value="1" checked> Email the invitation (with calendar invite)</label>
+                            <div class="ax-form-actions"><button class="ax-btn"><i class="fas fa-calendar-plus"></i> <?= $app['interview_at'] ? 'Save &amp; reschedule' : 'Schedule interview' ?></button></div>
+                        </form>
+                        <?php if ($app['interview_at']): ?>
+                        <form method="post" style="margin-top:10px" data-confirm="Cancel this interview? If ticked, the candidate is emailed." data-danger><?= ax_csrf() ?><input type="hidden" name="action" value="cancel_interview"><input type="hidden" name="id" value="<?= $id ?>">
+                            <label style="font-size:.82rem;display:inline-flex;gap:6px;align-items:center;margin-right:10px"><input type="checkbox" name="send" value="1" checked> Tell the candidate</label>
+                            <button class="ax-btn ghost sm"><i class="fas fa-calendar-xmark"></i> Cancel interview</button></form>
+                        <?php endif; ?>
+                    </div>
+                </section>
+
                 <section class="ax-panel">
                     <div class="ax-panel-h"><div><h2><i class="fas fa-reply"></i> Decision &amp; response</h2><p>Update the status and, optionally, email the applicant.</p></div></div>
                     <div class="ax-panel-b">
@@ -256,7 +336,7 @@ require_once 'includes/sidebar.php';
                             <?= ax_csrf() ?><input type="hidden" name="action" value="respond"><input type="hidden" name="id" value="<?= $id ?>">
                             <div class="ax-field"><label for="ns">Decision</label><select id="ns" name="new_status" required>
                                 <option value="">Choose…</option>
-                                <?php foreach (['evaluated' => 'Under review (update)', 'shortlisted' => 'Shortlist', 'interview' => 'Invite to interview', 'offered' => 'Make an offer', 'rejected' => 'Not successful'] as $k => $l): ?><option value="<?= $k ?>" <?= $app['status'] === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?>
+                                <?php foreach (['evaluated' => 'Under review (update)', 'shortlisted' => 'Shortlist', 'interview' => 'Interview stage (use the Interview panel to schedule)', 'offered' => 'Make an offer', 'rejected' => 'Not successful'] as $k => $l): ?><option value="<?= $k ?>" <?= $app['status'] === $k ? 'selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?>
                             </select></div>
                             <div class="ax-field"><label for="subj">Email subject</label><input id="subj" name="subject" maxlength="200"></div>
                             <div class="ax-field"><label for="msg">Message</label><textarea id="msg" name="message" rows="8"></textarea><div class="hint">Starts with "Dear <?= e($app['name']) ?>," and ends with the recruitment team's sign-off.</div></div>
@@ -289,6 +369,14 @@ require_once 'includes/sidebar.php';
     m.addEventListener('input', function () { touched = true; });
     function fill() { var t = T[ns.value]; if (!t) return; if (!touched || !m.value.trim()) { s.value = t[0]; m.value = t[1]; touched = false; } }
     ns.addEventListener('change', fill);
+    var mode = document.getElementById('iv-mode'), pl = document.getElementById('iv-pl'), pin = document.getElementById('iv-p');
+    function ivSync() {
+        var v = mode.value;
+        pl.textContent = v === 'video' ? 'Video call link' : v === 'phone' ? 'Phone number to call (optional)' : 'Venue';
+        pin.placeholder = v === 'video' ? 'https://meet.google.com/…' : v === 'phone' ? 'Leave blank to call the number they applied with' : 'e.g. Skope Digital Academy office, Kisumu';
+        pin.required = v !== 'phone';
+    }
+    if (mode) { mode.addEventListener('change', ivSync); ivSync(); }
 })();
 </script>
 </body></html>
