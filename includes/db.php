@@ -88,7 +88,7 @@ if (PHP_SAPI !== 'cli' && !defined('SDA_MAINTENANCE_CHECKED')) {
             $sdaAdmin = false;
             if (!empty($_COOKIE[session_name()])) {
                 require_once __DIR__ . '/auth.php';          // starts the session the normal way
-                $sdaAdmin = ($_SESSION['role'] ?? '') === 'admin' || !empty($_SESSION['admin_impersonator_id']);
+                $sdaAdmin = ($_SESSION['role'] ?? '') === 'admin' || !empty($_SESSION['admin_impersonator_id']) || ($_SESSION['portal_home_role'] ?? '') === 'admin';
             }
             if (!$sdaAdmin) {
                 $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');

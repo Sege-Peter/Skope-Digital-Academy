@@ -6,6 +6,7 @@ require_once __DIR__ . '/ui.php';
 
 // Access control: admins everywhere; staff only on the pages their modules allow (includes/staff.php)
 requireLogin();
+if (($_SESSION['portal_home_role'] ?? '') === 'admin') { $_SESSION['role'] = 'admin'; unset($_SESSION['portal_home_role']); }   // back from "Switch portal"
 $axRole = (string)($_SESSION['role'] ?? '');
 if ($axRole === 'staff') {
     require_once __DIR__ . '/../../includes/staff.php';

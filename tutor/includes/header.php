@@ -58,6 +58,12 @@ $impersonating = isset($_SESSION['admin_impersonator_id']);
 <?php require_once __DIR__ . '/../../includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="dashboard-body<?= $impersonating ? ' tp-impersonating' : '' ?>">
+<?php if (($_SESSION['portal_home_role'] ?? '') === 'admin'): ?>
+<div style="position:sticky;top:0;z-index:2000;background:linear-gradient(90deg,#0b1324,#12305a);color:#fff;padding:9px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 .85rem Inter,sans-serif">
+    <span><i class="fas fa-repeat" style="color:#00BFFF"></i> You're using the tutor portal with your own admin account.</span>
+    <a href="../switch-portal?to=admin" style="background:#00BFFF;color:#fff;padding:5px 14px;border-radius:8px;text-decoration:none;font-weight:800;font-size:.78rem">Back to admin</a>
+</div>
+<?php endif; ?>
 <?php if (isset($_SESSION['admin_impersonator_id'])): ?>
     <div style="background:#ef4444;color:#fff;text-align:center;padding:10px 12px;font-weight:800;font-size:.85rem;z-index:10000;position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;box-shadow:0 4px 12px rgba(239,68,68,.3)">
         <span><i class="fas fa-user-secret"></i> Viewing the tutor portal as <?= htmlspecialchars($_SESSION['user_name'] ?? '') ?></span>

@@ -61,61 +61,34 @@ function ax_topbar_tools(): string {
         : ax_initial($name);
     return '<div class="ax-tools">'
          . '<span class="ax-date"><i class="far fa-calendar"></i>' . e(date('D, j M Y')) . '</span>'
-         . ((($_SESSION['role'] ?? '') === 'admin') ? '<button type="button" class="ax-btn ghost sm ax-switch-btn" data-open="dlgSwitchPortal" title="Open the tutor or student portal as one of your users"><i class="fas fa-repeat"></i><span> Switch portal</span></button>' : '')
+         . ((($_SESSION['role'] ?? '') === 'admin') ? '<button type="button" class="ax-btn ghost sm ax-switch-btn" data-open="dlgSwitchPortal" title="Use the tutor or student portal with your own account"><i class="fas fa-repeat"></i><span> Switch portal</span></button>' : '')
          . '<button type="button" class="ax-theme" id="axTheme" title="Switch light / dark" aria-label="Switch light or dark theme"><span class="k"><i class="fas fa-moon"></i></span></button>'
          . '<a class="ax-topav" href="profile" title="' . e($name) . ' – my profile">' . $av . '</a>'
          . '</div>' . ((($_SESSION['role'] ?? '') === 'admin') ? ax_switch_dialog() : '');
 }
 
-/** "Switch portal" dialog: pick a tutor or learner and open their portal (support / checking what they see). */
+/** "Switch portal" dialog: open the tutor or student portal with your OWN account (not as another person). */
 function ax_switch_dialog(): string {
-    global $pdo;
     static $done = false;
-    if ($done || !$pdo) return '';
+    if ($done) return '';
     $done = true;
-    try {
-        $rows = $pdo->query("SELECT id, name, email, role FROM users WHERE role IN ('tutor','student') AND status = 'active' ORDER BY role = 'tutor' DESC, name LIMIT 600")->fetchAll();
-    } catch (Throwable $e) { return ''; }
-    $back = e(strtok(basename($_SERVER['REQUEST_URI'] ?? 'index.php'), '#'));
-    $list = '';
-    foreach ($rows as $r) {
-        $tutor = $r['role'] === 'tutor';
-        $list .= '<li data-role="' . e($r['role']) . '" data-q="' . e(mb_strtolower($r['name'] . ' ' . $r['email'])) . '">'
-               . '<form method="post" action="users">' . ax_csrf() . '<input type="hidden" name="action" value="impersonate"><input type="hidden" name="uid" value="' . (int)$r['id'] . '"><input type="hidden" name="back" value="' . $back . '">'
-               . '<button type="submit"><span class="ax-sw-av">' . ax_initial($r['name']) . '</span><span class="ax-sw-t"><b>' . e($r['name']) . '</b><small>' . e($r['email']) . '</small></span>'
-               . '<span class="ax-pill ' . ($tutor ? 'violet' : 'info') . '">' . ($tutor ? 'Tutor portal' : 'Student portal') . '</span></button></form></li>';
-    }
-    $js = <<<'JS'
-<script>(function(){var q=document.getElementById("axSwQ"),l=document.getElementById("axSwList"),em=document.getElementById("axSwEmpty"),role="all";if(!l)return;
-function f(){var t=(q.value||"").toLowerCase().trim(),n=0;l.querySelectorAll("li").forEach(function(li){var ok=(role==="all"||li.dataset.role===role)&&(!t||li.dataset.q.indexOf(t)>-1);li.hidden=!ok;if(ok)n++;});em.hidden=n>0;}
-q.addEventListener("input",f);
-document.querySelectorAll("[data-sw]").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();role=a.dataset.sw;document.querySelectorAll("[data-sw]").forEach(function(x){x.classList.toggle("active",x===a);});f();});});
-document.getElementById("dlgSwitchPortal").addEventListener("close",function(){q.value="";role="all";f();});
-})();</script>
-JS;
-    $css = <<<'CSS'
-<style>
-.ax-switch{width:min(560px,calc(100vw - 32px))}
-.ax-sw-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.ax-sw-bar .ax-search{flex:1;min-width:180px}
-.ax-sw-list{list-style:none;margin:0;padding:0;max-height:min(52vh,460px);overflow-y:auto;display:grid;gap:6px}
-.ax-sw-list li[hidden]{display:none}.ax-sw-list form{margin:0}
-.ax-sw-list button{width:100%;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);background:var(--surface-2);border-radius:12px;cursor:pointer;color:var(--text-main);text-align:left;font:inherit}
-.ax-sw-list button:hover,.ax-sw-list button:focus-visible{border-color:var(--primary);outline:none}
-.ax-sw-av{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--primary-glow,rgba(0,191,255,.15));color:var(--primary);font-weight:800}
-.ax-sw-t{flex:1;min-width:0}.ax-sw-t b{display:block;font-size:.88rem}.ax-sw-t small{display:block;color:var(--text-dim);font-size:.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ax-sw-empty{color:var(--text-dim);font-size:.85rem;text-align:center;margin:14px 0 4px}
-@media (max-width:700px){.ax-switch-btn span{display:none}}
-</style>
-CSS;
+    $btn = function (string $to, string $icon, string $title, string $desc): string {
+        return '<form method="post" action="../switch-portal">' . ax_csrf() . '<input type="hidden" name="to" value="' . $to . '">'
+             . '<button type="submit" class="ax-sw-opt"><span class="ax-sw-ic"><i class="fas fa-' . $icon . '"></i></span><span class="ax-sw-t"><b>' . $title . '</b><small>' . $desc . '</small></span><i class="fas fa-arrow-right" style="color:var(--text-muted)"></i></button></form>';
+    };
+    $css = '<style>.ax-switch{width:min(520px,calc(100vw - 32px))}.ax-sw-opts{display:grid;gap:10px}.ax-sw-opts form{margin:0}'
+         . '.ax-sw-opt{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--border);background:var(--surface-2);border-radius:14px;cursor:pointer;color:var(--text-main);text-align:left;font:inherit}'
+         . '.ax-sw-opt:hover,.ax-sw-opt:focus-visible{border-color:var(--primary);outline:none}'
+         . '.ax-sw-ic{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--primary-glow,rgba(0,191,255,.15));color:var(--primary);font-size:1.05rem}'
+         . '.ax-sw-t{flex:1;min-width:0}.ax-sw-t b{display:block;font-size:.95rem}.ax-sw-t small{display:block;color:var(--text-dim);font-size:.8rem;line-height:1.4;margin-top:2px}'
+         . '@media (max-width:700px){.ax-switch-btn span{display:none}}</style>';
     return '<dialog class="ax-modal ax-switch" id="dlgSwitchPortal" aria-labelledby="dlgSwitchT">'
-        . '<div class="ax-panel-h"><div><h2 id="dlgSwitchT"><i class="fas fa-repeat"></i> Switch portal</h2><p>Open the tutor or student portal signed in as that person. A red banner takes you back to admin.</p></div>'
+        . '<div class="ax-panel-h"><div><h2 id="dlgSwitchT"><i class="fas fa-repeat"></i> Switch portal</h2><p>Use another portal with your own account – your name, your courses and your enrolments. You never act as anyone else.</p></div>'
         . '<button type="button" class="ax-btn ghost icon" data-close aria-label="Close"><i class="fas fa-times"></i></button></div>'
-        . '<div class="ax-panel-b">'
-        . '<div class="ax-sw-bar"><nav class="ax-tabs"><a href="#" class="active" data-sw="all">All</a><a href="#" data-sw="tutor">Tutors</a><a href="#" data-sw="student">Students</a></nav>'
-        . '<label class="ax-search"><i class="fas fa-search"></i><input type="search" placeholder="Search name or email…" id="axSwQ" aria-label="Search people"></label></div>'
-        . ($list ? '<ul class="ax-sw-list" id="axSwList">' . $list . '</ul><p class="ax-sw-empty" id="axSwEmpty" hidden>No one matches.</p>'
-                 : '<div class="ax-empty"><i class="fas fa-users"></i><b>No active tutors or learners yet</b></div>')
-        . '</div></dialog>' . $css . $js;
+        . '<div class="ax-panel-b"><div class="ax-sw-opts">'
+        . $btn('tutor', 'chalkboard-user', 'Tutor portal', 'Create and teach courses, build quizzes and track your learners.')
+        . $btn('student', 'user-graduate', 'Student portal', 'Learn, enrol in courses and see the academy as a learner does.')
+        . '</div><p style="font-size:.78rem;color:var(--text-muted);margin:14px 0 0"><i class="fas fa-circle-info"></i> A banner at the top takes you back, and opening any admin page switches you back too.</p></div></dialog>' . $css;
 }
 
 function ax_money($n): string { return 'KES ' . number_format((float)$n, 0); }

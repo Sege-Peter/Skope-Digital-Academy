@@ -54,6 +54,12 @@ $user = $student; // Shared variable for sidebar compatibility
 </head>
 <body class="dashboard-body student-portal">
 <script>if (document.documentElement.classList.contains('sp-mini-pending')) document.body.classList.add('sp-mini');</script>
+<?php if (($_SESSION['portal_home_role'] ?? '') === 'admin'): ?>
+<div style="position:sticky;top:0;z-index:2000;background:linear-gradient(90deg,#0b1324,#12305a);color:#fff;padding:9px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 .85rem Inter,sans-serif">
+    <span><i class="fas fa-repeat" style="color:#00BFFF"></i> You're using the student portal with your own admin account.</span>
+    <a href="../switch-portal?to=admin" style="background:#00BFFF;color:#fff;padding:5px 14px;border-radius:8px;text-decoration:none;font-weight:800;font-size:.78rem">Back to admin</a>
+</div>
+<?php endif; ?>
 <?php if(isset($_SESSION['admin_impersonator_id'])): ?>
     <div style="background: #ef4444; color: white; text-align: center; padding: 12px; font-weight: 800; font-size: 0.85rem; z-index: 10000; position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 20px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); backdrop-filter: blur(8px);">
         <span><i class="fas fa-user-secret"></i> DIAGNOSTIC MODE: VIEWING AS <?= htmlspecialchars($student['name']) ?></span>
