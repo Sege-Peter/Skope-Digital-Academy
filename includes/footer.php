@@ -38,6 +38,7 @@ $ftH = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                     <li><a href="about">About Academy</a></li>
                     <li><a href="courses">Explore Courses</a></li>
                     <li><a href="scholarships">Scholarships</a></li>
+                    <li><a href="careers">Careers</a></li>
                     <li><a href="contact">Support Center</a></li>
                 </ul>
             </nav>

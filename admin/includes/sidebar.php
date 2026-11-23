@@ -46,6 +46,7 @@ $axMenu = [
     ],
     'System' => [
         ['announcements.php', 'announcements', 'bullhorn', 'Announcements'],
+        ['careers.php', 'careers', 'briefcase', 'Careers'],
         ['notifications.php', 'notifications', 'bell', 'Notifications'],
         ['email-notifications.php', 'email-notifications', 'envelope-open-text', 'Email Notifications'],
         ['activity.php', 'activity', 'clock-rotate-left', 'Activity Log'],
