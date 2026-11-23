@@ -136,7 +136,7 @@ function sda_security_alert(string $subject, string $html): void
         $to = $pdo->query("SELECT email FROM users WHERE role = 'admin' AND status = 'active'")->fetchAll(PDO::FETCH_COLUMN);
         foreach (array_unique(array_filter($to, fn($x) => filter_var($x, FILTER_VALIDATE_EMAIL))) as $addr) {
             sda_mail_enqueue('security_alert', $addr, '[Security] ' . $subject,
-                sda_mail_layout($subject, '<h2 style="margin:0 0 12px">' . htmlspecialchars($subject) . '</h2><p>' . $html . '</p>'));
+                '<h2 style="margin:0 0 12px">' . htmlspecialchars($subject) . '</h2><p>' . $html . '</p>');   // sda_mail() adds the branded layout
         }
         if (function_exists('sda_spawn_worker')) sda_spawn_worker();
     } catch (Throwable $e) { error_log('[security alert] ' . $e->getMessage()); }

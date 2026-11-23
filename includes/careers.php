@@ -35,7 +35,7 @@ function sda_careers_ensure(PDO $pdo): void
     static $done = false;
     if ($done) return;
     $done = true;
-    if (setting('careers_schema') === '3') return;
+    if (setting('careers_schema') === '4') return;
     if ($pdo->inTransaction()) { $done = false; return; }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS job_vacancies (
@@ -101,22 +101,58 @@ function sda_careers_ensure(PDO $pdo): void
         foreach ($seed as $i => $r) $ins->execute([$r[0], $r[1], $r[2], $r[3], ($i + 1) * 10]);
     }
 
-    // Default assessments for the seeded roles (only where a role has no questions yet).
+    // Default assessments for the seeded roles: 15 basic multiple-choice questions, 20 minutes.
+    // Version 4 replaces the earlier long test, but never for a role whose test someone has already started.
+    $prevSchema = setting('careers_schema');
     $bank = require __DIR__ . '/careers_seed.php';
     $has = $pdo->prepare("SELECT COUNT(*) FROM job_questions WHERE job_id = ?");
+    $taken = $pdo->prepare("SELECT COUNT(*) FROM job_applications WHERE job_id = ? AND started_at IS NOT NULL");
     $ins = $pdo->prepare("INSERT INTO job_questions (job_id, section, qtype, prompt, options, correct, marks, guide, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     foreach ($pdo->query("SELECT id, title FROM job_vacancies")->fetchAll() as $job) {
         $set = $bank[$job['title']] ?? null;
         if (!$set) continue;
         $has->execute([$job['id']]);
-        if ((int)$has->fetchColumn()) continue;
+        $taken->execute([$job['id']]);
+        $replace = $prevSchema !== '4' && (int)$taken->fetchColumn() === 0;
+        if ((int)$has->fetchColumn() && !$replace) continue;
+        $pdo->prepare("DELETE FROM job_questions WHERE job_id = ?")->execute([$job['id']]);
         $n = 0;
         foreach (['knowledge', 'situational'] as $sec) foreach ($set[$sec] as $q)
-            $ins->execute([$job['id'], $sec, 'mcq', $q[0], json_encode($q[1], JSON_UNESCAPED_UNICODE), $q[2], 4, null, $n += 10]);
-        foreach (['practical', 'professional'] as $sec)
-            $ins->execute([$job['id'], $sec, 'written', $set[$sec][0], null, null, $set[$sec][1], $set[$sec][2], $n += 10]);
+            $ins->execute([$job['id'], $sec, 'mcq', $q[0], json_encode($q[1], JSON_UNESCAPED_UNICODE), $q[2], 1, null, $n += 10]);
+        $pdo->prepare("UPDATE job_vacancies SET assess_minutes = 20 WHERE id = ?")->execute([$job['id']]);
     }
-    save_setting($pdo, 'careers_schema', '3');
+    save_setting($pdo, 'careers_schema', '4');
+}
+
+/** Email the applicant their score as soon as the test is fully auto-marked (Admin > Careers can switch this off). */
+function sda_app_send_score(PDO $pdo, int $appId): void
+{
+    try {
+        if (setting('careers_send_score', '1') === '0') return;
+        $st = $pdo->prepare("SELECT a.*, j.title AS job_title FROM job_applications a JOIN job_vacancies j ON j.id = a.job_id WHERE a.id = ?");
+        $st->execute([$appId]);
+        $a = $st->fetch();
+        if (!$a || $a['final_score'] === null) return;
+        require_once __DIR__ . '/notify.php';
+        require_once __DIR__ . '/mailer.php';
+        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $pct = rtrim(rtrim(number_format((float)$a['final_score'], 1), '0'), '.');
+        $right = rtrim(rtrim(number_format((float)$a['auto_score'], 1), '0'), '.');
+        $of = rtrim(rtrim(number_format((float)$a['max_score'], 1), '0'), '.');
+        $how = ['time_up' => 'Time ran out, so your saved answers were submitted.', 'violations' => 'Your test was submitted automatically after ' . SDA_AX_MAX_STRIKES . ' warnings; this is noted on your application.'][$a['end_reason'] ?? ''] ?? '';
+        $html = '<p>Hi ' . $e(strtok($a['name'], ' ')) . ',</p>'
+            . '<p>Thank you for completing the online assessment for the <b>' . $e($a['job_title']) . '</b> position.</p>'
+            . '<div style="margin:20px 0;padding:18px 20px;border-radius:14px;background:#f0f9ff;border:1px solid #bae6fd;text-align:center">'
+            . '<div style="font-size:13px;color:#0369a1;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Your score</div>'
+            . '<div style="font-size:40px;font-weight:800;color:#0f172a;line-height:1.2">' . $e($pct) . '%</div>'
+            . '<div style="font-size:14px;color:#475569">' . $e($right) . ' of ' . $e($of) . ' questions correct</div></div>'
+            . ($how ? '<p style="font-size:14px;color:#64748b">' . $e($how) . '</p>' : '')
+            . '<p>Our recruitment team now reviews every application, looking at your score together with your CV and cover letter. Only shortlisted candidates will be contacted for an interview.</p>'
+            . '<p>Kind regards,<br>Recruitment Team<br>Skope Digital Academy</p>';
+        sda_mail_enqueue('career_score', $a['email'], 'Your assessment score: ' . $pct . '% – ' . $a['job_title'], $html,
+            ['reply_to' => sda_careers_email(), 'dedupe' => 'career_score_' . $appId]);
+        sda_app_history($pdo, $appId, 'Score (' . $pct . '%) emailed to the applicant');
+    } catch (Throwable $e) { error_log('[careers score] ' . $e->getMessage()); }
 }
 
 /* ── Small helpers ─────────────────────────────────────────────────────── */
@@ -331,6 +367,7 @@ function sda_ax_finalize(PDO $pdo, int $appId, string $reason): bool
     $f->execute([$appId]);
     if ($f->fetchColumn() !== null) $pdo->prepare("UPDATE job_applications SET status = 'evaluated' WHERE id = ? AND status = 'submitted'")->execute([$appId]);
     sda_careers_alert($pdo, $appId, 'submitted');
+    sda_app_send_score($pdo, $appId);
     return true;
 }
 
@@ -396,7 +433,7 @@ function sda_careers_alert(PDO $pdo, int $appId, string $kind): void
               . ($kind === 'applied' ? 'View application' : ($a['final_score'] !== null ? 'Review result' : 'Mark written answers')) . '</a></p>'
               . '<p style="font-size:12px;color:#94a3b8">You get these alerts because you\'re on the recruitment team. Change who receives them in Admin → Careers.</p>';
         foreach (sda_careers_alert_recipients($pdo) as $to)
-            sda_mail_enqueue('career_alert', $to, $subject, sda_mail_layout($subject, $html), ['dedupe' => 'career_' . $kind . '_' . $appId . '_' . md5($to)]);
+            sda_mail_enqueue('career_alert', $to, $subject, $html, ['dedupe' => 'career_' . $kind . '_' . $appId . '_' . md5($to)]);
     } catch (Throwable $e) { error_log('[careers alert] ' . $e->getMessage()); }
 }
 

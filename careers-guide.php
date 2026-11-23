@@ -137,8 +137,8 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
             <div class="g-steps">
                 <div class="g-step"><div><b>Apply online</b><span>Fill in the form, attach your CV and confirm the declarations. You'll see a confirmation straight away.</span></div></div>
                 <div class="g-step"><div><b>Receive your assessment link by email</b><span>Usually within minutes. Check your spam or promotions folder. The link is private to you – don't share it.</span></div></div>
-                <div class="g-step"><div><b>Take the online assessment</b><span>A timed, <?= $mins ?>-minute test made for your position, with four parts: knowledge, practical problem-solving, situational judgement and professional competency (100 marks in total).</span></div></div>
-                <div class="g-step"><div><b>Evaluation</b><span>Multiple-choice answers are marked automatically. Written answers are marked by our recruitment panel against a marking guide.</span></div></div>
+                <div class="g-step"><div><b>Take the online assessment</b><span>A short, timed test made for your position: about 15 multiple-choice questions in <?= $mins ?> minutes, covering role knowledge and how you'd handle real situations at work.</span></div></div>
+                <div class="g-step"><div><b>Your score</b><span>Your answers are marked automatically, and your score (as a percentage) is emailed to you as soon as you finish. The recruitment team then reviews it together with your CV and cover letter.</span></div></div>
                 <div class="g-step"><div><b>Shortlisting &amp; interview</b><span>Shortlisted candidates are invited to an interview by email with the date, time and venue or video link. Only shortlisted candidates will be contacted.</span></div></div>
                 <div class="g-step"><div><b>Decision</b><span>The successful candidate receives an offer by email, followed by an offer letter.</span></div></div>
             </div>
@@ -148,7 +148,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
             <h2><span class="n">4</span> Before the assessment</h2>
             <p class="lead">Set yourself up properly – most problems happen because of the device or connection.</p>
             <ul class="g-list ok">
-                <li><i class="fas fa-laptop"></i><span><b>Use a laptop or desktop computer</b>, plugged in or fully charged. A phone works, but it's much harder to type the written answers, and switching apps on a phone counts as a warning.</span></li>
+                <li><i class="fas fa-laptop"></i><span><b>Use a laptop or desktop computer</b>, plugged in or fully charged. A phone works, but the screen is small, and switching apps on a phone counts as a warning.</span></li>
                 <li><i class="fab fa-chrome"></i><span><b>Use an up-to-date browser:</b> Google Chrome, Microsoft Edge or Mozilla Firefox. Allow the page to go full screen when asked.</span></li>
                 <li><i class="fas fa-wifi"></i><span><b>Have a stable internet connection</b> and enough data or bundles for <?= $mins ?> minutes.</span></li>
                 <li><i class="fas fa-volume-xmark"></i><span><b>Find a quiet place</b> where you won't be disturbed for <?= $mins ?> minutes.</span></li>
@@ -164,7 +164,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
                 <li><i class="fas fa-expand"></i><span><b>Full screen:</b> the test opens in full screen. Stay in full screen until you submit.</span></li>
                 <li><i class="fas fa-table-cells"></i><span><b>Move freely:</b> answer the questions in any order. The question list shows which ones you've answered; click a number to jump to it.</span></li>
                 <li><i class="fas fa-list-ol"></i><span><b>Multiple choice:</b> choose the one best answer. You can change it or clear it at any time before you submit. Unanswered questions score 0 – there's no penalty for guessing.</span></li>
-                <li><i class="fas fa-pen"></i><span><b>Written tasks:</b> type your answer in your own words. Each task shows a suggested length and a word count. Clear structure (short paragraphs or bullet points) and practical, realistic ideas earn the most marks.</span></li>
+                <li><i class="fas fa-stopwatch"></i><span><b>Pace yourself:</b> you have about a minute per question. If you're unsure, pick your best answer and move on – you can come back to it from the question list.</span></li>
                 <li><i class="fas fa-cloud"></i><span><b>Autosave:</b> your answers save automatically every few seconds; the top bar shows when they were last saved.</span></li>
                 <li><i class="fas fa-clock"></i><span><b>Timer:</b> shown at the top. You'll get reminders at 10 and 2 minutes left. When time runs out, everything you've saved is submitted automatically.</span></li>
                 <li><i class="fas fa-paper-plane"></i><span><b>Submitting:</b> press "Review &amp; submit". You'll see any unanswered questions before you confirm. After submitting you cannot change your answers or retake the test.</span></li>
@@ -215,7 +215,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
 
         <section class="g-sec" id="scoring">
             <h2><span class="n">9</span> Scoring &amp; shortlisting</h2>
-            <p class="lead">Your final score is out of 100%. Multiple-choice answers are marked automatically; written tasks are marked by the panel against the same guide for everyone.</p>
+            <p class="lead">Your score is the percentage of questions you answered correctly. Every applicant for a position gets the same questions (in a different order) and is marked the same way, and your score is emailed to you straight after the test.</p>
             <div class="g-bands">
                 <div style="background:#dcfce7;color:#14532d"><b>80–100%</b>Strongly recommended for shortlisting</div>
                 <div style="background:#e0f2fe;color:#0c4a6e"><b>70–79%</b>Recommended</div>
@@ -223,7 +223,7 @@ $toc = ['dates' => 'Key dates', 'apply' => 'Application rules', 'process' => 'Ho
                 <div style="background:#fee2e2;color:#7f1d1d"><b>Below 60%</b>Not shortlisted automatically</div>
             </div>
             <ul class="g-list" style="margin-top:16px">
-                <li><i class="fas fa-scale-balanced"></i><span>The score is important, but it isn't the only factor. Shortlisting also considers your CV, qualifications, cover letter, written work and the integrity record. The interview decides the final outcome.</span></li>
+                <li><i class="fas fa-scale-balanced"></i><span>The score is important, but it isn't the only factor. Shortlisting also considers your CV, qualifications, cover letter and the integrity record. The interview decides the final outcome.</span></li>
                 <li><i class="fas fa-envelope"></i><span>Decisions are sent by email. The panel's decisions are final, and we can't share the questions or marking guides.</span></li>
             </ul>
         </section>

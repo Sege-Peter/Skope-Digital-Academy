@@ -203,7 +203,7 @@ $secIcon = ['knowledge' => 'book-open', 'practical' => 'screwdriver-wrench', 'si
             <p class="muted" style="margin:16px 0 0;line-height:1.65">Hi <?= $e(strtok($app['name'], ' ')) ?>, thanks for applying! This assessment helps us see how you'd handle the real work of this role. Take a minute to read this page, then start when you're ready. The clock starts only when you press Start.</p>
             <div class="kv">
                 <div><b><?= (int)$app['assess_minutes'] ?> min</b>Time limit</div>
-                <div><b><?= $nq ?> questions</b>In 4 parts</div>
+                <div><b><?= $nq ?> questions</b><?= count($parts) === 1 ? 'Multiple choice' : 'In ' . count($parts) . ' parts' ?></div>
                 <div><b><?= $e(date('j M', strtotime($app['invite_expires_at']))) ?></b>Start before <?= $e(date('H:i', strtotime($app['invite_expires_at']))) ?></div>
             </div>
         </div>
@@ -217,7 +217,7 @@ $secIcon = ['knowledge' => 'book-open', 'practical' => 'screwdriver-wrench', 'si
                     <div class="r"><b><?= $fmtM($p['marks']) ?> marks</b>about <?= $p['mins'] ?> min</div></div>
                 <?php endforeach; ?>
             </div>
-            <p class="muted" style="font-size:.84rem;margin:12px 0 0"><i class="fas fa-lightbulb" style="color:var(--o)"></i> Tip: the written tasks carry the most marks, so leave enough time for them. You can move between questions freely.</p>
+            <p class="muted" style="font-size:.84rem;margin:12px 0 0"><i class="fas fa-lightbulb" style="color:var(--o)"></i> <?= array_filter(array_column($parts, 'written')) ? 'Tip: the written tasks carry the most marks, so leave enough time for them.' : 'Tip: about a minute per question. Answer every question – there\'s no penalty for guessing.' ?> You can move between questions freely.</p>
         </div>
 
         <div class="card">
@@ -267,9 +267,16 @@ $secIcon = ['knowledge' => 'book-open', 'practical' => 'screwdriver-wrench', 'si
             <ul class="tl">
                 <li class="done"><i class="fas fa-check"></i><b>Application received</b><?= $e(date('j M Y', strtotime($app['created_at']))) ?></li>
                 <li class="done"><i class="fas fa-check"></i><b>Assessment completed</b><?= $app['submitted_at'] ? $e(date('j M Y, H:i', strtotime($app['submitted_at']))) : '' ?></li>
-                <li class="<?= $stage >= 2 ? 'done' : 'now' ?>"><i class="fas fa-<?= $stage >= 2 ? 'check' : 'magnifying-glass' ?>"></i><b>Evaluation</b>Our team reviews every answer, including your written work.</li>
+                <li class="<?= $stage >= 2 ? 'done' : 'now' ?>"><i class="fas fa-<?= $stage >= 2 ? 'check' : 'magnifying-glass' ?>"></i><b>Evaluation</b>Our team reviews your score together with your CV and cover letter.</li>
                 <li class="<?= $stage >= 3 ? 'done' : '' ?>"><i class="fas fa-<?= $stage >= 3 ? 'check' : 'comments' ?>"></i><b>Interview</b>Shortlisted candidates are invited by email.</li>
             </ul>
+            <?php if ($app['final_score'] !== null && setting('careers_send_score', '1') !== '0'): ?>
+            <div style="max-width:320px;margin:4px auto 18px;padding:16px;border-radius:16px;background:#f0f9ff;border:1px solid #bae6fd">
+                <div style="font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0369a1">Your score</div>
+                <div style="font:800 2.4rem 'Poppins',sans-serif;color:#0f172a;line-height:1.15"><?= $e(rtrim(rtrim(number_format((float)$app['final_score'], 1), '0'), '.')) ?>%</div>
+                <div style="font-size:.86rem;color:#475569"><?= $e(rtrim(rtrim(number_format((float)$app['auto_score'], 1), '0'), '.')) ?> of <?= $e(rtrim(rtrim(number_format((float)$app['max_score'], 1), '0'), '.')) ?> correct · also sent to your email</div>
+            </div>
+            <?php endif; ?>
             <?php if (!empty($app['interview_at']) && strtotime($app['interview_at']) > time() - 7200): ?>
             <div class="note amber" style="text-align:left;max-width:520px;margin:0 auto 14px"><i class="fas fa-calendar-check" style="margin-top:3px"></i><span><b>Your interview:</b> <?= $e(date('l, j F Y, g:i a', strtotime($app['interview_at']))) ?> (EAT) · <?= $e(SDA_INTERVIEW_MODES[$app['interview_mode']] ?? '') ?><?= $app['interview_place'] ? ' · ' . (preg_match('#^https?://#', $app['interview_place']) ? '<a href="' . $e($app['interview_place']) . '" target="_blank" rel="noopener">join link</a>' : $e($app['interview_place'])) : '' ?>. Full details are in your email.</span></div>
             <?php endif; ?>

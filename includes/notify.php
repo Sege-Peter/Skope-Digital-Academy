@@ -133,6 +133,10 @@ const SDA_NOTIFY_EVENTS = [
         'Pick up where you left off in {{course}}',
         '<p>Hi {{first_name}},</p><p>It has been a week since your last lesson in <strong>{{course}}</strong> ({{progress}}% done). Ten minutes today keeps your streak alive.</p>',
         'Continue', 'student/classroom?id={{course_id}}', false],
+    'not_started_nudge' => ['schedule', 'Enrolled but not started yet (day 3 and day 10)', 'learner',
+        'Ready to start {{course}}?',
+        '<p>Hi {{first_name}},</p><p>You enrolled in <strong>{{course}}</strong> {{days}} days ago but have not opened the first lesson yet. Starting is the hardest part, so open lesson one today: it takes about ten minutes, and you can learn at your own pace on your phone or laptop.</p><p>Stuck or need help getting started? Just reply to this email.</p>',
+        'Start the first lesson', 'student/classroom?id={{course_id}}', false],
 
     // ── progress ──
     'assignment_graded' => ['progress', 'Assignment graded', 'learner',
@@ -179,6 +183,10 @@ const SDA_NOTIFY_EVENTS = [
         'New message: {{subject}}',
         '<p><strong>{{name}}</strong> ({{email}}) wrote:</p><blockquote style="border-left:3px solid #00BFFF;margin:12px 0;padding:6px 14px">{{message}}</blockquote>',
         'Open the inbox', 'admin/messages', false],
+    'admin_weekly_report' => ['admin', 'Admin: weekly report (every Monday)', 'admin',
+        'Weekly report: {{visits}} visits, {{signups}} new learners, {{enrolments}} enrolments',
+        '<p>Hi {{first_name}},</p><p>Here is how Skope Digital Academy did in the last 7 days ({{period}}), compared with the week before.</p>{{report_html}}',
+        'Open analytics', 'admin/analytics?range=7', false],
 ];
 
 const SDA_NOTIFY_CATEGORIES = [

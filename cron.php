@@ -30,7 +30,7 @@ if ($lock && !flock($lock, LOCK_EX | LOCK_NB)) exit("busy\n");
 $log = [];
 if ($mode !== 'queue') {
     save_setting($pdo, 'cron_last_run', (string)time());
-    foreach (['sda_job_lessons_opening', 'sda_job_cohort_starting', 'sda_job_assignments_due', 'sda_job_access_expiring', 'sda_job_weekly_digest', 'sda_job_inactive_nudge', 'sda_job_server_health'] as $job) {
+    foreach (['sda_job_lessons_opening', 'sda_job_cohort_starting', 'sda_job_assignments_due', 'sda_job_access_expiring', 'sda_job_weekly_digest', 'sda_job_inactive_nudge', 'sda_job_not_started_nudge', 'sda_job_admin_weekly_report', 'sda_job_server_health'] as $job) {
         try { $log[] = $job . ': ' . $job($pdo); } catch (Throwable $e) { $log[] = "$job FAILED: " . $e->getMessage(); error_log("[cron] $job " . $e->getMessage()); }
     }
     if (file_exists(__DIR__ . '/includes/mailbox.php')) {
@@ -174,4 +174,93 @@ function sda_job_server_health(PDO $pdo): string
     sda_security_alert('Server needs attention', implode('<br>', array_map('htmlspecialchars', $issues)));
     save_setting($pdo, 'health_alert_day', date('Y-m-d'));
     return 'alerted: ' . implode(' ', $issues);
+}
+
+/** Learners who enrolled 3+ days ago but never opened a lesson: one nudge at day 3 and one at day 10 (template not_started_nudge). */
+function sda_job_not_started_nudge(PDO $pdo): string
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS nudge_log (k VARCHAR(80) PRIMARY KEY, sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $rows = $pdo->query("SELECT e.student_id, e.course_id, e.enrolled_at, c.title FROM enrollments e
+            JOIN users u ON u.id = e.student_id AND u.status = 'active' AND u.role = 'student'
+            JOIN courses c ON c.id = e.course_id
+            WHERE e.status = 'active' AND e.enrolled_at < NOW() - INTERVAL 3 DAY AND e.enrolled_at > NOW() - INTERVAL 30 DAY
+              AND (e.starts_on IS NULL OR e.starts_on <= CURDATE())
+              AND NOT EXISTS (SELECT 1 FROM lesson_progress lp WHERE lp.student_id = e.student_id AND lp.course_id = e.course_id)
+              AND NOT EXISTS (SELECT 1 FROM learning_events le WHERE le.user_id = e.student_id AND le.course_id = e.course_id)
+            ORDER BY e.enrolled_at LIMIT 200")->fetchAll();
+    $mark = $pdo->prepare("INSERT IGNORE INTO nudge_log (k) VALUES (?)");
+    $n = 0;
+    foreach ($rows as $r) {
+        $days = (int)floor((time() - strtotime($r['enrolled_at'])) / 86400);
+        $key = 'notstarted:' . $r['student_id'] . ':' . $r['course_id'] . ':' . ($days >= 10 ? 2 : 1);
+        $mark->execute([$key]);
+        if ($mark->rowCount() !== 1) continue;            // already nudged at this stage
+        if (sda_notify('not_started_nudge', (int)$r['student_id'], ['course' => $r['title'], 'course_id' => $r['course_id'], 'days' => $days], ['dedupe' => $key])) $n++;
+    }
+    return "$n sent";
+}
+
+/** Monday-morning report to admins: last 7 days vs the week before (template admin_weekly_report). */
+function sda_job_admin_weekly_report(PDO $pdo, bool $force = false): string
+{
+    $week = date('o-W');
+    if (!$force) {
+        if (date('N') !== '1' || (int)date('G') < 7) return 'not Monday morning';
+        if (setting('admin_report_week') === $week) return 'already sent';
+        save_setting($pdo, 'admin_report_week', $week);      // claim it first: the job runs every 15 minutes
+    }
+    require_once __DIR__ . '/includes/site_stats.php';
+    try { sda_stats_ensure($pdo); } catch (Throwable $e) {}
+    $a = date('Y-m-d', strtotime('-7 days')); $b = date('Y-m-d', strtotime('-1 day'));
+    $pa = date('Y-m-d', strtotime('-14 days')); $pb = date('Y-m-d', strtotime('-8 days'));
+    $one = function (string $sql, array $p = []) use ($pdo) { try { $s = $pdo->prepare($sql); $s->execute($p); return $s->fetchColumn(); } catch (Throwable $e) { return 0; } };
+    $all = function (string $sql, array $p = []) use ($pdo) { try { $s = $pdo->prepare($sql); $s->execute($p); return $s->fetchAll(); } catch (Throwable $e) { return []; } };
+    $m = function (string $x, string $y) use ($one) {
+        return [
+            'visits'  => (int)$one("SELECT COUNT(DISTINCT day, visitor) FROM site_visits WHERE day BETWEEN ? AND ?", [$x, $y]),
+            'signups' => (int)$one("SELECT COUNT(*) FROM users WHERE role = 'student' AND DATE(created_at) BETWEEN ? AND ?", [$x, $y]),
+            'enrol'   => (int)$one("SELECT COUNT(*) FROM enrollments WHERE DATE(enrolled_at) BETWEEN ? AND ?", [$x, $y]),
+            'revenue' => (float)$one("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'verified' AND DATE(created_at) BETWEEN ? AND ?", [$x, $y]),
+            'active'  => (int)$one("SELECT COUNT(DISTINCT student_id) FROM lesson_progress WHERE DATE(last_seen_at) BETWEEN ? AND ?", [$x, $y]),
+            'lessons' => (int)$one("SELECT COUNT(*) FROM lesson_progress WHERE status = 'completed' AND DATE(completed_at) BETWEEN ? AND ?", [$x, $y]),
+            'certs'   => (int)$one("SELECT COUNT(*) FROM certificates WHERE DATE(issued_at) BETWEEN ? AND ?", [$x, $y]),
+        ];
+    };
+    $N = $m($a, $b); $P = $m($pa, $pb);
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $chg = function (string $k) use ($N, $P) {
+        if (!$P[$k]) return $N[$k] ? '<span style="color:#059669">new</span>' : '<span style="color:#94a3b8">no change</span>';
+        $d = round(($N[$k] - $P[$k]) / $P[$k] * 100);
+        return '<span style="color:' . ($d >= 0 ? '#059669' : '#ea580c') . '">' . ($d >= 0 ? '&#9650; ' : '&#9660; ') . abs($d) . '%</span>';
+    };
+    $tile = fn($label, $val, $k) => '<td style="width:33%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;vertical-align:top"><div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700">' . $label . '</div><div style="font-size:22px;font-weight:800;color:#0f172a;margin:2px 0">' . $val . '</div><div style="font-size:12px">' . $chg($k) . ' <span style="color:#94a3b8">vs last week</span></div></td>';
+    $html = '<table role="presentation" style="width:100%;border-collapse:separate;border-spacing:6px;margin:6px 0 14px"><tr>'
+        . $tile('Website visits', number_format($N['visits']), 'visits') . $tile('New learners', number_format($N['signups']), 'signups') . $tile('Enrolments', number_format($N['enrol']), 'enrol')
+        . '</tr><tr>' . $tile('Revenue (verified)', 'KES ' . number_format($N['revenue']), 'revenue') . $tile('Active learners', number_format($N['active']), 'active') . $tile('Lessons completed', number_format($N['lessons']), 'lessons')
+        . '</tr></table>';
+    $list = function (string $title, array $rows) use ($e) {
+        if (!$rows) return '';
+        return '<h3 style="font-size:14px;margin:16px 0 6px;color:#0f172a">' . $e($title) . '</h3><ul style="margin:0;padding-left:18px;line-height:1.7;font-size:14px">'
+            . implode('', array_map(fn($r) => '<li>' . $e($r[0]) . ' <span style="color:#64748b">&ndash; ' . $e($r[1]) . '</span></li>', $rows)) . '</ul>';
+    };
+    $html .= $list('Top courses by new enrolments', array_map(fn($r) => [$r['title'], $r['n'] . ' enrolment' . ($r['n'] == 1 ? '' : 's')],
+        $all("SELECT c.title, COUNT(*) n FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE DATE(e.enrolled_at) BETWEEN ? AND ? GROUP BY c.id ORDER BY n DESC LIMIT 3", [$a, $b])));
+    $html .= $list('Where visitors came from', array_map(fn($r) => [$r['source'], $r['n'] . ' visits'],
+        $all("SELECT source, COUNT(DISTINCT day, visitor) n FROM site_visits WHERE day BETWEEN ? AND ? GROUP BY source ORDER BY n DESC LIMIT 4", [$a, $b])));
+    $html .= $list('Searched for but not offered (course ideas)', array_map(fn($r) => ['"' . $r['q'] . '"', $r['n'] . ' search' . ($r['n'] == 1 ? '' : 'es')],
+        $all("SELECT q, COUNT(*) n FROM search_log WHERE results = 0 AND day BETWEEN ? AND ? GROUP BY q ORDER BY n DESC LIMIT 5", [$a, $b])));
+    $todo = array_values(array_filter([
+        ['payments waiting for approval', (int)$one("SELECT COUNT(*) FROM payments WHERE status = 'pending'")],
+        ['open support tickets', (int)$one("SELECT COUNT(*) FROM support_tickets WHERE status = 'open'")],
+        ['unread contact messages', (int)$one("SELECT COUNT(*) FROM contact_messages WHERE status = 'unread'")],
+        ['scholarship applications to decide', (int)$one("SELECT COUNT(*) FROM scholarship_applications WHERE status = 'pending'")],
+        ['courses waiting for approval', (int)$one("SELECT COUNT(*) FROM courses WHERE status = 'pending'")],
+        ['job applications to review', (int)$one("SELECT COUNT(*) FROM job_applications WHERE status IN ('submitted','evaluated') AND archived = 0")],
+    ], fn($t) => $t[1] > 0));
+    $html .= $todo ? $list('Needs attention', array_map(fn($t) => [$t[1] . ' ' . $t[0], 'in the admin panel'], $todo))
+                   : '<p style="margin-top:14px;color:#059669;font-weight:700">Nothing is waiting for action.</p>';
+    $html .= '<p style="font-size:12px;color:#94a3b8;margin-top:16px">' . (int)$N['certs'] . ' certificate' . ($N['certs'] == 1 ? '' : 's') . ' issued this week. You can switch this email off in Admin &rarr; Email Notifications.</p>';
+    sda_notify_admins('admin_weekly_report', ['report_html' => $html, 'visits' => number_format($N['visits']), 'signups' => $N['signups'], 'enrolments' => $N['enrol'],
+        'period' => date('j M', strtotime($a)) . ' - ' . date('j M Y', strtotime($b))]);
+    return 'sent';
 }

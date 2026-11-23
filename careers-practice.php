@@ -170,9 +170,9 @@ $secIcon = ['knowledge' => 'book-open', 'situational' => 'people-arrows', 'profe
         <h3><i class="fas fa-graduation-cap"></i> You're ready if you now know…</h3>
         <div class="learned">
             <div><i class="fas fa-circle-check"></i><span>The test runs in full screen, and leaving it, switching tabs or reloading gives a warning. <b>In the real test, <?= $MAX ?> warnings submit it automatically.</b></span></div>
-            <div><i class="fas fa-circle-check"></i><span>Copy and paste don't work, so you'll type your written answers yourself.</span></div>
+            <div><i class="fas fa-circle-check"></i><span>Copy, paste and right-click don't work during the test.</span></div>
             <div><i class="fas fa-circle-check"></i><span>You can move between questions with the question list, and your answers save automatically.</span></div>
-            <div><i class="fas fa-circle-check"></i><span>The real test is longer (about 90 minutes), with questions written for your position, and the written tasks carry the most marks.</span></div>
+            <div><i class="fas fa-circle-check"></i><span>The real test has about 15 multiple-choice questions written for your position, in 20 minutes, and your score is emailed to you when you finish.</span></div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
             <?php if ($back): ?><a class="btn big" href="<?= $e($back) ?>" style="flex:1"><i class="fas fa-arrow-right"></i> Go to my real assessment</a><?php else: ?><a class="btn" href="careers#openings" style="flex:1"><i class="fas fa-briefcase"></i> View open positions</a><?php endif; ?>

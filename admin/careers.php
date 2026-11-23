@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             save_setting($pdo, 'careers_apply_email', mb_substr($email, 0, 190));
             save_setting($pdo, 'careers_notify_emails', mb_substr(implode(', ', array_unique($notify)), 0, 1000));
             save_setting($pdo, 'careers_alerts', empty($_POST['careers_alerts']) ? '0' : '1');
+            save_setting($pdo, 'careers_send_score', empty($_POST['careers_send_score']) ? '0' : '1');
             ax_flash('ok', 'Recruitment email settings saved.');
         }
     } catch (Throwable $e) {
@@ -179,7 +180,8 @@ require_once 'includes/sidebar.php';
                         <div class="ax-field"><label for="c-notify">Send staff alerts to</label><input id="c-notify" type="text" name="careers_notify_emails" value="<?= e(setting('careers_notify_emails', '')) ?>" maxlength="1000" placeholder="Leave blank to alert every admin">
                             <div class="hint">Separate several addresses with commas. Now: <?= e(implode(', ', $alertTo) ?: 'nobody') ?></div></div>
                     </div>
-                    <label style="display:flex;gap:10px;align-items:center;font-size:.88rem;margin:0 0 14px"><input type="checkbox" name="careers_alerts" value="1" <?= setting('careers_alerts', '1') !== '0' ? 'checked' : '' ?>> Email staff when an application arrives and when an assessment is finished</label>
+                    <label style="display:flex;gap:10px;align-items:center;font-size:.88rem;margin:0 0 8px"><input type="checkbox" name="careers_alerts" value="1" <?= setting('careers_alerts', '1') !== '0' ? 'checked' : '' ?>> Email staff when an application arrives and when an assessment is finished</label>
+                    <label style="display:flex;gap:10px;align-items:center;font-size:.88rem;margin:0 0 14px"><input type="checkbox" name="careers_send_score" value="1" <?= setting('careers_send_score', '1') !== '0' ? 'checked' : '' ?>> Email applicants their score (%) as soon as they finish the assessment</label>
                     <div class="ax-form-actions"><button class="ax-btn"><i class="fas fa-floppy-disk"></i> Save</button></div>
                 </form>
             </div>

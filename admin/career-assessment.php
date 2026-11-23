@@ -48,6 +48,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$jid, $sec, $type, $prompt, $opts, $correct, $marks, $guide, $order]);
                 ax_flash('ok', 'Question added.');
             }
+        } elseif ($act === 'load_standard') {
+            $bank = require __DIR__ . '/../includes/careers_seed.php';
+            $set = $bank[$job['title']] ?? null;
+            if (!$set) { ax_flash('err', 'There is no standard test for this position title.'); ax_back($self); }
+            if ($started) { ax_flash('err', 'Someone has already taken this test. Delete or archive those applications first (deleting removes their answers), then try again.'); ax_back($self); }
+            $pdo->prepare("DELETE FROM job_questions WHERE job_id = ?")->execute([$jid]);
+            $ins = $pdo->prepare("INSERT INTO job_questions (job_id, section, qtype, prompt, options, correct, marks, guide, sort_order) VALUES (?, ?, 'mcq', ?, ?, ?, 1, NULL, ?)");
+            $n = 0;
+            foreach (['knowledge', 'situational'] as $sec) foreach ($set[$sec] as $q) $ins->execute([$jid, $sec, $q[0], json_encode($q[1], JSON_UNESCAPED_UNICODE), $q[2], $n += 10]);
+            $pdo->prepare("UPDATE job_vacancies SET assess_minutes = 20 WHERE id = ?")->execute([$jid]);
+            ax_flash('ok', 'Loaded the standard test: ' . $n / 10 . ' multiple-choice questions, 20 minutes.');
         } elseif ($act === 'delete_q') {
             if ($started) { ax_flash('err', 'Applicants have already taken this assessment, so questions can\'t be deleted. Edit them instead.'); ax_back($self); }
             $pdo->prepare("DELETE FROM job_questions WHERE id = ? AND job_id = ?")->execute([(int)$_POST['qid'], $jid]);
@@ -80,7 +91,9 @@ require_once 'includes/sidebar.php';
 </style>
 <main class="main-content">
     <?php ax_header('Assessment: ' . $job['title'], '', count($questions) . ' questions · ' . $fmt($total) . ' marks · ' . (int)$job['assess_minutes'] . ' minutes' . ($job['assess_on'] ? '' : ' · switched off'),
-        '<a class="ax-btn ghost" href="careers"><i class="fas fa-arrow-left"></i> Positions</a> <button type="button" class="ax-btn" data-open="q-new"><i class="fas fa-plus"></i> New question</button>'); ?>
+        '<a class="ax-btn ghost" href="careers"><i class="fas fa-arrow-left"></i> Positions</a> '
+        . '<form method="post" style="display:inline" data-confirm="Replace all questions for this position with the standard test (15 multiple-choice questions, 20 minutes)? Your custom questions will be removed.">' . ax_csrf() . '<input type="hidden" name="action" value="load_standard"><input type="hidden" name="job" value="' . $jid . '"><button class="ax-btn ghost"' . ($started ? ' disabled title="Someone has already taken this test"' : '') . '><i class="fas fa-rotate"></i> Use the standard 15-question test</button></form> '
+        . '<button type="button" class="ax-btn" data-open="q-new"><i class="fas fa-plus"></i> New question</button>'); ?>
     <div class="ax-body">
         <?php ax_alerts(); ?>
         <?php if ($started): ?><div class="ax-panel" style="padding:12px 16px;border-color:#f59e0b;font-size:.86rem"><i class="fas fa-triangle-exclamation" style="color:#f59e0b"></i> <?= $started ?> applicant<?= $started === 1 ? ' has' : 's have' ?> already taken this assessment. Changing answers or marks recalculates their scores; keep changes to fixing mistakes so everyone is assessed fairly.</div><?php endif; ?>
