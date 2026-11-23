@@ -47,7 +47,7 @@ $linkedin = $cert ? 'https://www.linkedin.com/profile/add?' . http_build_query([
     'issueYear' => date('Y', $issued), 'issueMonth' => date('n', $issued), 'certUrl' => $publicUrl, 'certId' => $code,
 ]) : '';
 $owner = isLoggedIn() && $cert && (int)$_SESSION['user_id'] === (int)$cert['student_id'];
-http_response_code($cert ? 200 : 404);
+http_response_code(($cert || $code === "") ? 200 : 404);   // 404 only for a code that does not exist
 ?><!DOCTYPE html>
 <html lang="en">
 <head>

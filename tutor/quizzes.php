@@ -147,9 +147,11 @@ if (!$course):
     <?php endif; ?>
 <?php
 else:
+    require_once __DIR__ . '/../includes/exam.php';
+    sda_exam_ensure($pdo);
     $stmt = $pdo->prepare("SELECT q.*, (SELECT COUNT(*) FROM quiz_questions qq WHERE qq.quiz_id = q.id) AS n_questions,
-                                  (SELECT COUNT(*) FROM quiz_attempts qa WHERE qa.quiz_id = q.id) AS n_attempts,
-                                  (SELECT AVG(qa.score) FROM quiz_attempts qa WHERE qa.quiz_id = q.id) AS avg_score
+                                  (SELECT COUNT(*) FROM quiz_attempts qa WHERE qa.quiz_id = q.id AND qa.status = 'completed') AS n_attempts,
+                                  (SELECT AVG(qa.score) FROM quiz_attempts qa WHERE qa.quiz_id = q.id AND qa.status = 'completed') AS avg_score
                            FROM quizzes q WHERE q.course_id = ? ORDER BY FIELD(q.type, 'quiz', 'cat', 'final'), q.title");
     $stmt->execute([$course_id]);
     $quizzes = $stmt->fetchAll();
@@ -161,6 +163,14 @@ else:
         $stmt = $pdo->prepare("SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_num ASC, id ASC");
         $stmt->execute([$active_quiz_id]);
         $questions = $stmt->fetchAll();
+        // Results: every finished attempt, with how it ended and the test-rule warnings
+        $stmt = $pdo->prepare("SELECT qa.*, u.name AS learner, u.email AS learner_email FROM quiz_attempts qa JOIN users u ON u.id = qa.student_id
+                               WHERE qa.quiz_id = ? AND qa.status = 'completed' ORDER BY qa.completed_at DESC LIMIT 100");
+        $stmt->execute([$active_quiz_id]);
+        $results = $stmt->fetchAll();
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id = ? AND status = 'in_progress' AND deadline_at > NOW()");
+        $stmt->execute([$active_quiz_id]);
+        $live_now = (int)$stmt->fetchColumn();
     }
     $stmt = $pdo->prepare("SELECT id, title, week_num FROM lessons WHERE course_id = ? ORDER BY week_num, order_num");
     $stmt->execute([$course_id]);
@@ -230,6 +240,33 @@ else:
                 </div>
             <?php endforeach; endif; ?>
         </section>
+        <?php if ($active): $endLabel = ['submitted' => ['Submitted', ''], 'time_up' => ['Time ran out', 'warn'], 'closed_early' => ['Closed early', 'bad'], 'violations' => ['Auto-submitted: left the test', 'bad']]; ?>
+        <section class="tp-card" style="grid-column:1/-1">
+            <div class="tp-card-head"><div><h2><i class="fas fa-square-poll-vertical"></i> Results</h2>
+                <p><?= count($results) ?> finished attempt<?= count($results) === 1 ? '' : 's' ?><?= $live_now ? ' · <b style="color:var(--tp-ok,#059669)">' . $live_now . ' learner' . ($live_now === 1 ? '' : 's') . ' taking it now</b>' : '' ?>. Warnings count the times a learner left the test tab or window.</p></div></div>
+            <?php if (!$results): ?>
+                <div class="tp-empty"><i class="fas fa-hourglass-half"></i><h3>No results yet</h3><p>Results appear here as learners submit.</p></div>
+            <?php else: ?>
+            <div class="tp-table-wrap" style="overflow-x:auto">
+                <table class="tp-table" style="width:100%;border-collapse:collapse;font-size:.88rem">
+                    <thead><tr style="text-align:left"><th style="padding:10px">Learner</th><th style="padding:10px">Finished</th><th style="padding:10px">Score</th><th style="padding:10px">How it ended</th><th style="padding:10px">Warnings</th><th style="padding:10px">Log</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($results as $r): [$el, $ec] = $endLabel[$r['end_reason'] ?? ''] ?? ['Submitted', '']; $wv = (int)$r['violations']; ?>
+                        <tr style="border-top:1px solid var(--tp-line,#e2e8f0);vertical-align:top">
+                            <td style="padding:10px"><b><?= e($r['learner']) ?></b><div class="tp-note" style="margin:0"><?= e($r['learner_email']) ?></div></td>
+                            <td style="padding:10px;white-space:nowrap"><?= $r['completed_at'] ? date('j M Y, H:i', strtotime($r['completed_at'])) : '—' ?><?php if ($r['started_at'] && $r['completed_at']): ?><div class="tp-note" style="margin:0"><?= max(1, (int)round((strtotime($r['completed_at']) - strtotime($r['started_at'])) / 60)) ?> min</div><?php endif; ?></td>
+                            <td style="padding:10px"><b><?= round((float)$r['score']) ?>%</b> <span class="tp-pill <?= $r['passed'] ? 'ok' : 'bad' ?>"><?= $r['passed'] ? 'Passed' : 'Not passed' ?></span></td>
+                            <td style="padding:10px"><span class="tp-pill <?= $ec ?>"><?= e($el) ?></span></td>
+                            <td style="padding:10px"><?= $wv ? '<span class="tp-pill ' . ($wv >= SDA_EXAM_MAX_VIOLATIONS ? 'bad' : 'warn') . '"><i class="fas fa-triangle-exclamation"></i> ' . $wv . '</span>' : '<span class="tp-note" style="margin:0">None</span>' ?></td>
+                            <td style="padding:10px"><?php if (trim((string)$r['proctor_log']) !== ''): ?><details><summary style="cursor:pointer;font-weight:600">View</summary><pre style="margin:6px 0 0;font:.78rem/1.5 ui-monospace,Consolas,monospace;white-space:pre-wrap"><?= e(str_replace(['warning: left_tab', 'warning: left_window', 'started'], ['left the test tab', 'switched to another window/app', 'started the test'], trim((string)$r['proctor_log']))) ?></pre></details><?php else: ?><span class="tp-note" style="margin:0">—</span><?php endif; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </section>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 

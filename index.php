@@ -474,7 +474,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <div class="hero-trust-badges">
           <span class="trust-badge cyan"><i class="fas fa-check-circle"></i> 100% Online</span>
           <span class="trust-badge orange"><i class="fas fa-clock"></i> Flexible Schedule</span>
-          <span class="trust-badge green"><i class="fas fa-award"></i> Industry Recognized</span>
+          <span class="trust-badge green"><i class="fas fa-award"></i> Verifiable Certificates</span>
         </div>
 
         <div class="cta-row">
@@ -648,29 +648,29 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
   <div class="container">
     <div style="text-align:center;max-width:700px;margin:0 auto 64px;">
       <div class="sec-tag">The Skope Difference</div>
-      <h2 class="sec-heading">Why Africa's Top Professionals<br>Choose Us</h2>
-      <p class="sec-sub">We remove every barrier between you and your next career level. No jargon. No fluff. Just transformative results.</p>
+      <h2 class="sec-heading">Why Learners<br>Choose Skope</h2>
+      <p class="sec-sub">Clear lessons, real practice and help when you get stuck. No jargon, no fluff.</p>
     </div>
     <div class="why-grid">
       <div class="why-card">
         <div class="why-icon" style="background:rgba(0,191,255,0.09);"><i class="fas fa-bolt" style="color:#00BFFF;"></i></div>
-        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">AI‑Powered Paths</h3>
-        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Your personalised roadmap adapts as you learn — serving exactly what you need, when you need it most.</p>
+        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">Learn by Doing</h3>
+        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Edit and run code in your browser, complete practice tasks and build projects, with an AI mentor that explains and gives hints when you're stuck.</p>
       </div>
       <div class="why-card">
         <div class="why-icon" style="background:rgba(255,140,0,0.09);"><i class="fas fa-certificate" style="color:#FF8C00;"></i></div>
-        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">Globally Verified Certs</h3>
-        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Cryptographically signed, shareable to LinkedIn, and accepted by 200+ employers worldwide.</p>
+        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">Verifiable Certificates</h3>
+        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Finish a course to earn a certificate with a verification code anyone can check online, ready to share on LinkedIn or your CV.</p>
       </div>
       <div class="why-card">
         <div class="why-icon" style="background:rgba(16,185,129,0.09);"><i class="fas fa-users" style="color:#10b981;"></i></div>
-        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">World‑Class Mentors</h3>
-        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Learn from practitioners, not academics. Instructors actively work at Google, Microsoft & top Kenyan tech firms.</p>
+        <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">Learn Your Way</h3>
+        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Go self-paced, or join a weekly track with a cohort, deadlines and tests. Works on your phone, even on weak data.</p>
       </div>
       <div class="why-card">
         <div class="why-icon" style="background:rgba(139,92,246,0.09);"><i class="fas fa-hand-holding-heart" style="color:#8b5cf6;"></i></div>
         <h3 style="font-family:'Poppins',sans-serif;font-size:1.1rem;margin-bottom:12px;">Scholarship Access</h3>
-        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Your financial situation should never limit your potential. We fund deserving students up to 100% of course fees.</p>
+        <p style="color:#475569;font-size:0.88rem;line-height:1.75;">Your finances shouldn't limit your potential. Many courses are free to learn, and scholarship rounds help talented learners with fees.</p>
       </div>
     </div>
   </div>
@@ -764,7 +764,7 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
         <div style="grid-column:1/-1;text-align:center;padding:80px;background:#fff;border-radius:20px;border:2px dashed #E2E8F0;">
           <i class="fas fa-book-open" style="font-size:3rem;color:#E2E8F0;margin-bottom:16px;"></i>
           <h3 style="color:#94a3b8;">Courses Are Being Curated</h3>
-          <p style="color:#94a3b8;margin-top:8px;font-size:0.9rem;">Our academic team is handpicking world-class content. Check back very soon!</p>
+          <p style="color:#94a3b8;margin-top:8px;font-size:0.9rem;">New courses are on the way. Check back soon, or start with the free tutorials.</p>
           <a href="contact" class="btn-cta-primary" style="margin-top:24px;">Notify Me When Ready</a>
         </div>
       <?php endif; ?>

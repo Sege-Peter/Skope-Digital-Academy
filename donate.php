@@ -101,7 +101,7 @@ $user = isLoggedIn() ? currentUser() : null;
     <section class="donate-hero">
         <div class="container">
             <h1>Support Our <span style="color: var(--sky-blue);">Learners.</span></h1>
-            <p class="hero-sub">Your contribution directly funds tuition, world-class certifications, and high-speed infrastructure for talented students across Africa.</p>
+            <p class="hero-sub">Your contribution directly funds tuition, certificates and learning tools for talented students across Africa.</p>
         </div>
     </section>
 

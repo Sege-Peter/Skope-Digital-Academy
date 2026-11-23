@@ -23,9 +23,11 @@ if (!$student):
 endif;
 
 $enrolments = td_enrolments($pdo, $tid, ['student_id' => $student_id, 'statuses' => ['active', 'completed', 'pending', 'cancelled']]);
-$st = $pdo->prepare("SELECT q.title AS quiz_title, qa.score, qa.passed, qa.completed_at, c.title AS course_title
+require_once __DIR__ . '/../includes/exam.php';
+sda_exam_ensure($pdo);
+$st = $pdo->prepare("SELECT q.title AS quiz_title, qa.score, qa.passed, qa.completed_at, qa.violations, qa.end_reason, c.title AS course_title
                      FROM quiz_attempts qa JOIN quizzes q ON qa.quiz_id = q.id JOIN courses c ON q.course_id = c.id
-                     WHERE qa.student_id = ? AND c.tutor_id = ? ORDER BY qa.completed_at DESC");
+                     WHERE qa.student_id = ? AND c.tutor_id = ? AND qa.status = 'completed' ORDER BY qa.completed_at DESC");
 $st->execute([$student_id, $tid]);
 $quizzes = $st->fetchAll();
 $st = $pdo->prepare("SELECT s.*, a.title AS assignment_title, a.max_score, c.title AS course_title
@@ -88,7 +90,7 @@ $csrf = csrfToken();
             <ul class="tp-list">
                 <?php foreach ($quizzes as $q): ?>
                     <li><div class="tp-row no-indent"><span class="tp-row-main"><span class="tp-row-title"><?= e($q['quiz_title']) ?></span><span class="tp-row-meta"><?= e($q['course_title']) ?> · <?= $q['completed_at'] ? e(date('j M Y', strtotime($q['completed_at']))) : '' ?></span></span>
-                        <span class="tp-row-side"><span class="tp-pill <?= $q['passed'] ? 'ok' : 'bad' ?>"><?= round((float)$q['score']) ?>% · <?= $q['passed'] ? 'passed' : 'not passed' ?></span></span></div></li>
+                        <span class="tp-row-side"><span class="tp-pill <?= $q['passed'] ? 'ok' : 'bad' ?>"><?= round((float)$q['score']) ?>% · <?= $q['passed'] ? 'passed' : 'not passed' ?></span><?php if ((int)$q['violations'] > 0): ?> <span class="tp-pill <?= (int)$q['violations'] >= SDA_EXAM_MAX_VIOLATIONS ? 'bad' : 'warn' ?>" title="Times the test tab was left"><i class="fas fa-triangle-exclamation"></i> <?= (int)$q['violations'] ?></span><?php endif; ?><?php if (in_array($q['end_reason'], ['closed_early', 'violations'], true)): ?> <span class="tp-pill bad"><?= $q['end_reason'] === 'violations' ? 'Auto-submitted' : 'Closed early' ?></span><?php endif; ?></span></div></li>
                 <?php endforeach; ?>
             </ul>
         <?php else: ?><div class="tp-empty"><i class="fas fa-circle-question"></i><h3>No quiz attempts yet</h3></div><?php endif; ?>

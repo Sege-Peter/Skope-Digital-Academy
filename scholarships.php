@@ -371,7 +371,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; overf
           <i class="fas fa-hand-holding-heart"></i>
         </div>
         <h2 style="font-family:'Poppins',sans-serif; font-size: 2.8rem; font-weight: 900; color: #0f172a; margin-bottom: 20px; line-height: 1.1; letter-spacing: -1.5px;">Support Our <span style="color: #00BFFF;">Learners.</span></h2>
-        <p style="color: #64748b; line-height: 1.7; font-size: 1.1rem; margin-bottom: 0;">Your contribution directly funds tuition, world-class certifications, and digital literacy tools for talented students in need.</p>
+        <p style="color: #64748b; line-height: 1.7; font-size: 1.1rem; margin-bottom: 0;">Your contribution directly funds tuition, certificates, and digital literacy tools for talented students in need.</p>
       </div>
 
       <!-- Right: Form -->

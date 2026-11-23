@@ -110,7 +110,7 @@ function rewardStudentPoints($student_id, $points, $pdo) {
         $upd->execute([round($points), $student_id]);
 
         // Log to point_ledger for transcript history
-        $stmt = $pdo->prepare("INSERT INTO point_ledger (student_id, merit_points, reason) VALUES (?, ?, 'Quiz / Assessment completion')");
+        $stmt = $pdo->prepare("INSERT INTO point_ledger (student_id, points, reason) VALUES (?, ?, 'Quiz / Assessment completion')");
         $stmt->execute([$student_id, round($points)]);
 
         // Automate badge check for achievements

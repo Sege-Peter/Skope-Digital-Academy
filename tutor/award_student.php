@@ -26,17 +26,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ex = $pdo->prepare("SELECT id FROM certificates WHERE student_id = ? AND course_id = ?");
             $ex->execute([$student_id, $course_id]);
             if ($ex->fetch()) throw new RuntimeException('This learner already has a certificate for that course.');
-            $code = strtoupper(bin2hex(random_bytes(6)));
+            // Same fee rule as automatic certificates: with a certificate fee set, it stays locked until the learner pays it
+            require_once __DIR__ . '/../includes/progress.php';
+            $cr = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
+            $cr->execute([$course_id]);
+            $fee = certificate_fee_for($cr->fetch() ?: []);
+            $code = new_cert_code($pdo);
             $pdo->beginTransaction();
-            $pdo->prepare("INSERT INTO certificates (student_id, course_id, verification_code, issued_by, issued_by_role, notes, status) VALUES (?,?,?,?,'tutor',?,'approved')")
-                ->execute([$student_id, $course_id, $code, $tid, $notes]);
+            $pdo->prepare("INSERT INTO certificates (student_id, course_id, certificate_type, verification_code, issued_at, issued_by, issued_by_role, notes, status, fee)
+                           VALUES (?, ?, 'course', ?, NOW(), ?, 'tutor', ?, ?, ?)")
+                ->execute([$student_id, $course_id, $code, $tid, $notes, $fee > 0 ? 'pending' : 'approved', $fee]);
             $pdo->prepare("UPDATE users SET merit_points = merit_points + 100 WHERE id = ?")->execute([$student_id]);
             $pdo->prepare("INSERT INTO point_ledger (student_id, points, reason, awarded_by) VALUES (?,100,'Certificate awarded by tutor',?)")->execute([$student_id, $tid]);
             $pdo->prepare("UPDATE enrollments SET progress_percent = 100, status = 'completed', completed_at = NOW() WHERE student_id = ? AND course_id = ?")->execute([$student_id, $course_id]);
             $pdo->commit();
             require_once __DIR__ . '/../includes/gamified_logic.php';
             awardBadgeIfEligible($student_id, 'courses_completed', $pdo);
-            td_flash('ok', "Certificate issued and the course marked as completed. Verification code: $code");
+            td_flash('ok', $fee > 0
+                ? "Certificate created and the course marked as completed. The learner unlocks it by paying the certificate fee of " . money($fee) . ". Verification code: $code"
+                : "Certificate issued and the course marked as completed. Verification code: $code");
         } elseif ($action === 'award_badge') {
             $pdo->prepare("INSERT IGNORE INTO student_badges (student_id, badge_id, awarded_by, awarded_by_role, notes) VALUES (?,?,?,'tutor',?)")
                 ->execute([$student_id, (int)($_POST['badge_id'] ?? 0), $tid, trim((string)($_POST['badge_notes'] ?? ''))]);

@@ -273,7 +273,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
 <section class="about-hero">
   <div class="about-hero-inner" data-aos>
     <h1>Building Kenya's <span>Digital Future</span>,<br>One Learner at a Time.</h1>
-    <p>Skope Digital Academy was founded on a single belief: world-class education should be accessible to every ambitious mind in Africa — regardless of background or location.</p>
+    <p>Skope Digital Academy is built on a simple belief: good, practical digital skills training should be within reach of every ambitious learner in Kenya and across Africa, whatever their background or location.</p>
     <div class="hero-cta-row">
       <a href="courses" class="btn-hero-primary"><i class="fas fa-rocket"></i> Explore Courses</a>
       <a href="scholarships" class="btn-hero-outline"><i class="fas fa-graduation-cap"></i> Get a Scholarship</a>
@@ -312,14 +312,14 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
       <!-- Left: Text -->
       <div data-aos="fade-right">
         <span class="mission-tag">About Skope Digital</span>
-        <h2 class="mission-heading">Revolutionizing Education<br>Through <span>AI Intelligence</span></h2>
-        <p class="mission-body">Skope Digital Academy was founded in 2024 with a clear mission — bridge the vast gap between traditional classroom education and the real-world skills employers demand. Using AI-powered adaptive learning paths, we deliver personalized, practical, and globally certified education to every Kenyan.</p>
-        <p class="mission-body">We've rapidly grown into Africa's leading digital education hub, partnering with industry leaders at Google, Microsoft, IBM and leading Kenyan tech firms to ensure our curriculum reflects exactly what the job market needs today.</p>
+        <h2 class="mission-heading">Practical Skills,<br>Learned <span>Your Way</span></h2>
+        <p class="mission-body">Skope Digital Academy is an online academy based in Kisumu, Kenya. We teach the coding and digital skills people use at work and in business, in plain English and with lots of hands-on practice, so learners can go from first lesson to real projects.</p>
+        <p class="mission-body">You can start for free with interactive coding tutorials, take practical skills courses in the Learning Lab, and choose to learn self-paced or on a weekly track with a cohort. When you finish a course, you earn a certificate that anyone can check online.</p>
         <ul class="mission-list">
-          <li><i class="fas fa-check-circle"></i> AI-personalized learning paths tailored to your career goals</li>
-          <li><i class="fas fa-check-circle"></i> Globally recognized and cryptographically verified certificates</li>
-          <li><i class="fas fa-check-circle"></i> Scholarship funding available — up to 100% of course fees</li>
-          <li><i class="fas fa-check-circle"></i> Real mentors from Google, Microsoft &amp; top Kenyan tech firms</li>
+          <li><i class="fas fa-check-circle"></i> Free coding tutorials with examples you can edit and run in your browser</li>
+          <li><i class="fas fa-check-circle"></i> Certificates with a verification code anyone can check online</li>
+          <li><i class="fas fa-check-circle"></i> Scholarship rounds announced to registered learners, plus flexible M-Pesa payments</li>
+          <li><i class="fas fa-check-circle"></i> Tutor feedback and an AI mentor that explains and gives hints as you learn</li>
         </ul>
       </div>
       <!-- Right: Image -->
@@ -346,29 +346,29 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
     <div class="vision-header" data-aos>
       <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#00BFFF;background:rgba(0,191,255,0.08);padding:6px 16px;border-radius:999px;display:inline-block;margin-bottom:14px;">Our Vision</div>
       <h2 class="vision-heading">The <span>Skope</span> Vision</h2>
-      <p class="vision-sub">To become the primary catalyst for Africa's technological revolution — empowering every learner with elite, accessible, and AI-personalized skills.</p>
+      <p class="vision-sub">A generation of African learners with practical, affordable digital skills they can use to find work, start businesses and build the future they want.</p>
     </div>
     <div class="vision-grid">
       <div class="vision-card" data-aos>
         <div class="vision-icon" style="background:rgba(0,191,255,0.09);color:#00BFFF;">
           <i class="fas fa-brain"></i>
         </div>
-        <h3>AI Personalization</h3>
-        <p>Our platform adapts to your pace, strengths, and goals — creating a truly bespoke learning experience that evolves with you.</p>
+        <h3>Help When You Need It</h3>
+        <p>An AI mentor explains ideas and gives hints whenever you're stuck, and tutors give feedback on your work, so you never learn alone.</p>
       </div>
       <div class="vision-card" data-aos style="transition-delay:0.12s;">
         <div class="vision-icon" style="background:rgba(255,140,0,0.09);color:#FF8C00;">
           <i class="fas fa-globe"></i>
         </div>
-        <h3>Global Impact</h3>
-        <p>We erase geographical barriers, bringing world-class mentors and globally recognized credentials to every corner of Kenya.</p>
+        <h3>Learn From Anywhere</h3>
+        <p>Everything is online and built for phones and weak data, with an app you can install, so learners in every corner of Kenya can take part.</p>
       </div>
       <div class="vision-card" data-aos style="transition-delay:0.24s;">
         <div class="vision-icon" style="background:rgba(16,185,129,0.09);color:#10b981;">
           <i class="fas fa-rocket"></i>
         </div>
-        <h3>Career Acceleration</h3>
-        <p>Beyond knowledge — we provide the credentials, mentorship, and networking needed for immediate, real-world professional growth.</p>
+        <h3>Skills You Can Use</h3>
+        <p>Practice tasks, coding exercises and peer-reviewed projects turn what you learn into work you can show, backed by a verifiable certificate.</p>
       </div>
     </div>
   </div>
@@ -391,7 +391,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
       <div class="value-card" data-aos style="transition-delay:0.1s;">
         <div class="value-icon"><i class="fas fa-lightbulb"></i></div>
         <h4>Innovation First</h4>
-        <p>We build with cutting-edge AI tools and constantly refresh our curriculum to stay ahead of industry shifts.</p>
+        <p>We use modern tools, including AI, to make learning clearer, and we keep improving our courses as the skills employers need change.</p>
       </div>
       <div class="value-card" data-aos style="transition-delay:0.2s;">
         <div class="value-icon"><i class="fas fa-hand-holding-heart"></i></div>
@@ -401,7 +401,7 @@ body { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
       <div class="value-card" data-aos style="transition-delay:0.3s;">
         <div class="value-icon"><i class="fas fa-chart-line"></i></div>
         <h4>Practical Excellence</h4>
-        <p>We don't just teach — we transform careers. Every lesson is rooted in real-world applications and employer needs.</p>
+        <p>Every lesson is rooted in real-world tasks: you learn by doing, with examples from work and business in Kenya.</p>
       </div>
     </div>
   </div>
