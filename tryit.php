@@ -130,6 +130,7 @@ $config = [
 <link rel="stylesheet" href="<?= $cm ?>/theme/material-darker.min.css">
 <link rel="stylesheet" href="assets/css/tryit.css?v=2">
 <link rel="icon" href="favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="assets/pwa/favicon-32.png">
+<?php require_once __DIR__ . '/includes/pwa.php'; sda_pwa_head(); ?>
 </head>
 <body class="ti">
 <header class="ti-top">

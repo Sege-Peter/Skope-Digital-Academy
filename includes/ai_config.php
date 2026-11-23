@@ -6,7 +6,7 @@
 
 // DO NOT SHARE THIS FILE
 require_once __DIR__ . '/db.php';   // defines GEMINI_API_KEY (Admin > Settings > AI, or includes/private/config.php)
-defined('GEMINI_API_URL') || define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent');
+// GEMINI_API_URL (with the current model) comes from includes/db.php
 
 /**
  * Core function to interact with Gemini API

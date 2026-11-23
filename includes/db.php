@@ -43,4 +43,11 @@ if (!defined('GEMINI_API_KEY')) {
     define('GEMINI_API_KEY', $sdaGemini !== '' ? $sdaGemini : (defined('SDA_GEMINI_KEY') ? SDA_GEMINI_KEY : ''));
     unset($sdaGemini);
 }
-defined('GEMINI_API_URL') || define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . GEMINI_API_KEY);
+if (!defined('GEMINI_MODEL')) {
+    // Model: Admin > Settings > AI (gemini_model), else a current one (the 1.5 models are retired)
+    $sdaModel = '';
+    try { $sdaModel = trim((string)$pdo->query("SELECT setting_value FROM platform_settings WHERE setting_key = 'gemini_model'")->fetchColumn()); } catch (Throwable $e) {}
+    define('GEMINI_MODEL', preg_match('/^gemini-[\w.-]+$/', $sdaModel) && !str_starts_with($sdaModel, 'gemini-1.') ? $sdaModel : 'gemini-2.5-flash');
+    unset($sdaModel);
+}
+defined('GEMINI_API_URL') || define('GEMINI_API_URL', 'https://generativelanguage.googleapis.com/v1beta/models/' . GEMINI_MODEL . ':generateContent?key=' . GEMINI_API_KEY);

@@ -37,6 +37,8 @@ function sda_pwa_head(): void
     <link rel="icon" href="<?= $u('favicon.ico') ?>" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="<?= $u('assets/pwa/favicon-32.png') ?>">
     <link rel="icon" type="image/png" sizes="192x192" href="<?= $u('assets/pwa/icon-192.png') ?>">
+    <link rel="stylesheet" href="<?= $u('assets/css/select.css') ?>?v=2">  <!-- one look for every dropdown -->
+
     <script>addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sdaBip=e;});
     (function(){var app=(matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true,pv=/[?&]splash=1/.test(location.search),k='sdaSplash';
     try{if(!pv&&(!app||sessionStorage.getItem(k)))return;sessionStorage.setItem(k,'1');}catch(e){if(!pv)return;}

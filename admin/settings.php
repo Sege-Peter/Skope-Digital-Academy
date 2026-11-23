@@ -21,7 +21,7 @@ $fields = [
     'google_client_id'  => ['Google Client ID', 'text', 'From Google Cloud Console > APIs & Services > Credentials (OAuth client, type Web application). Ends in .apps.googleusercontent.com. Leave empty to hide the Google button.', 'signin'],
     'ai_enabled'        => ['AI features on', 'bool', 'Turns the AI study helpers on or off.', 'ai'],
     'gemini_api_key'    => ['Gemini API key', 'secret', 'From Google AI Studio.', 'ai'],
-    'gemini_model'      => ['Gemini model', 'text', 'e.g. gemini-1.5-pro', 'ai'],
+    'gemini_model'      => ['Gemini model', 'text', 'e.g. gemini-2.5-flash (leave empty for the default)', 'ai'],
 ];
 $sections = [
     'general'  => ['General', 'building-columns', 'Basic details about the academy.'],

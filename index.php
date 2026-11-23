@@ -255,6 +255,13 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
   background: #F8FAFC; padding: 48px 0;
   border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;
 }
+.skills-kicker { font-size: .72rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; text-align: center; margin: 0 0 26px; }
+.skill-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 12px; max-width: 980px; margin: 0 auto; }
+.skill-chip { display: inline-flex; align-items: center; gap: 9px; padding: 10px 16px; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0;
+  color: #0f172a; font: 600 .88rem Inter, sans-serif; text-decoration: none; box-shadow: 0 6px 16px -12px rgba(15,23,42,.35); transition: transform .2s, border-color .2s, box-shadow .2s; }
+.skill-chip i { font-size: 1.1rem; width: 18px; text-align: center; }
+.skill-chip:hover { transform: translateY(-2px); border-color: #93c5fd; box-shadow: 0 10px 22px -12px rgba(0,128,255,.45); color: #0f172a; }
+@media (max-width: 480px) { .skill-row { gap: 8px; } .skill-chip { padding: 8px 12px; font-size: .8rem; } }
 .partner-row {
   display: flex; justify-content: center; align-items: center;
   gap: 56px; flex-wrap: wrap; opacity: 0.38; filter: grayscale(1);
@@ -609,15 +616,27 @@ body { background: #FFFFFF; color: #1E293B; font-family: 'Inter', sans-serif; }
 ══════════════════════════════════ -->
 <section class="trust-strip">
   <div class="container">
-    <p style="font-size:0.72rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;margin-bottom:36px;">
-      Trusted by learners at leading global organisations
-    </p>
-    <div class="partner-row">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/0/01/LinkedIn_Logo.svg" alt="LinkedIn" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/7/7b/Adobe_Systems_logo_and_wordmark.svg" alt="Adobe" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+    <p class="skills-kicker">Skills &amp; tools you'll learn here</p>
+    <div class="skill-row">
+      <?php
+      // Real courses and tutorials on the academy (each chip opens it)
+      $skills = [
+        ['fab fa-html5', '#e34f26', 'HTML', 'learn/html'],
+        ['fab fa-css3-alt', '#1572b6', 'CSS', 'learn/css'],
+        ['fab fa-js', '#d4a20a', 'JavaScript', 'learn/javascript'],
+        ['fab fa-python', '#3776ab', 'Python', 'learn/python'],
+        ['fab fa-php', '#777bb4', 'PHP', 'learn/php'],
+        ['fas fa-database', '#00758f', 'SQL', 'learn/sql'],
+        ['fas fa-file-excel', '#1d6f42', 'Word, Excel &amp; PowerPoint', 'lab/computer-packages'],
+        ['fas fa-bullhorn', '#FF8C00', 'Digital Marketing', 'lab/digital-marketing'],
+        ['fab fa-google', '#4285f4', 'Google Ads &amp; Analytics', 'lab/google-ads-analytics'],
+        ['fas fa-palette', '#d946ef', 'Graphic Design', 'lab/graphic-design'],
+        ['fas fa-robot', '#0080FF', 'Artificial Intelligence', 'lab/intro-to-ai'],
+        ['fas fa-shield-halved', '#ef4444', 'Cybersecurity', 'lab/intro-cybersecurity'],
+      ];
+      foreach ($skills as [$ico, $clr, $label, $href]): ?>
+        <a class="skill-chip" href="<?= $href ?>"><i class="<?= $ico ?>" style="color:<?= $clr ?>"></i><span><?= $label ?></span></a>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>

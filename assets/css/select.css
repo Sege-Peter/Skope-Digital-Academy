@@ -1,0 +1,79 @@
+/* Skope Digital Academy – one look for every dropdown (<select>) on the site.
+ * Loaded on every page by includes/pwa.php. Base styles use :where() (no specificity), so each area's own
+ * colours (admin dark mode, portal themes) still win; the chevron and spacing are enforced for all. */
+
+:where(select) {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 44px;
+  padding: 10px 40px 10px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  background-color: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
+}
+
+/* Chevron for single-choice dropdowns (multi-selects and list boxes keep their native look) */
+select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%230080FF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5l5 5 5-5'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 12px center !important;
+  background-size: 16px 16px !important;
+  padding-right: 40px !important;
+}
+select::-ms-expand { display: none; }
+
+:where(select):hover:not(:disabled) { border-color: #94a3b8; }
+:where(select):focus { outline: none; border-color: #0080FF; box-shadow: 0 0 0 4px rgba(0, 128, 255, .15); }
+:where(select):focus-visible { outline: none; border-color: #0080FF; box-shadow: 0 0 0 4px rgba(0, 128, 255, .2); }
+:where(select):disabled { opacity: .55; cursor: not-allowed; background-color: #f1f5f9; }
+:where(select):invalid:not(:focus):not(:placeholder-shown) { color: #64748b; }
+
+/* Options (browsers allow only a little styling here) */
+:where(select) option { color: #0f172a; background: #fff; padding: 6px 10px; }
+:where(select) option:disabled { color: #94a3b8; }
+:where(select) optgroup { font-weight: 700; color: #475569; }
+
+/* Multi-selects / list boxes: same frame, no chevron */
+:where(select[multiple], select[size]) { padding: 6px; min-height: 120px; background-image: none; }
+:where(select[multiple], select[size]) option { border-radius: 8px; }
+:where(select[multiple], select[size]) option:checked { background: #e0f2fe linear-gradient(0deg, #e0f2fe, #e0f2fe); color: #0369a1; }
+
+/* Admin dark mode (the default; light mode adds .ax-light): dark fields where the admin styles don't set them */
+:where(html.ax-admin:not(.ax-light)) :where(select) { background-color: var(--surface-2, var(--surface, #111827)); color: var(--text-main, #e2e8f0); border-color: var(--border, #334155); }
+:where(html.ax-admin:not(.ax-light)) :where(select) option { background: var(--surface, #111827); color: var(--text-main, #e2e8f0); }
+:where(html.ax-admin:not(.ax-light)) :where(select):disabled { background-color: var(--surface, #111827); }
+/* Admin dark mode: brighter chevron so it stays visible */
+html.ax-admin:not(.ax-light) select:not([multiple]):not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2338bdf8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 7.5l5 5 5-5'/%3E%3C/svg%3E") !important;
+}
+
+/* Compact dropdowns inside toolbars (webmail, code editor): slimmer, smaller chevron */
+.mx-tb select:not([multiple]), .mx-cf select:not([multiple]), .ti-select select:not([multiple]), select.sel-compact {
+  min-height: 0;
+  font-size: .82rem;
+  padding: 4px 26px 4px 8px !important;
+  border-radius: 8px;
+  background-position: right 6px center !important;
+  background-size: 12px 12px !important;
+}
+
+/* Admin forms: same height and text size as the text boxes next to them */
+:where(html.ax-admin) :where(select) { min-height: 0; font-size: inherit; }
+
+/* Phones: 16px text stops iPhone/iPad zooming in when a dropdown is tapped */
+@media (max-width: 768px) { :where(select) { font-size: 16px; } }
+
+@media (max-width: 480px) {
+  :where(select) { width: 100%; }
+  .mx-tb select, .ti-select select, select.sel-compact { width: auto; }
+}
