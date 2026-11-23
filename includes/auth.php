@@ -20,7 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
     ]);
     // Idle timeout: a signed-in session left alone too long is closed.
     if (!empty($_SESSION['user_id'])) {
-        $sdaIdle = (($_SESSION['role'] ?? '') === 'admin' ? SDA_IDLE_MINUTES_ADMIN : SDA_IDLE_MINUTES) * 60;
+        $sdaIdle = (in_array($_SESSION['role'] ?? '', ['admin', 'staff'], true) ? SDA_IDLE_MINUTES_ADMIN : SDA_IDLE_MINUTES) * 60;
         if (!empty($_SESSION['last_activity']) && time() - (int)$_SESSION['last_activity'] > $sdaIdle) {
             session_unset();
             session_regenerate_id(true);
@@ -61,8 +61,8 @@ function requireLogin(string $redirect = ''): void {
         header('Location: ' . ($redirect !== '' ? $redirect : sda_path('login')));
         exit;
     }
-    // Admins must pass two-factor sign-in before any signed-in page.
-    if (($_SESSION['role'] ?? '') === 'admin' && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'two-factor.php') {
+    // Admins and staff must pass two-factor sign-in before any signed-in page.
+    if (in_array($_SESSION['role'] ?? '', ['admin', 'staff'], true) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'two-factor.php') {
         require_once __DIR__ . '/security.php';
         if (!sda_mfa_ok()) {
             if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
@@ -165,6 +165,7 @@ function redirectByRole(string $role): void {
         'admin'   => sda_path('admin/'),
         'tutor'   => sda_path('tutor/'),
         'student' => sda_path('student/'),
+        'staff'   => sda_path('admin/staff-home'),
     ];
     header('Location: ' . ($map[$role] ?? sda_path('')));
     exit;

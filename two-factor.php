@@ -25,7 +25,7 @@ if (isset($_GET['t'])) {
         header('Location: ' . sda_path(sda_is_local_path($next) && !str_starts_with($next, 'two-factor') ? $next : 'admin/'));
         exit;
     }
-    if (!$c && !empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin' && sda_mfa_ok()) {
+    if (!$c && !empty($_SESSION['user_id']) && in_array($_SESSION['role'] ?? '', ['admin', 'staff'], true) && sda_mfa_ok()) {
         header('Location: ' . sda_path('admin/'));      // already signed in here: just open the admin panel
         exit;
     }
@@ -34,7 +34,7 @@ if (isset($_GET['t'])) {
 
 if (!isset($linkState)) {
     requireLogin();
-    if (($_SESSION['role'] ?? '') !== 'admin') redirectByRole((string)($_SESSION['role'] ?? ''));
+    if (!in_array($_SESSION['role'] ?? '', ['admin', 'staff'], true)) redirectByRole((string)($_SESSION['role'] ?? ''));
 }
 
 $uid = (int)($_SESSION['user_id'] ?? 0);

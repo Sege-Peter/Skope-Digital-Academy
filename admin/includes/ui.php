@@ -61,10 +61,10 @@ function ax_topbar_tools(): string {
         : ax_initial($name);
     return '<div class="ax-tools">'
          . '<span class="ax-date"><i class="far fa-calendar"></i>' . e(date('D, j M Y')) . '</span>'
-         . '<button type="button" class="ax-btn ghost sm ax-switch-btn" data-open="dlgSwitchPortal" title="Open the tutor or student portal as one of your users"><i class="fas fa-repeat"></i><span> Switch portal</span></button>'
+         . ((($_SESSION['role'] ?? '') === 'admin') ? '<button type="button" class="ax-btn ghost sm ax-switch-btn" data-open="dlgSwitchPortal" title="Open the tutor or student portal as one of your users"><i class="fas fa-repeat"></i><span> Switch portal</span></button>' : '')
          . '<button type="button" class="ax-theme" id="axTheme" title="Switch light / dark" aria-label="Switch light or dark theme"><span class="k"><i class="fas fa-moon"></i></span></button>'
          . '<a class="ax-topav" href="profile" title="' . e($name) . ' – my profile">' . $av . '</a>'
-         . '</div>' . ax_switch_dialog();
+         . '</div>' . ((($_SESSION['role'] ?? '') === 'admin') ? ax_switch_dialog() : '');
 }
 
 /** "Switch portal" dialog: pick a tutor or learner and open their portal (support / checking what they see). */

@@ -3,7 +3,9 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/careers.php';
-requireRole('admin');
+require_once __DIR__ . '/../includes/staff.php';
+requireLogin();
+if (!sda_staff_can_page($pdo, (int)($_SESSION['user_id'] ?? 0), (string)($_SESSION['role'] ?? ''), 'career-cv.php')) { http_response_code(403); exit('Not allowed.'); }
 
 $st = $pdo->prepare("SELECT cv_file, cv_name, name FROM job_applications WHERE id = ?");
 $st->execute([(int)($_GET['id'] ?? 0)]);

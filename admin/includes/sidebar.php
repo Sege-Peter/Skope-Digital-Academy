@@ -51,9 +51,20 @@ $axMenu = [
         ['notifications.php', 'notifications', 'bell', 'Notifications'],
         ['email-notifications.php', 'email-notifications', 'envelope-open-text', 'Email Notifications'],
         ['activity.php', 'activity', 'clock-rotate-left', 'Activity Log'],
+        ['staff.php', 'staff', 'id-badge', 'Staff'],
         ['settings.php', 'settings', 'cog', 'Platform Settings'],
     ],
 ];
+// Staff: only the tools their modules allow, under "My work"
+$axIsStaff = ($_SESSION['role'] ?? '') === 'staff';
+if ($axIsStaff) {
+    require_once __DIR__ . '/../../includes/staff.php';
+    $axStaffRec = sda_staff_record($pdo, (int)$_SESSION['user_id']);
+    $axFiltered = ['My work' => [['staff-home.php', 'staff-home', 'gauge-high', 'My dashboard']]];
+    foreach ($axMenu as $axLabel => $axItems) foreach ($axItems as $axIt)
+        if ($axIt[0] !== 'index.php' && sda_staff_can_page($pdo, (int)$_SESSION['user_id'], 'staff', $axIt[0])) $axFiltered['Tools'][] = $axIt;
+    $axMenu = $axFiltered;
+}
 // Pages that belong to a menu entry without having their own link.
 $axAlias = ['course_details.php' => 'courses.php', 'user-profile.php' => 'users.php', 'career-applications.php' => 'careers.php', 'career-application.php' => 'careers.php', 'career-assessment.php' => 'careers.php'];
 $axActive = $axAlias[$current_page] ?? $current_page;
@@ -63,19 +74,19 @@ $axActive = $axAlias[$current_page] ?? $current_page;
     <div class="sidebar-header">
         <a href="../" class="brand" title="View website">
             <img src="../assets/images/skope-logo-512.png" alt="" >
-            <span><b>SKOPE <span>DIGITAL</span></b><small>Admin Panel</small></span>
+            <span><b>SKOPE <span>DIGITAL</span></b><small><?= $axIsStaff ? e(SDA_STAFF_DEPTS[$axStaffRec['department'] ?? 'general'][0] ?? 'Staff') : 'Admin Panel' ?></small></span>
         </a>
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close menu"><i class="fas fa-times"></i></button>
     </div>
 
-    <form class="ax-side-search" action="search" method="get" role="search">
+    <?php if (!$axIsStaff): ?><form class="ax-side-search" action="search" method="get" role="search">
         <i class="fas fa-search"></i><input type="search" name="q" placeholder="Search…  (people, courses, codes)" value="<?= e($current_page === 'search.php' ? ($_GET['q'] ?? '') : '') ?>" aria-label="Search admin">
-    </form>
+    </form><?php endif; ?>
 
     <nav class="sidebar-menu">
         <?php foreach ($axMenu as $axLabel => $axItems): ?>
             <div class="menu-label"><?= e($axLabel) ?></div>
-            <?php foreach ($axItems as $axIt): $axN = isset($axIt[4]) ? (int)$axCounts[$axIt[4]] : 0; ?>
+            <?php foreach ($axItems as $axIt): $axN = isset($axIt[4]) ? (int)($axCounts[$axIt[4]] ?? 0) : 0; ?>
             <a href="<?= e($axIt[1]) ?>" class="menu-item <?= $axActive === $axIt[0] ? 'active' : '' ?>">
                 <i class="fas fa-<?= e($axIt[2]) ?>"></i>
                 <span><?= e($axIt[3]) ?></span>
@@ -88,7 +99,7 @@ $axActive = $axAlias[$current_page] ?? $current_page;
     <div class="sidebar-footer">
         <a href="profile" class="admin-chip <?= $current_page === 'profile.php' ? 'on' : '' ?>">
             <?= ax_avatar($user['name'] ?? 'Admin', $user['avatar'] ?? null) ?>
-            <span style="min-width:0"><b><?= e($user['name'] ?? 'Admin') ?></b><small>My profile</small></span>
+            <span style="min-width:0"><b><?= e($user['name'] ?? 'Admin') ?></b><small><?= $axIsStaff && !empty($axStaffRec['job_title']) ? e($axStaffRec['job_title']) : 'My profile' ?></small></span>
         </a>
         <a href="../logout" class="ax-signout"><i class="fas fa-sign-out-alt"></i> Sign out</a>
     </div>

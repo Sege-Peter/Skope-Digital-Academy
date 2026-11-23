@@ -202,7 +202,7 @@ function sda_backup_codes(): array
 /** Is the email sign-in check required for this role? Admins, unless setting admin_2fa_required is '0'. */
 function sda_mfa_required(string $role): bool
 {
-    if ($role !== 'admin' || setting('admin_2fa_required') === '0') return false;
+    if (!in_array($role, ['admin', 'staff'], true) || setting('admin_2fa_required') === '0') return false;
     // Only while the academy mailbox can send the code; a disconnected mailbox must never lock admins out.
     require_once __DIR__ . '/mail_account.php';
     return sda_mail_ready();

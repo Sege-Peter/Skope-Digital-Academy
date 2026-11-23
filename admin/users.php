@@ -101,11 +101,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'role') {
         $new = $_POST['role'] ?? '';
-        if (!in_array($new, ['student', 'tutor', 'admin'], true) || $new === $target['role']) ax_back($back);
+        if (!in_array($new, ['student', 'tutor', 'admin', 'staff'], true) || $new === $target['role']) ax_back($back);
         if ($target['role'] === 'admin' && ($isSelf || $lastAdmin)) {
             ax_flash('err', $isSelf ? 'You cannot change your own role.' : 'This is the last active admin, so its role cannot change.'); ax_back($back);
         }
+        require_once __DIR__ . '/../includes/staff.php';
+        sda_staff_ensure($pdo);   // adds the 'staff' role to the users table first
         $pdo->prepare("UPDATE users SET role = ? WHERE id = ?")->execute([$new, $uid]);
+        if ($new === 'staff') sda_staff_save($pdo, $uid, 'general', '', [], $me);
+        elseif ($target['role'] === 'staff') $pdo->prepare("DELETE FROM staff_members WHERE user_id = ?")->execute([$uid]);
         usr_log($pdo, $me, 'user_role', "Changed #$uid role from {$target['role']} to $new");
         ax_flash('ok', $target['name'] . ' is now ' . ($new === 'admin' ? 'an admin' : 'a ' . $new) . '.');
         ax_back($back);
@@ -208,7 +212,7 @@ function usr_qs(array $over): string {
     $a = array_filter($a, fn($v) => $v !== '' && $v !== 'all');
     return 'users' . ($a ? '?' . http_build_query($a) : '');
 }
-$rolePill = ['admin' => 'bad', 'tutor' => 'info', 'student' => ''];
+$rolePill = ['admin' => 'bad', 'tutor' => 'info', 'student' => '', 'staff' => 'violet'];
 $statusPill = ['active' => 'ok', 'pending' => 'warn', 'suspended' => 'bad'];
 
 require_once 'includes/sidebar.php';

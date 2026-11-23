@@ -56,7 +56,7 @@ $eventLabels = [
     'course_complete' => ['flag-checkered', 'Finished a course'], 'daily_streak' => ['fire', 'Kept the daily streak'],
     'badge' => ['medal', 'Earned a badge'], 'review' => ['star-half-stroke', 'Reviewed a course'],
 ];
-$rolePill = ['admin' => 'bad', 'tutor' => 'info', 'student' => ''];
+$rolePill = ['admin' => 'bad', 'tutor' => 'info', 'student' => '', 'staff' => 'violet'];
 $statusPill = ['active' => 'ok', 'pending' => 'warn', 'suspended' => 'bad'];
 $payPill = ['verified' => 'ok', 'pending' => 'warn', 'failed' => 'bad'];
 $certPill = ['approved' => 'ok', 'pending' => 'warn', 'revoked' => 'bad'];
@@ -314,7 +314,7 @@ $actions = '<a class="ax-btn ghost" href="users"><i class="fas fa-arrow-left"></
         <form method="post" action="users" class="ax-form" data-confirm="Change <?= e($u['name']) ?>'s role? Admins get full control of the platform." data-danger>
             <?= ax_csrf() ?><input type="hidden" name="back" value="<?= e($back) ?>"><input type="hidden" name="action" value="role"><input type="hidden" name="uid" value="<?= $uid ?>">
             <div class="ax-field"><label for="e-role">Role</label>
-                <select id="e-role" name="role" <?= $protect ? 'disabled' : '' ?>><?php foreach (['student' => 'Student', 'tutor' => 'Tutor', 'admin' => 'Admin'] as $k => $l): ?><option value="<?= $k ?>" <?= $u['role'] === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select>
+                <select id="e-role" name="role" <?= $protect ? 'disabled' : '' ?>><?php foreach (['student' => 'Student', 'tutor' => 'Tutor', 'staff' => 'Staff (set department on the Staff page)', 'admin' => 'Admin'] as $k => $l): ?><option value="<?= $k ?>" <?= $u['role'] === $k ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select>
                 <?php if ($protect): ?><div class="hint">Your own account and the last active admin keep their role.</div><?php endif; ?></div>
             <div class="ax-form-actions"><button class="ax-btn ghost" <?= $protect ? 'disabled' : '' ?>><i class="fas fa-user-tag"></i> Change role</button></div>
         </form>

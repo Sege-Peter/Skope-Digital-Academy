@@ -4,8 +4,22 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/ui.php';
 
-// Access control: Admin only
-requireRole('admin');
+// Access control: admins everywhere; staff only on the pages their modules allow (includes/staff.php)
+requireLogin();
+$axRole = (string)($_SESSION['role'] ?? '');
+if ($axRole === 'staff') {
+    require_once __DIR__ . '/../../includes/staff.php';
+    $axPage = basename($_SERVER['PHP_SELF']);
+    if ($axPage === 'index.php') { header('Location: staff-home'); exit; }
+    if (!sda_staff_can_page($pdo, (int)$_SESSION['user_id'], 'staff', $axPage)) {
+        http_response_code(403);
+        $_SESSION['ax_flash'] = ['err', "That page isn't part of your staff access. Ask an admin if you need it."];
+        header('Location: staff-home');
+        exit;
+    }
+} elseif ($axRole !== 'admin') {
+    requireRole('admin');
+}
 
 $admin = currentUser();
 $user  = $admin; // admin pages refer to the signed-in user as $user
