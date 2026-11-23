@@ -1,6 +1,7 @@
 <?php $user = isLoggedIn() ? currentUser() : null;
 $navCur = basename($_SERVER['SCRIPT_NAME'] ?? '', '.php');
 if ($navCur === 'course-details') $navCur = 'courses';
+if (in_array($navCur, ['careers-apply', 'careers-guide', 'careers-practice'], true)) $navCur = 'careers';
 $navAct = fn($p) => $navCur === $p ? ' class="active" aria-current="page"' : ''; ?>
 
 <!-- Top Bar -->
@@ -44,6 +45,7 @@ $navAct = fn($p) => $navCur === $p ? ' class="active" aria-current="page"' : '';
       <li><a href="about"<?= $navAct('about') ?>>About Us</a></li>
       <li><a href="courses"<?= $navAct('courses') ?>>Courses</a></li>
       <li><a href="scholarships"<?= $navAct('scholarships') ?>>Scholarships</a></li>
+      <li><a href="careers"<?= $navAct('careers') ?>>Careers</a></li>
       <li><a href="donate" class="nav-support<?= $navCur === 'donate' ? ' active' : '' ?>"<?= $navCur === 'donate' ? ' aria-current="page"' : '' ?>>Support Us</a></li>
       <li><a href="contact"<?= $navAct('contact') ?>>Contact Us</a></li>
     </ul>
@@ -95,14 +97,20 @@ $navAct = fn($p) => $navCur === $p ? ' class="active" aria-current="page"' : '';
         .about-hero .hero-cta-row { flex-direction: column; align-items: stretch; max-width: 320px; margin: 0 auto; }
         .about-hero .hero-cta-row a { justify-content: center; }
       }
-      @media (max-width: 1200px) and (min-width: 1025px) {
-        #navbar .navbar-menu { gap: 20px; }
+      #navbar .navbar-logo, #navbar .navbar-brand { flex-shrink: 0; }
+      @media (max-width: 1440px) and (min-width: 1101px) { #navbar .navbar-menu { gap: 24px; } }
+      @media (max-width: 1340px) and (min-width: 1101px) {
+        #navbar .navbar-menu { gap: 18px; }
         #navbar .navbar-menu a { font-size: .9rem; }
         #navbar .navbar-actions .btn-ghost { display: none; }
       }
+      @media (max-width: 1220px) and (min-width: 1101px) {
+        #navbar .navbar-menu { gap: 14px; }
+        #navbar .navbar-menu a { font-size: .86rem; }
+      }
 
       /* Tablet + mobile header: logo left, menu button right */
-      @media (max-width: 1024px) {
+      @media (max-width: 1100px) {
         #navbar .navbar-menu, #navbar .navbar-actions, .top-bar { display: none !important; }
         #navToggle { display: flex !important; }
         .mobile-menu { max-width: 100%; }
@@ -208,6 +216,7 @@ $navAct = fn($p) => $navCur === $p ? ' class="active" aria-current="page"' : '';
     <a href="about"<?= $navAct('about') ?>><i class="fas fa-circle-info"></i><span>About Us</span><i class="fas fa-chevron-right mm-go"></i></a>
     <a href="courses"<?= $navAct('courses') ?>><i class="fas fa-graduation-cap"></i><span>Courses</span><i class="fas fa-chevron-right mm-go"></i></a>
     <a href="scholarships"<?= $navAct('scholarships') ?>><i class="fas fa-award"></i><span>Scholarships</span><i class="fas fa-chevron-right mm-go"></i></a>
+    <a href="careers"<?= $navAct('careers') ?>><i class="fas fa-briefcase"></i><span>Careers</span><i class="fas fa-chevron-right mm-go"></i></a>
     <a href="donate" class="mm-support<?= $navCur === 'donate' ? ' active' : '' ?>"><i class="fas fa-heart"></i><span>Support Us</span><i class="fas fa-chevron-right mm-go"></i></a>
     <a href="contact"<?= $navAct('contact') ?>><i class="fas fa-envelope"></i><span>Contact Us</span><i class="fas fa-chevron-right mm-go"></i></a>
   </nav>
